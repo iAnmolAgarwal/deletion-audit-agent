@@ -1,0 +1,4 @@
+# Development tools (developer decision T73/T76), pinned the same way as requirements.txt.
+-r requirements.txt
+ruff==0.17.0
+mypy==2.4.0

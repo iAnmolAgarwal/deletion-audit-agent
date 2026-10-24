@@ -9,14 +9,20 @@ Method:
   the table does not name.
 * A person's identifiers (test tooling only): the request email resolves to a ``user_id``
   through current emails in ``user_identities.csv`` and old or new emails in
-  ``user_audit_log.csv``; the person's identifiers are then every email and phone that user
-  has had in either file.
+  ``user_audit_log.csv``. The person is then searched by the ``user_id``, every email and
+  phone that user has had in either file, the sha256 of each of those emails (the
+  identities file's own ``email_hash`` formula, T59), and every resource ID that a
+  ``system_activity.csv`` row links to the ``user_id`` (T68).
 * Per family, the 3 test cases with the lowest ``sha256(case_id)`` among those whose person
   appears in a file of the family are selected.
 * Raw units (lines, SQL ``INSERT`` rows, JSON records, PDF pages) are enumerated here with
   their own regular expressions, not with the parsers. Each unit that holds a person
   identifier, and each unit carrying a resource ID on the same trace, must map to an
-  observation with the same locator, record time, resource ID, identifiers and trace.
+  observation with the same locator, record time, resource ID and trace. Identifiers are
+  compared as sets for **equality** (T68): the observation's own identifiers (record
+  identifiers, plus lookups whose value is in the unit) must equal the identifier tokens
+  of the raw unit (emails, known phones, user IDs, 64-hex hashes), and every lookup it
+  borrowed must appear in a unit on the same trace in the same file.
 
 The report names case IDs, locators and identifier kinds, never identifier values.
 """
@@ -37,7 +43,7 @@ sys.path.insert(0, str(REPO_ROOT / "code"))
 
 from deletion_audit.evidence import EvidenceIndex, parse_all  # noqa: E402
 from deletion_audit.evidence.model import Observation  # noqa: E402
-from deletion_audit.inputs import load_audit_log, load_identities  # noqa: E402
+from deletion_audit.inputs import load_activity, load_audit_log, load_identities  # noqa: E402
 
 DATASET = REPO_ROOT / "dataset"
 REPORT = REPO_ROOT / "notes" / "parser_raw_check.md"
@@ -76,6 +82,10 @@ UNSEEN_RESEARCH: tuple[str, ...] = (
 EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 PHONE = re.compile(r"\+?\d[\d ().-]{6,}\d")
 TRACE = re.compile(r"\b(?:tr|rb)-[A-Za-z0-9-]+\b")
+USER_ID = re.compile(r"\buser_\d+\b")
+HASH64 = re.compile(r"\b[0-9a-fA-F]{64}\b")
+SEAL = re.compile(r"integrity_seal\\?\"?\s*[:=]\s*\\?\"?(?:sha256:)?([0-9a-fA-F]{64})")
+COMPARED_KINDS = ("email", "phone", "email_hash", "user_id")
 RESOURCE = re.compile(r"\b(?:account|search|analytics|support|export|data_flow|backup|audit_record|"
                       r"tombstone|legal_hold)_\d+\b")
 DECLARED_RESOURCE = re.compile(r"resource_id\\?\"?\s*[:=]\s*\\?\"?([a-z_]+_\d+)")
@@ -87,11 +97,19 @@ HANDOVER_TIME = re.compile(r"^- (\S+) \|")
 # --------------------------------------------------------------------------- people
 @dataclass
 class Person:
-    """Every email and phone one user has had, each with its label."""
+    """Every identifier one user has had, each with its label, plus linked resource IDs."""
 
     user_id: str
     emails: dict[str, str] = field(default_factory=dict)   # lower-case email -> label
     phones: dict[str, str] = field(default_factory=dict)   # digits -> label
+    hashes: dict[str, str] = field(default_factory=dict)   # lower-case sha256 hex -> label
+    resources: dict[str, str] = field(default_factory=dict)  # resource ID -> label
+
+# Every phone (digits) any user has had, and every known email hash: phone-shaped and
+# 64-hex tokens outside these sets are not identifiers (dates and amounts match the phone
+# pattern; integrity seals are 64-hex too). Filled by load_people() (T75).
+KNOWN_PHONES: set[str] = set()
+KNOWN_HASHES: set[str] = set()
 
 
 def _digits(text: str) -> str:
@@ -120,6 +138,21 @@ def load_people() -> tuple[dict[str, Person], dict[str, str]]:
                 email_to_user.setdefault(ident.value, row.user_id)
             else:
                 person.phones.setdefault(_digits(ident.raw), "phone (old)")
+    for person in people.values():
+        for email, label in person.emails.items():
+            person.hashes.setdefault(hashlib.sha256(email.encode("utf-8")).hexdigest(),
+                                     label.replace("email", "email hash"))
+        KNOWN_PHONES.update(person.phones)
+    for row in load_identities(DATASET):
+        if row.email_hash:
+            people[row.user_id].hashes.setdefault(row.email_hash.strip().lower(), "email hash (current)")
+    for person in people.values():
+        KNOWN_HASHES.update(person.hashes)
+    for act in load_activity(DATASET):
+        if act.resource_id:
+            for user in USER_ID.findall(act.details):
+                if user in people:
+                    people[user].resources.setdefault(act.resource_id, "linked resource")
     return people, email_to_user
 
 
@@ -155,6 +188,12 @@ class Unit:
     def phones(self) -> set[str]:
         """Digit strings of phone-like tokens in the unit."""
         return {_digits(m) for m in PHONE.findall(self.text)}
+
+    @property
+    def tokens(self) -> set[str]:
+        """Identifier tokens of the unit in comparable form: emails, known phones, user IDs, hashes."""
+        return (self.emails | (self.phones & KNOWN_PHONES) | set(USER_ID.findall(self.text))
+                | ({m.lower() for m in HASH64.findall(self.text)} & KNOWN_HASHES))
 
     @property
     def trace(self) -> str | None:
@@ -234,19 +273,40 @@ def hits(unit: Unit, person: Person) -> list[str]:
     """Labels of the person's identifiers found in the unit."""
     found = [person.emails[e] for e in unit.emails if e in person.emails]
     found += [person.phones[p] for p in unit.phones if p in person.phones]
+    if person.user_id in USER_ID.findall(unit.text):
+        found.append("user_id")
+    found += [person.hashes[h] for h in {m.lower() for m in HASH64.findall(unit.text)} if h in person.hashes]
+    found += [person.resources[r] for r in set(RESOURCE.findall(unit.text)) if r in person.resources]
     return found
 
 
 def _ident_values(obs: Observation, lookup_only: bool = False) -> set[str]:
     """Comparable identifier values of an observation (emails lower, phones digits)."""
     idents = obs.lookup_identifiers if lookup_only else obs.record_identifiers | obs.lookup_identifiers
-    return {_digits(i.value) if i.kind == "phone" else i.value for i in idents}
+    return _comparable(idents)
+
+
+def _comparable(idents: Any) -> set[str]:
+    """Comparable values of the compared identifier kinds (phones as digits, known phones only)."""
+    out: set[str] = set()
+    for i in idents:
+        if i.kind not in COMPARED_KINDS:
+            continue
+        value = _digits(i.value) if i.kind == "phone" else i.value.lower()
+        if i.kind == "phone" and value not in KNOWN_PHONES:
+            continue
+        if i.kind == "email_hash" and value not in KNOWN_HASHES:
+            continue
+        out.add(value)
+    return out
 
 
 def _person_values(unit: Unit, person: Person) -> set[str]:
     """The person's identifier values present in a unit, in comparable form."""
-    return {e for e in unit.emails if e in person.emails} | \
-           {p for p in unit.phones if p in person.phones}
+    return ({e for e in unit.emails if e in person.emails}
+            | {p for p in unit.phones if p in person.phones}
+            | ({person.user_id} & set(USER_ID.findall(unit.text)))
+            | ({m.lower() for m in HASH64.findall(unit.text)} & set(person.hashes)))
 
 
 # --------------------------------------------------------------------------- comparison
@@ -264,7 +324,7 @@ class CaseResult:
 
 
 def _check_unit(unit: Unit, observations: list[Observation], expected_ids: set[str],
-                companion: bool) -> list[str]:
+                companion: bool, peer_tokens: set[str] = frozenset()) -> list[str]:
     """Field mismatches between one raw unit and its observations ([] when they agree)."""
     problems: list[str] = []
     if unit.kind == "pdf_page":
@@ -285,11 +345,15 @@ def _check_unit(unit: Unit, observations: list[Observation], expected_ids: set[s
             problems.append("record_time")
         if obs.trace_id != unit.trace and unit.kind == "line":
             problems.append("trace_id")
-        values = _ident_values(obs, lookup_only=companion)
-        if companion and not (expected_ids & values):
-            problems.append("lookup_identifiers")
-        if not companion and not expected_ids <= values:
+        tokens = unit.tokens
+        record = _comparable(obs.record_identifiers)
+        lookup = _comparable(obs.lookup_identifiers)
+        if record | (lookup & tokens) != tokens:
             problems.append("identifiers")
+        if (lookup - tokens) - peer_tokens:
+            problems.append("lookup_identifiers (not on the trace)")
+        if companion and not (expected_ids & lookup):
+            problems.append("lookup_identifiers")
     return sorted(set(problems))
 
 
@@ -300,6 +364,10 @@ def compare_file(file_id: str, units: list[Unit], person: Person, index: Evidenc
     for obs in index.files[file_id].observations:
         by_locator[(obs.locator.kind, obs.locator.ref)].append(obs)
     person_units = {u.ref: u for u in units if hits(u, person)}
+    trace_units: dict[str, list[Unit]] = defaultdict(list)
+    for unit in units:
+        if unit.trace:
+            trace_units[unit.trace].append(unit)
     trace_ids: dict[str, set[str]] = defaultdict(set)
     for unit in person_units.values():
         result.labels.update(hits(unit, person))
@@ -315,7 +383,11 @@ def compare_file(file_id: str, units: list[Unit], person: Person, index: Evidenc
         if not observations:
             result.missed.append(f"{file_id} {unit.ref}")
             continue
-        problems = _check_unit(unit, observations, expected, companion)
+        peers: set[str] = set()
+        for other in trace_units.get(unit.trace or "", []):
+            if other is not unit:
+                peers |= other.tokens
+        problems = _check_unit(unit, observations, expected, companion, peers)
         if problems:
             result.mismatched.append(f"{file_id} {unit.ref}: {', '.join(problems)}")
         else:
@@ -386,12 +458,16 @@ def render(rows: list[tuple[Group, int, list[CaseResult]]], index: EvidenceIndex
         "",
         "- Families: the never-DEV-primary families of `research/16_test_coverage.md` section 3.2 "
         "(files picked by that table's file-name stem), plus registry families the table does not name.",
-        "- Person identifiers: every email and phone the request's user has had, current and old, "
-        "from `user_identities.csv` and `user_audit_log.csv`.",
+        "- Person search: the request's `user_id`, every email and phone the user has had (current and old, "
+        "from `user_identities.csv` and `user_audit_log.csv`), the sha256 of each of those emails, and the "
+        "resource IDs a `system_activity.csv` row links to the `user_id` (T68).",
         "- Cases: the 3 test cases with the lowest sha256(case_id) whose person appears in a file of the family.",
         "- A raw unit is checked when it holds a person identifier, or carries a resource ID on the same trace "
         "as such a unit (\"companion\"). It must map to an observation with the same locator, record time, "
-        "resource ID, identifiers (companions: the trace's person identifier among `lookup_identifiers`) and trace.",
+        "resource ID and trace. Identifiers are compared for equality (T68): the observation's record identifiers "
+        "plus its lookups that appear in the unit must equal the unit's identifier tokens (emails, known phones, "
+        "user IDs, 64-hex hashes); lookups borrowed from the trace must appear in another unit on the same trace; "
+        "a companion must carry the trace's person identifier among `lookup_identifiers`.",
         "- Identifier values are not printed; only their kind and whether they are current or old.",
         "",
     ]
@@ -436,6 +512,16 @@ def render(rows: list[tuple[Group, int, list[CaseResult]]], index: EvidenceIndex
     return "\n".join(out) + "\n"
 
 
+def seal_collisions(index: EvidenceIndex) -> tuple[int, int]:
+    """(integrity_seal values in the raw evidence, how many equal a known email hash)."""
+    seals: list[str] = []
+    for fp in index.files.values():
+        path = DATASET / fp.path
+        if path.suffix in (".log", ".txt", ".sql", ".json"):
+            seals += [m.lower() for m in SEAL.findall(path.read_text(encoding="utf-8"))]
+    return len(seals), sum(1 for v in seals if v in KNOWN_HASHES)
+
+
 def main() -> int:
     """Run the check and write the report; exit 1 when any unit is missed or mismatched."""
     index = parse_all(DATASET)
@@ -448,9 +534,12 @@ def main() -> int:
             continue
         candidates, results = run_group(group, index, people, cases)
         rows.append((group, candidates, results))
-    REPORT.write_text(render(rows, index), encoding="utf-8")
-    bad = sum(len(r.missed) + len(r.mismatched) for _, _, results in rows for r in results)
-    print(f"wrote {REPORT}; problems: {bad}")
+    seals, collisions = seal_collisions(index)
+    REPORT.write_text(render(rows, index) + f"\n## Integrity seals (T75)\n\n- {seals} `integrity_seal` "
+                      f"values scanned; {collisions} equal a known email hash (must be 0, or the 64-hex "
+                      f"restriction could hide a real link).\n", encoding="utf-8")
+    bad = sum(len(r.missed) + len(r.mismatched) for _, _, results in rows for r in results) + collisions
+    print(f"wrote {REPORT}; problems: {bad}; integrity seals scanned: {seals}, equal to a known email hash: {collisions}")
     return 1 if bad else 0
 
 

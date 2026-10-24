@@ -176,7 +176,12 @@ Linking observations or CSV rows to a person or an account, state at `audit_at`,
   - **T71 Q2/Q5:** the intent fail-closed row is the engine's deletion-path row, flagged; `FAILED_CLOSED` is an enumerated row class, and freeze requires 0 such rows or the developer's acknowledgement.
   - **T71 Q11:** `marketing_001`-type conflicts: the record is included and flagged IMAGE_SUBJECT_CONFLICT; the catalog link wins.
   - **T72 F1:** a file is "image, model needed" only when its bytes start with the PNG signature.
-  - **T74 (pending the developer):** the hard check covers FINDING steps and cited `VERIFY_RECORD_PRESENT`; verifications in INCOMPLETE rows carry `""`.
+  - **T74/T77, row rules** (DEV: 53/53, 23/23, 29/29):
+    - every verification step in an INCOMPLETE row has an empty citation;
+    - every verification step in a COMPLETE row cites a file;
+    - every FINDING cites a file.
+    The hard check applies to every cited step that says a record still exists. A cited step that should be empty, or an empty one that should cite, is a validator failure.
+  - **T78, G5's done list adds** a replay-only run on all 518 test inputs: 0 crashes, 0 coherence violations, the validator counts by part, the FAILED_CLOSED count and the runtime. No scoring.
   - **T68:** PDF page identifiers never link when the page names several resources or several people. A PDF observation's time is the page's stated time at its stated precision, else `captured_at`, and the state records which one it used.
   - **T69:** a hold that names no resource produces no step.
 
@@ -190,4 +195,4 @@ Linking observations or CSV rows to a person or an account, state at `audit_at`,
   - `stop_reason == "max_tokens"` and refusals are failures;
   - each failed call's error class and status go to the run artifacts;
   - fake-client tests for retry, cache and give-up.
-- **SDK version:** pending T73. GM's tests run on `FakeTransport` and need no SDK; `AnthropicTransport` is written against the pinned version once the developer chooses it.
+- **SDK version (T76):** `anthropic==1.13.0`, installed in `.venv/` (`requirements.txt`). GM writes `AnthropicTransport` for 1.13.0 and makes no live call. GM's tests run on `FakeTransport`. A live smoke call is proposed separately, cost first, before G7's routing check.
