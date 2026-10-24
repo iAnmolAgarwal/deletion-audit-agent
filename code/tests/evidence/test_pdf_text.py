@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import unittest
 
-from ._support import assert_real_family, id_set, parse_fixture
+from ._support import DATASET, assert_real_family, id_set, parse_fixture, real_index
 
 
 class PdfTextFixture(unittest.TestCase):
@@ -38,6 +38,31 @@ class PdfTextReal(unittest.TestCase):
 
     def test_real_files(self) -> None:
         assert_real_family(self, "pdf_text")
+
+    def test_no_page_mixes_several_resources_and_several_people(self) -> None:
+        """T68: a page gives its identifiers to every resource it names, so no real page may
+        name more than one resource together with more than one person."""
+        from deletion_audit.inputs import load_audit_log, load_identities
+        owner: dict[tuple[str, str], set[str]] = {}
+        for row in load_identities(DATASET):
+            owner.setdefault(("user_id", row.user_id), set()).add(row.user_id)
+            for ident in (row.email, row.phone):
+                if ident is not None:
+                    owner.setdefault((ident.kind, ident.value), set()).add(row.user_id)
+        for row in load_audit_log(DATASET):
+            for ident in (row.old_identifier, row.new_identifier):
+                if ident is not None:
+                    owner.setdefault((ident.kind, ident.value), set()).add(row.user_id)
+        pages: dict[tuple[str, str], list] = {}
+        for obs in real_index().observations():
+            if obs.locator.kind == "pdf_page":
+                pages.setdefault((obs.file_id, obs.locator.ref), []).append(obs)
+        self.assertTrue(pages)
+        for key, observations in pages.items():
+            resources = {o.resource_id for o in observations if o.resource_id}
+            people = {u for o in observations for i in o.record_identifiers
+                      for u in owner.get((i.kind, i.value), ())}
+            self.assertFalse(len(resources) > 1 and len(people) > 1, (key, len(resources), len(people)))
 
 
 if __name__ == "__main__":

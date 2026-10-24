@@ -133,13 +133,19 @@ NULL_MARKERS: frozenset[str] = frozenset({"", "null", "none", "nil", "no direct 
 
 RECORD_ID_FIELDS: frozenset[str] = frozenset({
     "email", "phone", "email_hash", "user_id", "customer_email", "customer_reference",
-    "subject_reference", "requester_email", "requester_phone", "owner_email", "owner_phone",
+    "requester_email", "requester_phone", "owner_email", "owner_phone",
     "uploaded_by", "subject_selector", "matched_value",
     "full_name", "display_name", "name", "requester_name",
 })
 LOOKUP_ID_FIELDS: frozenset[str] = frozenset({
-    "lookup_key", "match_key", "subject_key", "scan_key", "owner_key", "subject_ref",
-    "correlation_key", "query", "lookup_value",
+    "lookup_key", "match_key", "subject_key", "scan_key", "owner_key", "query", "lookup_value",
+})
+# Developer ruling T49: these fields take their role from the line. On a line or row that
+# names a resource_id they are that resource's own key (a search hit's correlation_key is
+# the key the hit is indexed under; a subject_ref is the record's subject). On a line with
+# no resource_id they are a lookup key, which reaches a resource only through its trace.
+LINE_ROLE_ID_FIELDS: frozenset[str] = frozenset({
+    "correlation_key", "subject_ref", "subject_reference",
 })
 TEXT_FIELDS: tuple[str, ...] = ("message_text", "message_excerpt")
 NAME_FIELDS: frozenset[str] = frozenset({"full_name", "display_name", "name", "requester_name"})
@@ -220,10 +226,16 @@ def identifiers_in_text(text: str, field: str) -> list[Identifier]:
     return found
 
 
+def names_resource(fields: Mapping[str, str]) -> bool:
+    """True when the record's own fields name a resource_id."""
+    return not is_null(fields.get("resource_id"))
+
+
 def split_identifiers(fields: Mapping[str, str]) -> tuple[list[Identifier], list[Identifier]]:
     """Return (record identifiers, lookup identifiers) found in one record's fields."""
     record: list[Identifier] = []
     lookup: list[Identifier] = []
+    line_role = record if names_resource(fields) else lookup
     for key, raw in fields.items():
         leaf = leaf_name(key)
         if leaf in TEXT_FIELDS and not is_null(raw):
@@ -235,6 +247,8 @@ def split_identifiers(fields: Mapping[str, str]) -> tuple[list[Identifier], list
             record.append(make_identifier(classify_identifier(leaf, raw), raw, key))
         elif leaf in LOOKUP_ID_FIELDS:
             lookup.append(make_identifier(classify_identifier(leaf, raw), raw, key))
+        elif leaf in LINE_ROLE_ID_FIELDS:
+            line_role.append(make_identifier(classify_identifier(leaf, raw), raw, key))
     return record, lookup
 
 
