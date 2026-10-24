@@ -1,0 +1,2 @@
+2026-05-05T06:00:00Z requestId=collector-5 level=DEBUG function=log_router message="instance=\"collector-5\" event=\"export_started\""
+2026-05-05T06:00:01Z requestId=tr-5000001 level=INFO function=analytics_platform message="instance=\"analytics-1\" region=\"eu-west-1\" resource_id=\"analytics_6006\" event=\"analytics_profile_read\" direct_identifiers=\"1\" email=\"ada.lovelace@example.test\" phone=\"+44 20 7946 0001\""

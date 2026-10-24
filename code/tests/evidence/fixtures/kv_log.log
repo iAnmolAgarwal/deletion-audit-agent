@@ -1,0 +1,5 @@
+2026-05-01T10:00:00Z level=DEBUG service=log_router instance=collector-1 event=export_started sources=platform_services
+2026-05-01T10:00:01Z level=DEBUG service=account_service instance=account-1 pod=account-aa region=eu-west-1 trace_id=tr-1000001 event=profile_lookup_started lookup_key="Ada.Lovelace@Example.Test" attempt=1
+2026-05-01T10:00:02Z level=DEBUG service=account_service instance=account-1 pod=account-aa region=eu-west-1 trace_id=tr-1000001 event=connection_acquired pool=account_service_primary wait_ms=4
+2026-05-01T10:00:03Z level=INFO service=account_service instance=account-1 pod=account-aa region=eu-west-1 trace_id=tr-1000001 resource_id=account_1001 event=profile_lookup_completed rows=1 http_status=200
+2026-05-01T10:00:04Z INFO service=lookup_service event=record_lookup seq=1 system="search_service" resource_id="search_2002" record_type="SEARCH_INDEX_ENTRY" result="FOUND" subject_reference="grace.hopper@example.test"

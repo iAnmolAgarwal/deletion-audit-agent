@@ -53,6 +53,7 @@ SENTENCE_END = re.compile(r"[.!?](?=\s+[A-Z(\"'*`\[]|\s*$)")
 NOTE_0005 = "correction note in the 2026-10-25T00:05:00+05:30 entry"
 NOTE_0132 = "correction note in the 2026-10-25T01:32:51+05:30 entry (T18, confirmed by T23)"
 NOTE_0237 = "correction note in the 2026-10-25T02:37:47+05:30 entry"
+NOTE_0244 = "correction note in the 2026-10-25T02:44:55+05:30 entry"
 
 # A header stamped wrongly is ordered by the time its correction note gives, so one bad
 # stamp does not make every later entry look out of order. stamp -> (effective time, note)
@@ -65,6 +66,7 @@ STAMP_OVERRIDES: dict[str, tuple[str, str]] = {
 EXCEPTIONS: dict[tuple[str, str], str] = {
     ("H1", "2026-10-25T01:09:13+0530"): NOTE_0132,
     ("H1", "2026-10-25T01:47:03+05:30"): NOTE_0237,
+    ("H1", "2026-10-25T02:43:14+05:30"): NOTE_0244,
     **{("H2", stamp): NOTE_0237 for stamp in (
         "2026-10-25T00:13:30+05:30", "2026-10-25T00:14:42+05:30", "2026-10-25T01:37:06+05:30",
         "2026-10-25T01:41:22+05:30", "2026-10-25T01:49:56+05:30", "2026-10-25T01:55:30+05:30",

@@ -1,0 +1,3 @@
+2026-05-02T08:00:00Z [DEBUG] [log_router] [collector-2] export_started: instance="collector-2" sources="platform_services"
+2026-05-02T08:00:05Z [DEBUG] [support_platform] [tr-2000001] message_scan_started: instance="support-1" region="ap-south-1" subject_key="ada.lovelace@example.test" attempt="1"
+2026-05-02T08:00:07Z [WARN] [support_platform] [tr-2000001] message_pii_scan: instance="support-1" region="ap-south-1" resource_id="support_3003" matched_value="ada.lovelace@example.test" detector="direct_identifier"

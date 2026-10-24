@@ -1,0 +1,9 @@
+{
+  "exported_at": "2026-05-09T12:00:00Z",
+  "origin": "fixture",
+  "record_count": 2,
+  "records": [
+    {"recorded_at": "2026-05-09T12:00:00Z", "system": "account_service", "resource_id": "account_1001", "record_type": "USER_PROFILE", "result": "NOT_FOUND", "subject_reference": "ADA.LOVELACE@EXAMPLE.TEST"},
+    {"recorded_at": "2026-05-09T12:00:01Z", "system": "integration_service", "resource_id": "data_flow_4004", "record_type": "DATA_FLOW", "result": "DISABLED", "subject_reference": "no direct identifier"}
+  ]
+}

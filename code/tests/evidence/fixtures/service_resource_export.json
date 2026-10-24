@@ -1,0 +1,18 @@
+{
+  "exported_at": "2026-05-07T12:00:00Z",
+  "region": "global",
+  "service_exports": {
+    "account_service": {
+      "profile_lookups": [
+        {"observed_at": "2026-05-07T11:00:01Z", "profile": {"email": "ada.lovelace@example.test", "full_name": null}, "resource_id": "account_1001", "status_code": 200},
+        {"observed_at": "2026-05-07T11:00:02Z", "profile": null, "resource_id": "account_1002", "status_code": 404}
+      ]
+    },
+    "search_service": {
+      "index_queries": [
+        {"hits": {"documents": [{"email": "ada.lovelace@example.test", "resource_id": "search_2002"}], "total": 1}, "observed_at": "2026-05-07T11:00:03Z", "query": "ada.lovelace@example.test", "resource_id": "search_2002"}
+      ]
+    }
+  },
+  "source": "fixture"
+}

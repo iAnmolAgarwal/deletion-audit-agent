@@ -1,0 +1,3 @@
+2026-05-06T05:00:00Z {"severity":"DEBUG","logger":"log_router","service":"log_router","instance":"collector-6","event":"export_started"}
+2026-05-06T05:00:01Z {"severity":"DEBUG","logger":"backup_service","service":"backup_service","instance":"backup-1","region":"ap-south-1","trace_id":"tr-6000001","event":"restore_policy_check_started","subject_key":"grace.hopper@example.test","attempt":"1"}
+2026-05-06T05:00:02Z {"severity":"INFO","logger":"backup_service","service":"backup_service","instance":"backup-1","region":"ap-south-1","trace_id":"tr-6000001","resource_id":"backup_7007","event":"restore_policy_read_completed","restore_allowed":"false"}

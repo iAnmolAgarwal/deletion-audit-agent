@@ -1,0 +1,8 @@
+{
+  "captured_at": "2026-05-10T09:45:00Z",
+  "source": "fixture",
+  "collection": "customer_export_jobs",
+  "records": [
+    {"resource_id": "export_8008", "owner_email": "grace.hopper@example.test", "download_available": true, "included_sections": ["profile", "orders"]}
+  ]
+}

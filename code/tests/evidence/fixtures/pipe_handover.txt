@@ -1,0 +1,5 @@
+FIXTURE PLATFORM - SHIFT HANDOVER
+Snapshot: 2026-05-11T12:00:00Z
+
+- 2026-05-11T12:00:00Z | account_service | account_1001 | USER_PROFILE | NOT_FOUND | ada.lovelace@example.test
+- 2026-05-11T12:00:01Z | backup_service | backup_7007 | BACKUP_ARCHIVE | BLOCKED | user_9001

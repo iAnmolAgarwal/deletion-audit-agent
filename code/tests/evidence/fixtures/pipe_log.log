@@ -1,0 +1,3 @@
+2026-05-04T07:00:00Z | DEBUG | log_router | collector-4 | export_started | instance="collector-4" sources="platform_services"
+2026-05-04T07:00:01Z | DEBUG | security_service | tr-4000001 | audit_record_query_started | instance="security-1" region="eu-central-1" subject_ref="user_9001" attempt="1"
+2026-05-04T07:00:02Z | DEBUG | security_service | tr-4000001 | audit_record_read_completed | instance="security-1" region="eu-central-1" resource_id="audit_record_5005" integrity_check="passed" rows="1"

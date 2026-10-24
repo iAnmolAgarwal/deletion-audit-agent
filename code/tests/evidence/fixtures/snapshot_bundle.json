@@ -1,0 +1,13 @@
+{
+  "exported_at": "2026-05-08T12:00:00Z",
+  "source": "fixture",
+  "snapshots": [
+    {"captured_at": "2026-05-08T12:00:00Z", "data_store": "account_service", "collection": "customer_profiles", "records": []},
+    {"captured_at": "2026-05-08T11:59:59Z", "data_store": "support_platform", "collection": "support_conversations", "records": [
+      {"resource_id": "support_3003", "ticket_id": "CS-1", "subject_reference": "user_9001", "channel": "email", "message_text": "Please call +44 20 7946 0001 or write to ada.lovelace@example.test."}
+    ]},
+    {"captured_at": "2026-05-08T12:00:00Z", "data_store": "privacy_treatment_service", "collection": "operational_record_history", "records": [
+      {"recorded_at": "2026-05-01T09:30:07Z", "system": "analytics_platform", "resource_id": "analytics_6006", "record_type": "ANALYTICS_PROFILE", "result": "IDENTIFIABLE", "lookup_value": "grace.hopper@example.test"}
+    ]}
+  ]
+}
