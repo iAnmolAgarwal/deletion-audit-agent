@@ -17,7 +17,10 @@ entries at or after SUMMARY_RULE_FROM.
 
 log.txt is append-only, so a defect is never rewritten. A known defect is listed in
 EXCEPTIONS with the correction note that covers it; an exception that no longer matches
-anything is itself reported, so the list cannot go stale.
+anything is itself reported, so the list cannot go stale. A header-shaped line quoted
+inside an entry is listed in QUOTED_HEADERS by the exact line text and the stamp of the
+entry it sits in (T64); it is read as that entry's body text, so it neither splits the
+entry nor takes part in the time-order check.
 
 Usage: python3 scripts/check_log.py [--staged] [path]
 Exit status: 0 = pass, 1 = a blocking check failed, 2 = the log could not be read.
@@ -27,7 +30,7 @@ from __future__ import annotations
 import re
 import subprocess
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
@@ -54,12 +57,21 @@ NOTE_0005 = "correction note in the 2026-10-25T00:05:00+05:30 entry"
 NOTE_0132 = "correction note in the 2026-10-25T01:32:51+05:30 entry (T18, confirmed by T23)"
 NOTE_0237 = "correction note in the 2026-10-25T02:37:47+05:30 entry"
 NOTE_0244 = "correction note in the 2026-10-25T02:44:55+05:30 entry"
+NOTE_0316 = "correction note in the 2026-10-25T03:16:49+05:30 entry"
 
 # A header stamped wrongly is ordered by the time its correction note gives, so one bad
 # stamp does not make every later entry look out of order. stamp -> (effective time, note)
 STAMP_OVERRIDES: dict[str, tuple[str, str]] = {
     "2026-10-25T00:20:00+05:30": ("2026-10-25T00:04:00+05:30",
                                   NOTE_0005 + ": header mis-stamped, written at about 00:04"),
+}
+
+# (stamp of the entry it sits in, exact line text) -> the correction note that covers it.
+# The line is read as body text of that entry (T64).
+QUOTED_HEADERS: dict[tuple[str, str], str] = {
+    ("2026-10-25T03:16:15+05:30",
+     "## [2026-10-25T03:40:00+05:30] G4 fix continued: no-resource-ID state, coherence messages"):
+        NOTE_0316 + ": an example header quoted from main's brief",
 }
 
 # (check code, header timestamp as written) -> the correction note that covers it.
@@ -77,13 +89,15 @@ EXCEPTIONS: dict[tuple[str, str], str] = {
 
 @dataclass
 class Entry:
-    """One log entry: its header line number, raw timestamp, title and body lines."""
+    """One log entry: its header line number, raw timestamp, title and body lines, plus
+    any listed quoted header lines read as body (line number, text)."""
 
     line_no: int
     stamp: str
     title: str
     header: str
     body: list[str]
+    quoted: list[tuple[int, str]] = field(default_factory=list)
 
 
 def read_log(staged: bool, path: Path) -> str:
@@ -97,11 +111,15 @@ def read_log(staged: bool, path: Path) -> str:
 
 
 def split_entries(text: str) -> list[Entry]:
-    """Split the log into entries at header lines (a timestamp right after '## ')."""
+    """Split the log into entries at header lines (a timestamp right after '## '). A line
+    listed in QUOTED_HEADERS for the entry it sits in stays in that entry's body."""
     entries: list[Entry] = []
     for i, line in enumerate(text.splitlines(), start=1):
         m = HEADER_ANY.match(line)
-        if m:
+        if m and entries and (entries[-1].stamp, line) in QUOTED_HEADERS:
+            entries[-1].body.append(line)
+            entries[-1].quoted.append((i, line))
+        elif m:
             entries.append(Entry(i, m.group(1), m.group(2), line, []))
         elif entries:
             entries[-1].body.append(line)
@@ -178,9 +196,14 @@ def main(argv: list[str]) -> int:
     blocking: list[str] = []
     excused: list[str] = []
     used: set[tuple[str, str]] = set()
+    used_quoted: set[tuple[str, str]] = set()
     warnings: list[str] = []
     prev = None
     for e in entries:
+        for n, line in e.quoted:
+            used_quoted.add((e.stamp, line))
+            excused.append(f"line {n} (inside [{e.stamp}]) quoted header read as body -> "
+                           f"{QUOTED_HEADERS[(e.stamp, line)]}")
         fails, warns = check_entry(e)
         try:
             when = parse_stamp(e.stamp)
@@ -205,6 +228,8 @@ def main(argv: list[str]) -> int:
 
     for key in sorted(set(EXCEPTIONS) - used):
         blocking.append(f"stale exception {key}: it matches no defect")
+    for key in sorted(set(QUOTED_HEADERS) - used_quoted):
+        blocking.append(f"stale quoted-header exception {key}: it matches no line")
 
     print(f"check-log: {len(entries)} entries, {len(blocking)} blocking, "
           f"{len(excused)} known defects (excused), {len(warnings)} warnings")

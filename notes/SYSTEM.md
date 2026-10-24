@@ -8,6 +8,8 @@
 ## For each case
 - The agent first decides whether the request really asks for deletion. If it doesn't, the row is `NOT_APPLICABLE` with `[]`.
   - That decision comes from a cached model call that code cross-checks. There are no per-row keyword tables (T7).
+  - The model's answer is the decision. The code cross-check only flags a disagreement; it never overrides. "Please verify my deletion is complete" counts as a deletion request. An "uncertain" answer goes to a tool or to a fail-closed row (T63).
+  - A request whose identity resolves to no one gets its own defined, tested outcome. It is never `NOT_APPLICABLE` (T63).
 - If it does, code resolves who the person is, including old emails and phones, as of the audit time.
 - Code finds every record tied to that person in evidence available up to the audit time, works out each record's state at that moment, and applies the conditional rules in `deletion_rules.csv` to decide what is still non-compliant.
   - **One exception, for the primary account's ID only (T27).** Which account belongs to a person is an identity fact, so it may come from any input, including an identity lookup logged after the audit time. Limits on the exception:
@@ -36,7 +38,7 @@
     3. a deterministic pick, flagged in the run artifacts (T6). It is a one-to-one matching that gives every case an account where one exists. Among equally good matchings, the order is `sha256` of the resolved person's `user_id`. That order is openly arbitrary: the README states how many cases it decides and that each one is a coin flip (T39). It applies only to ties still left after the ruling on follow-up 2's candidate 1 (T39), which changed nothing (T52, T57).
   - **One-to-one means one owner per person, not per case.** Two requests from the same person may share an account (T29). Every sort order names its key, and the key is never the case number or row order (T29).
   - **The assignment reads every competing request's inputs** from both request files (`deletion_requests.csv` and `sample_deletion_requests.csv`), so a test case cannot take an account that belongs to a sample case. It never reads `sample_output.csv` (T32).
-  - **Identifier-free analytics attach by their policy slot's own timing band** (T53), only when the record goes to a single person, and never anchored on a guessed account (T5, T29). The band comes from the generator's timing, like D17, not from a spec rule, and the README says so (T5, T53).
+  - **Identifier-free analytics attach by their policy slot's own timing band** (T53), only when the record goes to a single person (T5, T29). They follow their job's account, a flagged tie pick included, and carry its flag (T62). The band comes from the generator's timing, like D17, not from a spec rule, and the README says so (T5, T53).
 - When code can't settle something (a screenshot, copies that disagree, an evidence format we haven't seen), it raises an open question. The model chooses read-only tools to answer it, at most 4 calls. Its answer is checked against the evidence and can never override a fact code has already settled.
   - The 11 screenshots are read by cached model calls with code cross-checks, never by hand-typed facts (T7).
 - **A support record is a message or an attachment** by a cue visible at or before the audit time, screenshots included. Only when there is no such cue does the deletion worker's own action decide it, and each such use is flagged (T55).
@@ -97,3 +99,5 @@ Reporting a case COMPLETE while a ghost record or an active sync or restore path
 | T56 | 2026-10-25T03:08:01+05:30 | T27 not extended to audit records; on the can-wait list |
 | T59 | 2026-10-25T03:08:01+05:30 | The complete identifier set, hashes of every email included; own key beats trace lookup |
 | T60 | 2026-10-25T03:08:01+05:30 | The final run skips no file |
+| T62 | 2026-10-25T03:15:35+05:30 | Analytics follow their job's account, a flagged tie pick included |
+| T63 | 2026-10-25T03:15:35+05:30 | The model's intent call decides, cross-check only flags; unresolved identity is never NOT_APPLICABLE |

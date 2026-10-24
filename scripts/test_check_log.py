@@ -39,8 +39,9 @@ class CheckLogTest(unittest.TestCase):
 
     def run_on(self, text: str) -> tuple[int, str]:
         """Run main() on text written to a temp file, with no exceptions configured."""
-        saved = (check_log.EXCEPTIONS, check_log.STAMP_OVERRIDES)
+        saved = (check_log.EXCEPTIONS, check_log.STAMP_OVERRIDES, check_log.QUOTED_HEADERS)
         check_log.EXCEPTIONS, check_log.STAMP_OVERRIDES = {}, {}
+        check_log.QUOTED_HEADERS = dict(getattr(self, "quoted", {}))
         try:
             with tempfile.TemporaryDirectory() as d:
                 p = Path(d) / "log.txt"
@@ -50,7 +51,7 @@ class CheckLogTest(unittest.TestCase):
                     code = check_log.main([str(p)])
             return code, buf.getvalue()
         finally:
-            check_log.EXCEPTIONS, check_log.STAMP_OVERRIDES = saved
+            check_log.EXCEPTIONS, check_log.STAMP_OVERRIDES, check_log.QUOTED_HEADERS = saved
 
     def test_clean_log_passes(self) -> None:
         code, out = self.run_on(entry("## [2026-10-25T03:00:00+05:30] ok"))
@@ -116,6 +117,49 @@ class CheckLogTest(unittest.TestCase):
             self.assertIn("stale exception", buf.getvalue())
         finally:
             check_log.EXCEPTIONS = saved
+
+
+QUOTE = "## [2026-10-25T03:40:00+05:30] an example header in a brief"
+
+
+def quoting_entry(stamp: str) -> str:
+    """An entry whose verbatim prompt contains a header-shaped line."""
+    return (f"## [{stamp}] host\n\nUser Prompt (verbatim, secrets redacted):\n"
+            f"Use this header:\n{QUOTE}\nthanks\n\nAgent Response Summary:\nOne. Two.\n\n"
+            f"Actions:\n* x\n\n{CONTEXT_MAIN}")
+
+
+class QuotedHeaderTest(unittest.TestCase):
+    """T64: a listed quoted header is body text; an unlisted one still fails; the entries
+    after it are still time-ordered against the real headers."""
+
+    quoted = {("2026-10-25T03:16:15+05:30", QUOTE): "note"}
+    run_on = CheckLogTest.run_on
+
+    def test_listed_quoted_header_is_body(self) -> None:
+        code, out = self.run_on(quoting_entry("2026-10-25T03:16:15+05:30")
+                                + "\n" + entry("## [2026-10-25T03:17:00+05:30] next"))
+        self.assertEqual(code, 0, out)
+        self.assertIn("quoted header read as body", out)
+
+    def test_unlisted_quoted_header_fails(self) -> None:
+        self.quoted = {}
+        code, out = self.run_on(quoting_entry("2026-10-25T03:16:15+05:30")
+                                + "\n" + entry("## [2026-10-25T03:17:00+05:30] next"))
+        self.assertEqual(code, 1, out)
+        self.assertIn("S1", out)
+        self.assertIn("T1", out)
+
+    def test_same_line_in_another_entry_is_not_excused(self) -> None:
+        code, out = self.run_on(quoting_entry("2026-10-25T03:16:20+05:30"))
+        self.assertEqual(code, 1, out)
+        self.assertIn("stale quoted-header exception", out)
+
+    def test_real_entry_after_quote_is_still_time_ordered(self) -> None:
+        code, out = self.run_on(quoting_entry("2026-10-25T03:16:15+05:30")
+                                + "\n" + entry("## [2026-10-25T03:10:00+05:30] earlier than host"))
+        self.assertEqual(code, 1, out)
+        self.assertIn("T1 timestamp goes backwards", out)
 
 
 if __name__ == "__main__":
