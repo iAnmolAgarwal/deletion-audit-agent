@@ -1,0 +1,31 @@
+# Secrets: the API key lives only in the uncommitted .env (see .env.example)
+.env
+.env.*
+!.env.example
+
+# Run outputs: the CLI writes to runs/<run_id>/ by default
+runs/
+
+# Derived caches (parsed evidence, index, intermediate JSON) and the reply cache
+cache/
+.cache/
+*.sqlite
+*.sqlite3
+*.db-journal
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Agent-trace staging and archives (built at packaging time)
+agent-trace*
+
+# Local Claude Code state: per-machine hook wiring and log-guard markers
+.claude/settings.local.json
+.claude/.log_guard_*
+
+# OS / editor noise
+.DS_Store
+.venv/
+venv/
