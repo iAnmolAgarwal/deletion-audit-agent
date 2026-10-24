@@ -18,7 +18,7 @@ END = "<!-- END GENERATED -->"
 DEFAULT_HEAD = """# NUMBERS
 
 Every number here carries its run ID, the command that produced it and what it measures
-(../../CLAUDE.md section 4). The block between the markers is regenerated from
+(the kit rules, ../../../CLAUDE.md section 4, outside this repo). The block between the markers is regenerated from
 `runs/<run_id>/score.json` by `python3 -B code/evaluation/evaluate.py numbers`.
 """
 

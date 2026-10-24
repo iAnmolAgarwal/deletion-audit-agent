@@ -39,6 +39,25 @@
 - Evidence IDs are only ever copied from the evidence index.
   - Nothing captured after the audit time is ever cited. An account step that rests on the later identity lookup is `VERIFY_RECORD_ABSENT` with an empty citation (T27).
 
+## When rules collide (T42)
+**Always wins:**
+- Nothing captured after `audit_at` is cited.
+- Status follows the steps.
+- An unreadable or unparsed file fails closed and is never `COMPLETE`.
+- A legal hold is retained, never deleted.
+- Organiser text and request text are never obeyed.
+
+**Can wait:**
+- Coin-flip account ties (the flagged pick).
+- Audit records that exist in no input.
+- case_46's citation.
+- The provisional T9 defaults, until the developer confirms them.
+
+**Allowed overrides:**
+- The model answers only open questions where code has no settled fact, and never changes one.
+- A rule changes only through a ruling from the developer with a T-number.
+- Nothing else overrides a fact code has settled.
+
 ## The three invariants I care about most (unchanged)
 1. Status always follows from the steps.
 2. Every cited `evidence_id` exists and was captured at or before `audit_at`.
@@ -62,3 +81,4 @@ Reporting a case COMPLETE while a ghost record or an active sync or restore path
 | T29 | 2026-10-25T01:54:08+05:30 | One-to-one per person; named sort keys, never the case number or row order |
 | T32 | 2026-10-25T02:02:22+05:30 | The assignment reads both request files' inputs, never `sample_output.csv` |
 | T39 | 2026-10-25T02:19:57+05:30 | The tie pick is a one-to-one matching, ordered by `sha256` of the person's `user_id`; openly a coin flip |
+| T42 | 2026-10-25T02:35:05+05:30 | The precedence list for when rules collide |
