@@ -10,6 +10,7 @@
   - That decision comes from a cached model call that code cross-checks. There are no per-row keyword tables (T7).
   - The model's answer is the decision. The code cross-check only flags a disagreement; it never overrides. "Please verify my deletion is complete" counts as a deletion request. An "uncertain" answer goes to a tool or to a fail-closed row (T63).
   - A request whose identity resolves to no one gets its own defined, tested outcome. It is never `NOT_APPLICABLE` (T63).
+  - **The model routes every case (A+, T70).** Its first turn sees only the request text and commits its intent before any evidence is shown; then it may fetch the engine's findings and investigate open questions with read-only tools. If intent stays uncertain, a call fails or the budget runs out, the case gets the engine's deletion-path row, flagged, never `NOT_APPLICABLE` (T71). A row that cannot be made valid is `FAILED_CLOSED`, and the final run needs 0 of them or the developer's acknowledgement (T71).
 - If it does, code resolves who the person is, including old emails and phones, as of the audit time.
 - Code finds every record tied to that person in evidence available up to the audit time, works out each record's state at that moment, and applies the conditional rules in `deletion_rules.csv` to decide what is still non-compliant.
   - **One exception, for the primary account's ID only (T27).** Which account belongs to a person is an identity fact, so it may come from any input, including an identity lookup logged after the audit time. Limits on the exception:
@@ -19,6 +20,7 @@
 
     The account's state at the audit time, and every citation, still come only from evidence captured at or before the audit time.
   - A non-empty evidence file that parses to nothing is a parser failure, not "nothing found". Every case that depends on it fails closed and is never `COMPLETE` (T8). The final run skips no file (T60).
+  - **A record that the evidence shows remaining is cited where it remains.** An alias counts when a link row at or before the audit time ties it to the record (T66, T71).
   - **Only a file that declares completeness can prove a record absent:** a SQL `snapshot_scope` row, or a snapshot bundle entry naming its data store. A plain collection export doesn't claim to hold every record, so a record missing from it proves nothing (T50).
   - **A record missing from a file that declares completeness, captured at or before the audit time, is absent at that file's time.** The latest observation wins. A SQL inventory doesn't rule out a replica copy, and the `support_records` table never covers attachments (T54).
 - **The steps list is the source of truth.** Status is derived from it: any finding means `INCOMPLETE`, none means `COMPLETE`.
@@ -101,3 +103,4 @@ Reporting a case COMPLETE while a ghost record or an active sync or restore path
 | T60 | 2026-10-25T03:08:01+05:30 | The final run skips no file |
 | T62 | 2026-10-25T03:15:35+05:30 | Analytics follow their job's account, a flagged tie pick included |
 | T63 | 2026-10-25T03:15:35+05:30 | The model's intent call decides, cross-check only flags; unresolved identity is never NOT_APPLICABLE |
+| T70, T71 | 2026-10-25T04:24:24+05:30 | The model routes every case (A+); the intent fail-closed row; FAILED_CLOSED; alias containment |

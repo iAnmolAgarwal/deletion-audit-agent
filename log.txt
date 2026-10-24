@@ -2340,3 +2340,64 @@ parent_agent=none
 worktree=main
 branch=main
 repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T04:30:11+05:30] G4 fix round 2: PNG signature, output hash, field size, run IDs
+
+User Prompt (verbatim, secrets redacted):
+[brief written by main; approved in developer turn 2026-10-25T04:24:24+05:30]
+G4 fix, round 2: the developer ruled on the G4-fix verifier's FIX verdict (decision T72, message received 2026-10-25T04:24:24+05:30).
+
+directed_by: 2026-10-25T04:24:24+05:30
+
+Read the verifier's report first: notes/verify/g4fix_verify.md (F1, F2, F3 and two notes). Same scope and rules as before:
+- edit only code/evaluation/**;
+- new run IDs prefixed g4fix2-;
+- never edit ../research/;
+- no paid calls; never read .env;
+- lock probes on synthetic gold only;
+- never open dataset/sample_output.csv.
+The verifier's repro scripts are in /tmp/verify-g4fix/ (fault.py, score_tmp.py, mk_synth.py).
+
+Order:
+1. Re-run the three repros on the current code and show each one succeeding (the bug present):
+   - F1: python3 -B /tmp/verify-g4fix/fault.py fake_png_label <run id>;
+   - F2: the stale producer record beside a different output.csv, via score_tmp.py;
+   - F3: a synthetic row with a 200,000-character steps_json cell, read with read_output.
+2. Fix, in one round, each with a test that fails before the fix and passes after (show both runs):
+   - F1: allow a png-model-needed skip only when the file's bytes start with the PNG signature \x89PNG\r\n\x1a\n. Anything else with that label refuses. (The same rule goes into G5; main records it.)
+   - F2: the producer writes output_sha256 into its record. check_producer marks the run unchecked when that differs from the sha256 of the file being scored, so the run cannot feed NUMBERS.md (T60).
+   - F3: raise csv.field_size_limit to a fixed cap; choose the value and state it. A row that still fails becomes an issue (not a crash), and scoring, coherence and drift continue.
+   - Note 1: the case name printed in coherence messages must match ^case_\d+$. Otherwise the message names the record by its position, never by the cell's value.
+   - Note 2: evidence_failures: null in a producer record refuses (it is not treated as an empty list).
+   - Run IDs: runs.run_dir accepts only IDs matching ^[A-Za-z0-9][A-Za-z0-9._-]*$, with a test that an ID containing a space is refused. Keep the three INVALID runs as they are. In NUMBERS.md, note that the time suffix of g4fix-discrim-20261025T0318 doesn't match its created_at.
+3. Show the three repros refusing after the fixes.
+4. Done list:
+   - all tests;
+   - a guarded producer re-run under a new g4fix2- ID, scored. Its output sha256 must be 60234e8f…, with 0 flips against g4fix-baseline-20261025T0314, and its producer record must carry output_sha256;
+   - NUMBERS.md regenerated.
+   If anything fails, stop and report the hypothesis and the signal you expect to change.
+
+Report back short: per item the change (file:line), the test, before/after evidence, then the done list.
+
+Log: append exactly one new entry with a single Bash heredoc (never Write or Edit). Get the time with TZ=Asia/Kolkata date -Iseconds and write the finished header line into the heredoc, brackets included. The shape, shown here in backticks: `## [<time>] G4 fix round 2: PNG signature, output hash, field size, run IDs`. When you quote this message in the User Prompt section, put any line that starts with "## [" inside backticks. Title at most 80 characters. Sections in order: User Prompt (verbatim, secrets redacted):, Agent Response Summary: (2-5 sentences), Actions:, Context: with tool=Claude Code, model=claude-opus-5-5, agent_type=orch-eval-engineer, parent_agent=main, directed_by=2026-10-25T04:24:24+05:30, worktree=main, branch=main, repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26. Then run python3 -I scripts/check_log.py; fix any blocking failure in your own entry with a correction note entry.
+
+Agent Response Summary:
+All three verifier repros reproduced on the old code. Before the fixes they ran as follows: F1 exited 0 with case_07 wrongly COMPLETE; F2 got producer check ok on a stale record with status 21/22; F3 crashed with "field larger than field limit (131072)". After the fixes, F1 refuses (exit 3, not-a-png-by-content), F2 is reported unverified (no hash) or output-mismatch (hash differs), and F3 reads the 200,011-character cell with the process limit restored. Each fix has a test in test_round2.py that failed before and passes after (26 failures or errors before, 135/135 passing after). One addition beyond the brief: NUMBERS.md now re-runs the current producer check on every stored record, so the g4fix-baseline-0314/0316 runs (no output_sha256) are excluded with that reason. The final guarded run g4fix2-baseline-final-20261025T0429 has output sha256 60234e8f…, 0 flips against g4fix-baseline-20261025T0314, and output_sha256 in its record.
+
+Actions:
+* evidence_guard.py: PNG_SIGNATURE and has_png_signature; audit_extraction allows a png-model-needed skip only on the signature, by content (not-a-png-by-content / file-not-in-manifest refuse otherwise). check_producer(producer, *, pred_sha256) refuses non-list evidence_skipped or evidence_failures (null included); a missing hash gives unverified, a different hash gives output-mismatch.
+* prototype_baseline.py: output_sha256 in producer.json. evaluate.py: read_output runs first (gold guard), then the producer check against the scored file's sha256.
+* outputs.py: FIELD_SIZE_CAP of 16 MiB, set during the read and restored after; a per-record csv.Error becomes a hard H16 "CSV error" issue; CASE_ID_RE, case_label and record_no. coherence.py names cases by case_label (else <record N>, header = record 1). runs.py: RUN_ID_RE.
+* numbers_md.py: RUN_NOTES (the g4fix-discrim-20261025T0318 suffix note), and _exclusion_reason re-checks the stored producer record and pred_sha256 with the current rules. NUMBERS.md prose gains a T72 bullet; the block is regenerated.
+* Tests: new test_round2.py; test_evidence_guard.py updated (test_clean writes a real PNG signature; test_statuses uses the new signature; the render fixture has a config.json).
+* Runs: g4fix2-baseline-20261025T0428 and g4fix2-baseline-final-20261025T0429 (default), g4fix2-baseline-{nosig,vision,forceintent}-20261025T0429, g4fix2-discrim-20261025T0429. Repro runs under /tmp/verify-g4fix/runs: g4fix2-f1-before, g4fix2-f1-clean, g4fix2-f1-after, g4fix2-f2-before, g4fix2-f2-after-a, g4fix2-f2-after-b. The three INVALID runs are unchanged.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=orch-eval-engineer
+parent_agent=main
+directed_by=2026-10-25T04:24:24+05:30
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26

@@ -166,3 +166,28 @@ Linking observations or CSV rows to a person or an account, state at `audit_at`,
 - **Case selection:** for each unseen family, take the 3 test cases with the lowest `sha256(case_id)` among those whose person appears in a file of that family under **any** of those identifiers. The choice is deterministic and not hand-picked.
 - **Comparison:** for each selected case, list every raw line, row or record in that file that contains any of the person's identifiers, or a resource ID on the same trace. Each must map to an observation with the same record time, resource ID, identifiers and trace_id.
 - **Output:** `notes/parser_raw_check.md`, giving per-case counts of matched lines, missed lines and mismatched fields, with locators. It also states which identifier matched (current or old, email or phone).
+
+
+## 7. G5 engine (pinned for the G5 proposal, developer decision T70)
+- **The interface is `notes/ARCHITECTURE_OPTIONS.md` §5**, from `inputs/requests.py` through `validate/prewrite.py` and `engine.py`, plus `record.py` / `artifacts.py` / `pipeline.py`. It also includes §6 (the canonical per-case record), §7 (hard invariants as test names) and §10 (where each ruling lands). G7's `agent/` package is out of G5's scope; `pipeline.run` takes `mode` and `replay_only`, and G5 builds it with the engine path only.
+- **Amendments from rulings made after G3:**
+  - **T71 Q3:** `ValidationContext` gains the aliases LINK_RESOURCE_IDENTITY rows tie to a resource at or before `audit_at`. The hard check counts such an alias as containment. Three tests: with the link, without it, and with the link after `audit_at`.
+  - **T71 Q4:** REDACTED, ANONYMIZED, DATA_FLOW_DISABLED and RESTORE_BLOCKED verifications get flag-and-count, not hard.
+  - **T71 Q2/Q5:** the intent fail-closed row is the engine's deletion-path row, flagged; `FAILED_CLOSED` is an enumerated row class, and freeze requires 0 such rows or the developer's acknowledgement.
+  - **T71 Q11:** `marketing_001`-type conflicts: the record is included and flagged IMAGE_SUBJECT_CONFLICT; the catalog link wins.
+  - **T72 F1:** a file is "image, model needed" only when its bytes start with the PNG signature.
+  - **T74 (pending the developer):** the hard check covers FINDING steps and cited `VERIFY_RECORD_PRESENT`; verifications in INCOMPLETE rows carry `""`.
+  - **T68:** PDF page identifiers never link when the page names several resources or several people. A PDF observation's time is the page's stated time at its stated precision, else `captured_at`, and the state records which one it used.
+  - **T69:** a hold that names no resource produces no step.
+
+## 8. GM model client (pinned for the GM proposal, developer decision T70)
+- **The interface is `notes/ARCHITECTURE_OPTIONS.md` §5, the `model/` block:** `ModelRequest` (key = sha256 of the canonical body plus the API version; no case ID, no row index), `ModelReply`, `ModelCallFailed`, `Transport` (`AnthropicTransport` with the SDK's `max_retries=0`, plus `FakeTransport`), `ModelClient.call` (cache → budget → send/ladder → cache.put → log), `RetryPolicy` (the one place that decides retry, repair or give up), `ReplyCache` (atomic, never overwrites, raw replies only), `BudgetGuard` (per-run dollar and call caps; project ledger stop at $110). §8 (caching, determinism, retries) also applies.
+- **Requirements from `../CLAUDE.md` §5 and T63:**
+  - structured output via `output_config.format`, re-validated in code;
+  - `tool_choice` auto or none only;
+  - no `temperature`;
+  - one retry ladder for 408, 409, 429, 529, `InternalServerError`, `APIConnectionError` and `APITimeoutError`;
+  - `stop_reason == "max_tokens"` and refusals are failures;
+  - each failed call's error class and status go to the run artifacts;
+  - fake-client tests for retry, cache and give-up.
+- **SDK version:** pending T73. GM's tests run on `FakeTransport` and need no SDK; `AnthropicTransport` is written against the pinned version once the developer chooses it.
