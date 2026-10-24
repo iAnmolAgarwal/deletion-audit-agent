@@ -2552,3 +2552,44 @@ directed_by=2026-10-25T04:24:24+05:30
 worktree=main
 branch=main
 repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T04:48:51+05:30] Raw check 21 to 0; venv pinned; T75-T79; GM and G5 launched; G4 round 2 FIX
+
+User Prompt (verbatim, secrets redacted):
+1. Raw check: confirmed. Count a 64-hex token only when it's a known person's email hash, the same limit phones already have. Add one assertion so the restriction can't hide a real link: no integrity_seal value equals any known email hash. Expected: 21 → 0, and both of the GP verifier's over-attribution mutations caught. Show both.
+
+2. anthropic 1.13.0, under the two-week rule; ruff 0.17.0 and mypy 2.4.0 as proposed. GM also writes the real transport for 1.13.0, making no calls. research/13 verified 2.3.0, not 1.13.0, so before G7's routing check, propose one live smoke call (cost first): structured output, effort, a tool call and the reply cache on claude-sonnet-5-5. If anything doesn't work on 1.13.0, stop and report it, and I'll rule on 2.3.0 then.
+
+3. T74: your reading, stated as row rules so nothing escapes the hard check:
+- every verification step in an INCOMPLETE row has an empty citation (DEV 43/43);
+- every verification step in a COMPLETE row cites a file (DEV 23/23);
+- every FINDING cites a file.
+Count all three on DEV before you pin them. The hard check then applies to every cited step that says a record still exists. A cited step that should be empty, or an empty one that should cite, is a validator failure.
+
+4. GM and G5: approved as proposed. GM is orch-builder at medium, pinned to INTERFACES §8. G5 is orch-builder-core at high, pinned to §7 with T68–T74 and items 1–3 above. directed_by = this turn. Add to G5's done list: after the 22 DEV cases, a replay-only run on all 518 test inputs. It must show 0 crashes and 0 coherence violations, and report the validator counts by part, the FAILED_CLOSED count and the runtime. No scoring, since test has no gold.
+
+5. Agent cap: up to 3 subagents at once from now on: the G4 round-2 verifier, GM and G5. Still never two of the same type at once.
+
+Time is not a factor.
+
+Agent Response Summary:
+Orchestration decisions (developer): GM (orch-builder, medium, pinned to INTERFACES §8) and G5 (orch-builder-core, high, pinned to §7 with T68-T77) are approved and running; they gate G7 and the full run, with up to 3 agents at once. The raw check now reports 0 problems (was 21) and catches all 8 of the GP verifier's mutations, and the venv holds the approved pins with every dependency at least two weeks old. The T74 row rules hold on DEV, but the INCOMPLETE count is 53/53, not the 43 I had reported. The G4 round-2 verifier returned FIX (2 MAJOR), which waits for the developer's fix class. I also found and fixed a corrupted notes/RESUME.md, introduced by my own 04:36 scripted edit.
+
+Actions:
+* code/tests/evidence/raw_check.py: KNOWN_HASHES (every known email hash) limits 64-hex tokens; seal_collisions() scans integrity_seal values. python3 -B code/tests/evidence/raw_check.py: "problems: 0; integrity seals scanned: 358, equal to a known email hash: 0"; Total 201 units checked, 201 matched. Mutations (the verifier's mutate.py re-pointed to scratchpad mutate_main.py): time_minus_1s 98, drop_every_7th 33, trace_none 99, swap_roles 40, leak_foreign_id 201, drop_phones 4, record_time_is_captured_at 102, lookup_into_record 40 problems. Every exit is 1; the two over-attribution mutations were 0 before. GP tests OK.
+* T74 row rules on DEV gold (scratchpad gpq/t74_rows.py; via evaluation.gold): INCOMPLETE verification empty 53, COMPLETE verification cited 23, FINDING cited 29, REMEDIATION empty 29. Correction: the 43/43 in T74 was my addition error (5+26+4+12+4+2 = 53).
+* G4 round-2 verifier (orch-verifier, directed_by 2026-10-25T04:24:24+05:30) returned FIX. M1: a non-UTF-8 byte crashes read_output (outputs.py:142). M2: --prev bypasses the run-ID check (runs.py:94-96). F1/F2/F3 and the notes are closed. Report saved verbatim to notes/verify/g4fix2_verify.md. Its fix class waits for the developer (verdict rule).
+* Venv: python3 -m venv .venv, then pip install --uploaded-prior-to 2026-10-11T00:00:00Z anthropic==1.13.0 pdfplumber==0.11.10 ruff==0.17.0 mypy==2.4.0. Resolved: pydantic 2.14.0, httpx2 2.13.1, anyio 4.15.1 and 27 others (requirements.lock). pdfplumber 0.11.10 was uploaded 2026-06-15. Both test suites pass under .venv/bin/python. Wrote requirements.txt, requirements-dev.txt, requirements.lock.
+* notes/DECISIONS.md T75-T79; notes/INTERFACES.md §7 (T77 row rules, T78 518-input run) and §8 (SDK 1.13.0).
+* Agents launched, both directed_by 2026-10-25T04:39:02+05:30, briefs checked for "## [" lines (0): orch-builder (medium), GM, brief scratchpad gm_brief.md; orch-builder-core (high), G5, brief scratchpad g5_brief.md.
+* git commit d9ac31e (raw_check.py, parser_raw_check.md, requirements*, DECISIONS, INTERFACES, g4fix2_verify.md, TASKS, log), pushed to github main, https://github.com/iAnmolAgarwal/orchestrate-oct26-ghost-data. The TASKS edit in the same script landed; the RESUME edit raised ValueError before writing.
+* Found: notes/RESUME.md was corrupted by my 04:36 scripted edit (slice positions taken before two replacements), and the corrupted copy went into commit ce88703. Rewrote the file cleanly with the Write tool; it is committed in the next commit. The new RESUME rule: chain each step with && and take slice positions after the replacements.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
