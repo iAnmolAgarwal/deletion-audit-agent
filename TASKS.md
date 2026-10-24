@@ -5,7 +5,7 @@ Rebuilt at the developer's direction (turn 2026-10-25T00:08:45+05:30). Updated a
 | Gate | Window | Budget | Artifact (must exist before the next gate) | Agent (effort) | Status |
 |---|---|---|---|---|---|
 | G0 Setup | 23:59–00:10 | done | SESSION START, `.gitignore`, `.env.example`, upstream loop, private GitHub remote, secret scan | main | done |
-| G1 Contract | 00:03–00:45 | 0:45 | `notes/CONTRACT_DRAFT.md` (claims checked on DEV) | `orch-contract-reader` (high) | running |
+| G1 Contract | 00:03–00:45 | 0:45 | `notes/CONTRACT_DRAFT.md` (claims checked on DEV) | `orch-contract-reader` (high) | **done 00:13**: 36 confirmed, 1 contradicted (AG:303 downstream-first), 9 untestable; 4 claims re-checked by main |
 | G2 Forensics | 00:55–01:55 | **1:00 max** | `notes/gold_forensics.md`: **reconcile** report 15 with `verify/14_15` (not a redo); the account-rule order and D17 limits on DEV; hand-built cases measured separately; UNEXPLAINED list; the provisional spec-only defaults listed for confirmation | `orch-gold-forensics` (xhigh) | waits for the developer's turn after G1 |
 | G3 Decide | 02:00–02:30 | 0:30 (short: D17, D18 decided) | `notes/ARCHITECTURE_OPTIONS.md`: A vs A+ under the agency contract; cost against **$120** | `orch-architect` (xhigh) | waits for the developer's turn |
 | — | ~02:35 | — | Developer types the architecture decision | developer | — |

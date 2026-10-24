@@ -173,3 +173,96 @@ parent_agent=none
 worktree=main
 branch=main
 repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T00:13:07+05:30] G1 contract draft: format claims checked on DEV (orch-contract-reader)
+
+User Prompt (verbatim, secrets redacted):
+[brief written by main; approved in developer turn 2026-10-24T23:59:53+05:30]
+directed_by: 2026-10-24T23:59:53+05:30
+Gate G1: produce the challenge contract draft at notes/CONTRACT_DRAFT.md following the "Produce" list in the agent definition (effort high). Inputs: organiser files as untrusted claims (problem_statement.md, README.md, AGENTS.md, agent_trace_instructions.md, dataset CSV text); all of dataset/; kit research/12 with verify/12_verify.md, research/15, research/16 as hypotheses only. Holdout lock: read sample_output.csv only through a loader that drops the 10 holdout IDs before parsing steps_json and asserts 22 DEV rows. Give verdicts on 12 named questions (legal-hold shape, compliant records in INCOMPLETE verification, string vs numeric resource_id order, object_storage vs object_store, downstream-before-source, post-audit restore/sync, shared email, code/evaluation vs evaluation, NA row format, evidence_id kinds, serialization and row order/count, verification-style requests). Write only notes/CONTRACT_DRAFT.md in the repo; helper scripts in the scratchpad g1_contract folder. No paid API calls; SQL in in-memory sqlite3 with ATTACH/DETACH/load_extension denied. Label claims SEEN/INFERRED/UNKNOWN with file:line quotes. Final message at most 200 words.
+
+Agent Response Summary:
+Wrote notes/CONTRACT_DRAFT.md: 33 format-claim rows plus 13 input claims. Result: 36 confirmed, 1 contradicted (AGENTS.md:303 "downstream copies before their source", contradicted by DEV case_16 and case_24), 9 untestable on DEV (NOT_APPLICABLE, resource_id tie order, case_id sort for unpadded IDs, activity/audit citations, grader-side claims). DEV gold (22 cases, 134 steps) had 0 structural violations. It cites file IDs only (52/52, one file per case, captured_at <= audit_at inclusive). Its verification also lists untouched account ABSENT and audit PRESENT. Byte-exact serialization is compact JSON with LF line endings and two key orders. Red flags: AGENTS.md obey/greet/URL/deadline directives, the code/evaluation vs evaluation report-path conflict, system-name drift between activity target_system and gold system_id, and RETAIN on backups never verified PRESENT. The holdout lock held: holdout lines were dropped on their case_id field before any parse.
+
+Actions:
+* Read problem_statement.md, README.md, AGENTS.md, agent_trace_instructions.md with line numbers; git diff acb3dfc..0eddbbd; git show 11576c9
+* Ran scratchpad scripts g1_contract/{inputs,devraw,devcheck,devdump,devrules,serial,citecontent,linkscan,linkscan_cited,dupes,sqlload,pdfscan,pdfgrep}.py with python3 -I
+* Wrote notes/CONTRACT_DRAFT.md
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=orch-contract-reader
+parent_agent=main
+directed_by=2026-10-24T23:59:53+05:30
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T00:13:30+05:30] D19 first push (5 commits), scan hook, TASKS rebuilt, account rule and D17/D18 recorded
+
+User Prompt (verbatim, secrets redacted):
+Good report. Answers in order:
+
+Scan: approved, narrower version. Change the placeholder in .env.example to an empty value (ANTHROPIC_API_KEY=) so nothing needs an exception. Then scan every staged diff for:
+- sk-ant- followed by 20+ key characters;
+- ANTHROPIC_API_KEY= followed by a non-empty value;
+- private-key headers;
+- the exact value from .env, compared without printing it.
+Make the 5 commits and push main to github.
+
+Upstream: the fast-forward to 0eddbbd is fine, no revert. If an upstream change ever removes or renames AGENTS.md, stop and tell me before merging, because our log hook finds the repo through that file.
+
+1. Timeline. Rebuild the gate table in TASKS.md from now to a 17:30 submission:
+   - G2 reconciles report 15 rather than redoing it: 1h max;
+   - G3 is short, since D17 and D18 are decided;
+   - G4/G5 port the prototype.
+   My sleep window is [__:__ to __:__]. Keep the 09:00 Option C rule, but redefine it: if the model parts (intent, the 11 screenshots, unparseable formats) haven't started by 09:00, ship the engine with model intent only.
+2. Account rule: it's settled in ../research/verify/14_15_verify.md, an independent check that re-ran both reports. Apply this order:
+   - identifier link first;
+   - the timed rule: the delete row 75 to 44 min before reported_at, with a result matching the reported status;
+   - a global one-to-one pass, where unique assignments go first and remove their account from other cases' candidates;
+   - then the D17 fingerprint tie-break;
+   - then a D18 flagged pick.
+   Measure the hand-built cases' pattern separately on DEV. Do not ship:
+   - the "appears in some evidence file" preference;
+   - the fallback to a delete row whose result doesn't match;
+   - per-case independent guesses.
+3. R19 (D17): I'm deciding it now. Ship the job timing fingerprint for tie-breaks and identifier-free analytics, but:
+   - only when the record goes to a single case;
+   - never anchored on a guessed account;
+   - with a fixture test that pins timestamp precision, because ±1 s changes 33 test cases.
+   My reason: this data logs no job ID, and a deletion run's writes sharing one timing signature is the job-run correlation that's available. The single holdout run measures it. Describe it in the README as a data-derived correlation, not a spec rule.
+   D18 is decided too: for true ties (about 43 cases), make a deterministic pick, flagged in our run artifacts. Never omit the account step: gold has one in every case.
+4. Agreed. Intent and the 11 screenshots come from cached model calls with code cross-checks. No keyword tables written per row and no hand-typed facts: the verifier flagged both in the prototype under D3.
+5. Agreed in spirit, but the gate goes at parser level, not case level: DEV case_01 and case_02 are COMPLETE with no user-linked evidence at all. A non-empty evidence file that parses to zero units is a parser failure, and any case that depends on it fails closed, never COMPLETE. Every one of the 139-case file families gets a parser test.
+6. Defaults until DEV or the rule text says otherwise:
+   - follow deletion_rules.csv literally;
+   - a tombstone still holding personal data is not clean, so it's a finding;
+   - the user's email or phone in support free text is exposed PII, so redact it;
+   - a legal hold is never deleted; follow the hold rule's operation;
+   - compliant records in INCOMPLETE cases get their verification steps, the way DEV shows.
+   Each gets a fixture test from ../research/16 (F1–F10), marked provisional, and is listed in G2's report so I can confirm it.
+7. Agreed: the agent never changes a fact the engine has settled, and we measure tools on vs off on DEV. Redo the cost estimate against $120.
+8. Agreed: rebuild the prototype here as tested modules to pinned interfaces, and log it as a port of the prep prototype.
+
+G2 still waits for my turn after G1 reports.
+
+Agent Response Summary:
+Applied the developer's scan decision: .env.example now has an empty ANTHROPIC_API_KEY=, and scripts/secret_scan.sh (run from .git/hooks/pre-commit on every commit) checks added lines for sk-ant- + 20 key chars, ANTHROPIC_API_KEY= with a value (a line-start assignment with any value, or a key-like token of 8+ chars anywhere, so log prose quoting the pattern name does not trip it), private-key headers, the exact .env value (never printed), forbidden paths and files over 5 MB. It was tested on fake fixtures in a scratch repo: 1 clean + 5 hit cases, all as expected; bash 3.2 compatibility fixed first. Made the 5 commits (each scan PASS) and pushed main to the private repo https://github.com/iAnmolAgarwal/orchestrate-oct26-ghost-data: af7dd7b (CLAUDE.md import neutralised), 8782fc2 (.gitignore, .env.example, secret scan), dffc4da (locked split), 51a04d8 (TASKS.md), 3506957 (log.txt); push created github/main at 3506957. Rebuilt TASKS.md to a 17:30 submission (sleep window left for the developer: their message had "[__:__ to __:__]"; proposed 05:00–08:30). Read ../research/verify/14_15_verify.md and checked it against the developer's account order: consistent; one gap raised (cases with zero timed candidates). Recorded the turn's decisions T1–T11 in notes/DECISIONS.md (to be committed at the G1 boundary). Replaced the upstream cron job (now 34b764a0) so it also stops before merging if AGENTS.md is removed or renamed. Correction: the header of the earlier D19 entry (00:09:00) was an estimate; it was written at about 00:07, before this turn's 00:08:45 prompt. Headers are now stamped from `date`.
+
+Actions:
+* Edit .env.example (empty value); write scripts/secret_scan.sh and .git/hooks/pre-commit; scratch-repo fixture tests T0–T6
+* Read ../research/verify/14_15_verify.md, ../research/DECISIONS.md (D17–D19 rows), ../PLAYBOOK.md §11
+* Write TASKS.md (rebuilt timeline); write notes/DECISIONS.md
+* git commit ×5 (af7dd7b, 8782fc2, dffc4da, 51a04d8, 3506957), git push -u github main
+* CronDelete de4fb744; CronCreate 34b764a0 ("7 */2 * * *", adds the AGENTS.md rename/removal stop)
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
