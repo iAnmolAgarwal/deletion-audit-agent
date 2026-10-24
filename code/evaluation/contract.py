@@ -7,6 +7,7 @@ phase-then-operation-table order holds in 22 of 22 DEV cases).
 """
 from __future__ import annotations
 
+import json
 from typing import Any, Mapping
 
 STATUSES: tuple[str, ...] = ("COMPLETE", "INCOMPLETE", "NOT_APPLICABLE")
@@ -68,14 +69,33 @@ PREFIX_SYSTEM: dict[str, str] = {
 }
 
 
-def step_key(step: Any) -> tuple[Any, ...]:
-    """The step-matching key: (phase, operation, system_id, resource_id).
+def hashable(value: Any) -> Any:
+    """Make an untrusted JSON value safe to use as a dict key, Counter or set member.
 
-    A non-dict step gets a key that can never match a real step.
+    Strings, numbers, booleans and None come back unchanged. A list or dict (or anything
+    else unhashable) becomes a tagged tuple ``("<list>", canonical JSON)``. A tuple never
+    equals a string, so such a value can never match a real gold value; it scores as
+    wrong, and coherence H04 reports its type. (Verifier finding M1: a list value used to
+    crash the scorer and coherence with TypeError.)
+    """
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    try:
+        text = json.dumps(value, sort_keys=True, separators=(",", ":"), default=repr)
+    except (TypeError, ValueError):
+        text = repr(value)
+    return (f"<{type(value).__name__}>", text)
+
+
+def step_key(step: Any) -> tuple[Any, ...]:
+    """The step-matching key: (phase, operation, system_id, resource_id), always hashable.
+
+    A non-dict step gets a key that can never match a real step. Each component goes
+    through :func:`hashable`, so a list or dict value cannot crash a dict or Counter.
     """
     if not isinstance(step, Mapping):
         return ("<not-an-object>", repr(step), "", "")
-    return (step.get("phase"), step.get("operation"), step.get("system_id"), step.get("resource_id"))
+    return tuple(hashable(step.get(k)) for k in ("phase", "operation", "system_id", "resource_id"))
 
 
 def sort_key(step: Mapping[str, Any]) -> tuple[int, int, str, str]:

@@ -13,6 +13,11 @@ Published metrics (``aggregate()['published']``):
 
 * **status**: share of cases whose ``deletion_status`` equals gold; plus a confusion
   matrix with MISSING (no predicted row) and INVALID (not one of the three statuses).
+  Two readings are recorded for a row whose ``steps_json`` does not parse to a JSON list
+  (verifier finding M2): (a) ``status_accuracy``, the headline, compares its status like
+  any other row, so the status is credited; (c) ``status_accuracy_unparseable_wrong``
+  counts such a row as status-wrong. They differ only when an unparseable row has the
+  right status. A missing row is status-wrong under both.
 * **row (exact)**: share of cases whose whole row equals gold: status equal AND the parsed
   ``steps_json`` equal as JSON values (dict key order ignored, list order kept).
   Alternative: the steps alone (``steps_exact``), also reported. They differ only when the
@@ -45,7 +50,7 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping
 
-from .contract import OPERATIONS, STATUSES, STEP_KEYS, step_key
+from .contract import OPERATIONS, STATUSES, STEP_KEYS, hashable, step_key
 from .gold import GoldCase
 from .outputs import OutputRow
 
@@ -90,11 +95,11 @@ def pairwise_order(pairs: list[tuple[int, int]]) -> tuple[int, int]:
 
 
 def _prep_tuple(step: Any) -> tuple[Any, ...]:
-    return tuple(_get(step, k) for k in PREP_TUPLE_FIELDS)
+    return tuple(hashable(_get(step, k)) for k in PREP_TUPLE_FIELDS)
 
 
 def _resources(steps: list[Any]) -> set[tuple[Any, Any]]:
-    return {(_get(s, "system_id"), _get(s, "resource_id")) for s in steps}
+    return {(hashable(_get(s, "system_id")), hashable(_get(s, "resource_id"))) for s in steps}
 
 
 def _citations(steps: list[Any]) -> set[str]:
@@ -118,7 +123,15 @@ def _normalize_pred(pred: OutputRow | None) -> _Pred:
 
 
 def score_case(pred_row: OutputRow | None, gold: GoldCase) -> dict[str, Any]:
-    """Score one case. An unparseable or missing prediction scores as wrong everywhere."""
+    """Score one case.
+
+    A missing prediction scores as wrong everywhere. An unparseable prediction (its
+    ``steps_json`` is not a JSON list) counts as zero predicted steps, so every step,
+    field, sequence and citation metric charges it, and ``steps_exact``/``row_exact``
+    are false; but its status is still compared and credited when equal (reading (a),
+    ``status_ok``). Reading (c), where such a row is status-wrong, is
+    ``status_ok_unparseable_wrong``.
+    """
     p = _normalize_pred(pred_row)
     gs, ps = gold.steps, p.steps
     pairs = match_steps(ps, gs)
@@ -151,6 +164,7 @@ def score_case(pred_row: OutputRow | None, gold: GoldCase) -> dict[str, Any]:
     pc, gc = _citations(ps), _citations(gs)
 
     status_ok = p.status == gold.status
+    status_ok_strict = status_ok and p.valid  # reading (c): an unparseable row is status-wrong
     steps_exact = p.valid and ps == gs
     field_mismatches = [
         {"key": list(step_key(gs[gi])), "field": f, "pred": _get(ps[pi], f), "gold": gs[gi][f]}
@@ -163,6 +177,7 @@ def score_case(pred_row: OutputRow | None, gold: GoldCase) -> dict[str, Any]:
         "pred_valid": p.valid,
         "pred_invalid_reason": p.reason,
         "status_ok": status_ok,
+        "status_ok_unparseable_wrong": status_ok_strict,
         "steps_exact": steps_exact,
         "row_exact": status_ok and steps_exact,
         "n_pred": len(ps),
@@ -242,6 +257,7 @@ def aggregate(cases: list[Mapping[str, Any]]) -> dict[str, Any]:
         "cases": n,
         "published": {
             "status_accuracy": _rate(s("status_ok"), n),
+            "status_accuracy_unparseable_wrong": _rate(s("status_ok_unparseable_wrong"), n),
             "status_confusion": confusion(cases),
             "row_exact": _rate(s("row_exact"), n),
             "steps_exact": _rate(s("steps_exact"), n),

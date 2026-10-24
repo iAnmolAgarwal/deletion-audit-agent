@@ -92,18 +92,19 @@ class TestHoldoutLocked(unittest.TestCase):
             with self.assertRaises(HoldoutLockedError):
                 load_gold(SAMPLE_OUTPUT, holdout=True)
 
-    def test_requests_holdout_locked(self) -> None:
-        with self.assertRaises(HoldoutLockedError):
-            load_requests(include_holdout=True)
-
     def test_phrase_constant(self) -> None:
         self.assertEqual(UNLOCK_PHRASE, "HOLDOUT EVALUATION RUN")
 
 
 class TestRequestsAndGuard(unittest.TestCase):
-    def test_default_requests_drop_holdout(self) -> None:
+    def test_requests_load_all_32_without_unlock(self) -> None:
+        """T47: request inputs are not locked; all 32 sample rows load with no phrase."""
         r = load_requests()
-        self.assertEqual(set(r), set(DEV_IDS))
+        self.assertEqual(len(r), 32)
+        self.assertEqual(set(r), set(DEV_IDS | HOLDOUT_IDS))
+
+    def test_requests_explicit_dev_selection(self) -> None:
+        self.assertEqual(set(load_requests(cases=DEV_IDS)), set(DEV_IDS))
 
     def test_read_output_refuses_gold_file(self) -> None:
         with self.assertRaises(PermissionError):

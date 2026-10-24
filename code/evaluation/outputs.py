@@ -3,19 +3,63 @@
 A row whose ``steps_json`` does not parse to a JSON list is kept with ``parse_error`` set.
 It is never turned into ``[]``: a failed parse is an explicit failure, not "nothing found"
 (../CLAUDE.md section 3).
+
+Gold guard (verifier finding B1, developer ruling T47): :func:`read_output` refuses the gold
+file by identity, not by path spelling. A file is the gold file when ``os.path.samefile``
+says so (case variants on a case-insensitive disk, hard links, symlinks) or when its bytes
+have the same sha256 as ``sample_output.csv`` (copies). The sha256 is computed only when the
+two sizes are equal, in memory; the digest is never stored, printed or logged. The guard
+opens only through ``evaluation.gold``'s unlock phrase, which logs the access.
+Limit: a copy with even one byte changed is not caught by this guard.
+
+Field size (verifier F3, ruling T72): ``csv``'s default field limit (131072 characters)
+crashed the whole read on one oversized ``steps_json`` cell. :func:`read_output` raises the
+limit to :data:`FIELD_SIZE_CAP` (16 MiB) for the duration of the read and restores the
+process value afterwards. 16 MiB is about 600 times the largest plausible honest row (a
+100-step ``steps_json`` is about 25 KB) and still bounds memory per field. A record that
+still fails to parse becomes a hard issue, never a crash, and the read goes on.
+
+Decoding (verifier M1, ruling T80): the file's bytes are read ONCE. The same bytes give
+``OutputFile.sha256`` (what ``evaluate.py score`` records), feed a second gold-identity
+check, and are decoded as UTF-8 with ``surrogateescape``, so an invalid byte cannot raise.
+A record holding an undecodable byte is skipped with a hard issue that names its record
+number, never its value.
+
+Case names (T72 note 1): messages built from a file name a case only by a value matching
+:data:`CASE_ID_RE` (``case_`` then ASCII digits); any other first-column value is named by
+its record number (``<record N>``, the header being record 1), never by the value.
 """
 from __future__ import annotations
 
 import csv
+import hashlib
+import io
 import json
+import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable
 
+from . import paths
 from .contract import STEP_KEYS
-from .paths import SAMPLE_OUTPUT
+from .gold import HoldoutLockedError, check_unlock
 
 OUTPUT_HEADER: list[str] = ["case_id", "deletion_status", "steps_json"]
+FIELD_SIZE_CAP: int = 16 * 1024 * 1024  # characters per CSV field while reading a prediction file
+CASE_ID_RE: re.Pattern[str] = re.compile(r"case_[0-9]+", re.ASCII)
+
+
+def is_case_name(value: str) -> bool:
+    """True when ``value`` is fully ``case_`` plus ASCII digits (safe to print as a case name)."""
+    return isinstance(value, str) and CASE_ID_RE.fullmatch(value) is not None
+
+
+def case_label(value: str, record_no: int | None) -> str:
+    """``value`` if it is a case name, else ``<record N>`` (never the value itself)."""
+    if is_case_name(value):
+        return value
+    return f"<record {record_no}>" if record_no is not None else "<unnamed record>"
 
 
 @dataclass(frozen=True)
@@ -37,6 +81,8 @@ class OutputFile:
     order: list[str]
     issues: list[str] = field(default_factory=list)
     header: list[str] | None = None
+    record_no: dict[str, int] = field(default_factory=dict)  # case_id -> CSV record number (header = 1)
+    sha256: str | None = None  # sha256 of the exact bytes that were parsed
 
 
 def parse_steps(raw: str) -> tuple[list[Any] | None, str | None]:
@@ -50,11 +96,61 @@ def parse_steps(raw: str) -> tuple[list[Any] | None, str | None]:
     return value, None
 
 
-def read_output(path: Path) -> OutputFile:
-    """Read a prediction file. Refuses the gold file, which only gold.py may read."""
-    if path.resolve() == SAMPLE_OUTPUT.resolve():
-        raise PermissionError("sample_output.csv is gold; load it only through evaluation.gold")
-    raw_bytes = path.read_bytes()
+def _sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for block in iter(lambda: f.read(1 << 16), b""):
+            h.update(block)
+    return h.hexdigest()
+
+
+def is_gold_file(path: Path, data: bytes | None = None) -> bool:
+    """True when ``path`` is the gold file (``paths.SAMPLE_OUTPUT``, read at call time).
+
+    Same file by ``os.path.samefile`` (any spelling, hard link or symlink), or the same
+    bytes by sha256 (a copy). With ``data``, the bytes already read are compared instead of
+    re-reading ``path``. Only ``stat`` is used unless the sizes are equal.
+    """
+    gold = paths.SAMPLE_OUTPUT
+    try:
+        if os.path.samefile(path, gold):
+            return True
+        size = len(data) if data is not None else os.stat(path).st_size
+        if size != os.stat(gold).st_size:
+            return False
+    except OSError:  # a missing gold file or candidate: nothing to protect or compare
+        return False
+    mine = hashlib.sha256(data).hexdigest() if data is not None else _sha256(path)
+    return mine == _sha256(gold)
+
+
+def _has_bad_bytes(fields: list[str]) -> bool:
+    """True when a decoded field holds a surrogate-escaped (undecodable) byte."""
+    return any("\udc80" <= ch <= "\udcff" for f in fields for ch in f)
+
+
+def read_output(path: Path, *, unlock_phrase: str | None = None, run_id: str | None = None) -> OutputFile:
+    """Read a prediction file. Refuses the gold file, which only gold.py may read.
+
+    Raises:
+        HoldoutLockedError: ``path`` is the gold file (see :func:`is_gold_file`) and the
+            unlock phrase was not given. With the phrase, the access is logged by
+            ``evaluation.gold.check_unlock`` and the file is read.
+    """
+    def refuse_or_unlock() -> None:
+        if unlock_phrase is None:
+            raise HoldoutLockedError(
+                f"{path} is the gold file (sample_output.csv by identity or content); load gold only "
+                "through evaluation.gold")
+        check_unlock(True, unlock_phrase, "gold via outputs.read_output", run_id)
+
+    unlocked = False
+    if is_gold_file(path):
+        refuse_or_unlock()
+        unlocked = True
+    raw_bytes = path.read_bytes()  # the only read: hash, gold check and parse all use these bytes
+    if not unlocked and is_gold_file(path, raw_bytes):  # the file changed into gold after the check
+        refuse_or_unlock()
     issues: list[str] = []
     if b"\r\n" in raw_bytes:
         issues.append("CRLF line endings (the sample file uses LF)")
@@ -62,25 +158,49 @@ def read_output(path: Path) -> OutputFile:
         issues.append("UTF-8 BOM present")
     rows: dict[str, OutputRow] = {}
     order: list[str] = []
-    with path.open(newline="", encoding="utf-8-sig") as f:
-        reader = csv.reader(f)
-        header = next(reader, None)
-        if header != OUTPUT_HEADER:
-            issues.append(f"header is {header!r}, expected {OUTPUT_HEADER!r}")
-        for lineno, record in enumerate(reader, start=2):
-            if len(record) != 3:
-                issues.append(f"record {lineno}: {len(record)} fields, expected 3")
-                if not record:
+    record_no: dict[str, int] = {}
+    header: list[str] | None = None
+    previous_limit = csv.field_size_limit(FIELD_SIZE_CAP)
+    try:
+        text = raw_bytes.removeprefix(b"\xef\xbb\xbf").decode("utf-8", errors="surrogateescape")
+        with io.StringIO(text, newline="") as f:
+            reader = csv.reader(f)
+            lineno = 0
+            while True:
+                lineno += 1
+                try:
+                    record = next(reader)
+                except StopIteration:
+                    break
+                except csv.Error as exc:  # e.g. a field over FIELD_SIZE_CAP: an issue, never a crash
+                    issues.append(f"record {lineno}: CSV error ({exc}); record skipped, and the records "
+                                  "after it may be misaligned")
                     continue
-                record = (record + ["", "", ""])[:3]
-            case_id, status, raw = record
-            if case_id in rows:
-                issues.append(f"record {lineno}: duplicate case_id {case_id!r}")
-                continue
-            steps, err = parse_steps(raw)
-            rows[case_id] = OutputRow(case_id, status, steps, raw, err)
-            order.append(case_id)
-    return OutputFile(rows=rows, order=order, issues=issues, header=header)
+                if _has_bad_bytes(record):  # invalid UTF-8: an issue for this record, never a crash
+                    issues.append(f"record {lineno}: invalid UTF-8 bytes; record skipped")
+                    continue
+                if lineno == 1:
+                    header = record
+                    if header != OUTPUT_HEADER:
+                        issues.append(f"header: not {','.join(OUTPUT_HEADER)} ({len(header)} column(s))")
+                    continue
+                if len(record) != 3:
+                    issues.append(f"record {lineno}: {len(record)} fields, expected 3")
+                    if not record:
+                        continue
+                    record = (record + ["", "", ""])[:3]
+                case_id, status, raw = record
+                if case_id in rows:
+                    issues.append(f"record {lineno}: duplicate case_id {case_label(case_id, None) if is_case_name(case_id) else '(value not shown)'}")
+                    continue
+                steps, err = parse_steps(raw)
+                rows[case_id] = OutputRow(case_id, status, steps, raw, err)
+                order.append(case_id)
+                record_no[case_id] = lineno
+    finally:
+        csv.field_size_limit(previous_limit)
+    return OutputFile(rows=rows, order=order, issues=issues, header=header, record_no=record_no,
+                      sha256=hashlib.sha256(raw_bytes).hexdigest())
 
 
 def serialize_steps(steps: list[dict[str, Any]]) -> str:

@@ -13,8 +13,13 @@ Holdout lock (../CLAUDE.md section 4, developer decision D3):
   logged to stderr and appended to ``runs/HOLDOUT_ACCESS.log``. It is meant to be called
   once, after freeze, in the run the developer names.
 
-Request rows (``sample_deletion_requests.csv``) follow the same lock: holdout request rows
-are dropped by default, so no DEV computation can use them even for elimination.
+Request rows are NOT locked (developer ruling T47, building on T32): the lock covers gold
+only. The holdout cases' request inputs may join the batch account matching, so
+:func:`load_requests` returns every row of the file. A DEV run chooses which cases it solves
+and scores by an explicit selection (``cases=DEV_IDS``), not by this lock.
+
+Other readers: ``outputs.read_output`` refuses the gold file by identity (same file or same
+bytes) unless this module's unlock phrase is given (verifier finding B1).
 """
 from __future__ import annotations
 
@@ -24,7 +29,7 @@ import json
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 from .paths import HOLDOUT_ACCESS_LOG, SAMPLE_OUTPUT, SAMPLE_REQUESTS
 from .split import DEV_IDS, HOLDOUT_IDS
@@ -46,7 +51,7 @@ class GoldCase:
     steps: list[dict[str, Any]]
 
 
-def _check_unlock(holdout: bool, unlock_phrase: str | None, what: str, run_id: str | None) -> None:
+def check_unlock(holdout: bool, unlock_phrase: str | None, what: str, run_id: str | None) -> None:
     """Refuse holdout access unless the exact unlock phrase is given; log a granted unlock."""
     if not holdout:
         return
@@ -82,7 +87,7 @@ def load_gold(
         HoldoutLockedError: holdout requested without the unlock phrase (before any I/O).
         ValueError: bad header, a case ID in neither split, a duplicate, or an incomplete split.
     """
-    _check_unlock(holdout, unlock_phrase, "gold", run_id)
+    check_unlock(holdout, unlock_phrase, "gold", run_id)
     wanted, dropped_set = (HOLDOUT_IDS, DEV_IDS) if holdout else (DEV_IDS, HOLDOUT_IDS)
     out: dict[str, GoldCase] = {}
     with path.open(newline="", encoding="utf-8") as f:
@@ -113,21 +118,20 @@ def load_gold(
 def load_requests(
     path: Path = SAMPLE_REQUESTS,
     *,
-    include_holdout: bool = False,
-    unlock_phrase: str | None = None,
-    run_id: str | None = None,
+    cases: Iterable[str] | None = None,
 ) -> dict[str, dict[str, str]]:
-    """Return request rows keyed by ``case_id``; holdout request rows are dropped by default.
+    """Return request rows keyed by ``case_id``: every row, or only the IDs in ``cases``.
 
-    Works for both ``sample_deletion_requests.csv`` and ``deletion_requests.csv`` (the test
-    file holds no sample IDs, so nothing is dropped from it).
+    Request inputs are not locked (module docstring, T47). ``cases`` is the caller's explicit
+    selection, e.g. ``cases=DEV_IDS`` for a DEV run. Works for both
+    ``sample_deletion_requests.csv`` and ``deletion_requests.csv``.
     """
-    _check_unlock(include_holdout, unlock_phrase, "requests", run_id)
+    wanted = None if cases is None else frozenset(cases)
     out: dict[str, dict[str, str]] = {}
     with path.open(newline="", encoding="utf-8") as f:
         for row in csv.DictReader(f):
             case_id = row["case_id"]
-            if case_id in HOLDOUT_IDS and not include_holdout:
+            if wanted is not None and case_id not in wanted:
                 continue
             if case_id in out:
                 raise ValueError(f"duplicate request case {case_id!r}")

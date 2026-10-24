@@ -8,6 +8,7 @@ from __future__ import annotations
 import datetime as dt
 import hashlib
 import json
+import re
 import subprocess
 from pathlib import Path
 from typing import Any, Iterable, Mapping
@@ -16,6 +17,7 @@ from .gold import GoldCase
 from .paths import REPO_ROOT, RUNS
 
 IST = dt.timezone(dt.timedelta(hours=5, minutes=30))
+RUN_ID_RE: re.Pattern[str] = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*", re.ASCII)
 FLIP_METRICS: tuple[str, ...] = ("status_ok", "row_exact", "order_exact", "citation_set_exact")
 
 
@@ -60,11 +62,20 @@ def git_head() -> str | None:
         return None
 
 
+def check_run_id(run_id: str) -> str:
+    """Return ``run_id`` if it matches ``^[A-Za-z0-9][A-Za-z0-9._-]*$`` (T72), else raise ValueError.
+
+    Every read or write by run ID goes through here (``run_dir``, ``load_score``; T80): no
+    spaces, slashes, leading dot or dash, so neither a shell slip nor a path can escape ``runs/``.
+    """
+    if not isinstance(run_id, str) or RUN_ID_RE.fullmatch(run_id) is None:
+        raise ValueError(f"bad run id {run_id!r}: must match ^[A-Za-z0-9][A-Za-z0-9._-]*$")
+    return run_id
+
+
 def run_dir(run_id: str) -> Path:
-    """``runs/<run_id>/``, created if needed. Run IDs are plain names, never paths."""
-    if not run_id or "/" in run_id or run_id.startswith("."):
-        raise ValueError(f"bad run id {run_id!r}")
-    d = RUNS / run_id
+    """``runs/<run_id>/``, created if needed; the ID is checked by :func:`check_run_id`."""
+    d = RUNS / check_run_id(run_id)
     d.mkdir(parents=True, exist_ok=True)
     return d
 
@@ -89,5 +100,5 @@ def flips(prev_cases: Iterable[Mapping[str, Any]], cur_cases: Iterable[Mapping[s
 
 
 def load_score(run_id: str) -> dict[str, Any]:
-    """Read ``runs/<run_id>/score.json``."""
-    return json.loads((RUNS / run_id / "score.json").read_text(encoding="utf-8"))
+    """Read ``runs/<run_id>/score.json``; the ID is checked by :func:`check_run_id` (T80, M2)."""
+    return json.loads((RUNS / check_run_id(run_id) / "score.json").read_text(encoding="utf-8"))

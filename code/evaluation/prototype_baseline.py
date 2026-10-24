@@ -12,8 +12,16 @@ Variants (each its own run ID):
     --force-intent      bypass ``intent.py``'s keyword tables (T7: per-row tables do not
                         ship) by treating every request as deletion-authorized
 
-Holdout lock: requests come from ``evaluation.gold.load_requests`` (holdout rows dropped),
-and the prototype never reads gold during ``solve``.
+Case selection: the 22 DEV cases are chosen explicitly (``load_requests(cases=DEV_IDS)``).
+Request inputs are not locked (T47); the gold lock is separate, and the prototype never reads
+gold during ``solve``.
+
+Evidence guard (verifier B2, ruling T47; ``evaluation.evidence_guard``): the extraction is
+instrumented, and no output is written (exit status 3) when a skip falls outside the
+allow-list (only ``png-model-needed``), a parsed file yields zero units without a declared
+empty scope or the T51 "text present, no resource ID" state, or a log line's JSON fails to
+parse. ``producer.json`` records the allowed
+skips and the (empty) failure list for ``evaluate.py score`` to check.
 
 Usage: python3 -B code/evaluation/prototype_baseline.py --run-id <id> [--vision] [--no-signature] [--force-intent]
 """
@@ -36,8 +44,9 @@ if __package__ in (None, ""):  # run as a script: make the ``evaluation`` packag
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     __package__ = "evaluation"
 
-from evaluation import runs  # noqa: E402
+from evaluation import evidence_guard, runs  # noqa: E402
 from evaluation.gold import load_requests  # noqa: E402
+from evaluation.split import DEV_IDS  # noqa: E402
 from evaluation.outputs import write_output  # noqa: E402
 from evaluation.paths import REPO_ROOT  # noqa: E402
 
@@ -55,6 +64,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"prototype not found at {PROTOTYPE}; this tool needs the prep kit", file=sys.stderr)
         return 1
     sys.path.insert(0, str(PROTOTYPE))
+    import extract  # type: ignore  # noqa: E402
     import solver  # type: ignore  # noqa: E402
 
     if a.force_intent:
@@ -63,14 +73,22 @@ def main(argv: list[str] | None = None) -> int:
     if a.vision:
         from vision_facts import vision_units as _vu  # type: ignore  # noqa: E402
         vision_units = _vu()
-    world = solver.World(vision_units=vision_units)
-    failed = [x for x in world.skipped if ":FAILED:" in x or "-failed" in x]
-    if failed:  # a failed read is an explicit failure, never "nothing found": refuse to write output
-        print(f"evidence parse failures, no output written: {failed}", file=sys.stderr)
+    with evidence_guard.instrument(solver, extract) as rec:
+        world = solver.World(vision_units=vision_units)
+    guard = evidence_guard.audit_extraction(rec, list(world.skipped), extract.DATASET, extract.load_sql,
+                                            pdf_text=extract.pdf_text,
+                                            extra_prefixes=[pre for pre, _ in extract.SERVICE_FROM_RID])
+    if not guard["ok"]:  # "nothing found" is never success: refuse to write output
+        print(f"evidence guard: {len(guard['failures'])} failure(s), no output written:", file=sys.stderr)
+        for x in guard["failures"]:
+            print(f"  {x}", file=sys.stderr)
+        print(f"  (allowed skips: {len(guard.get('allowed_skips', []))}, reason(s) "
+              f"{guard.get('allowed_skip_reasons')}; text present, no resource ID: "
+              f"{guard.get('no_resource_id_files')})", file=sys.stderr)
         return 3
     opts = solver.Opts(use_signature=not a.no_signature)
 
-    requests = load_requests()  # DEV sample requests, holdout rows dropped
+    requests = load_requests(cases=DEV_IDS)  # explicit DEV selection (request inputs are not locked)
     rows, per_case = [], {}
     for cid in sorted(requests):
         res = solver.solve(requests[cid], world, opts)
@@ -95,7 +113,12 @@ def main(argv: list[str] | None = None) -> int:
         "force_intent": a.force_intent,
         "prototype_sha256": {p.name: runs.sha256_file(p) for p in sorted(PROTOTYPE.glob("*.py"))},
         "rows_written": n,
+        "output_sha256": runs.sha256_file(d / "output.csv"),  # ties this record to its output (F2, T72)
         "evidence_skipped": sorted(world.skipped),
+        "evidence_skip_count": len(world.skipped),  # G9 freeze check: must be 0 in the final run
+        "evidence_failures": guard["failures"],
+        "evidence_no_resource_id_files": guard["no_resource_id_files"],
+        "evidence_guard": guard,
         "validator_errors": {c: v["validator"] for c, v in per_case.items() if v["validator"]},
         "per_case": per_case,
         "model_ids": [],

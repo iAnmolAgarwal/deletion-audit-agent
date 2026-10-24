@@ -12,6 +12,9 @@ it is typed by hand. The prose outside the block gives context only and quotes n
 - The split was made after the prep forensics agent had read all 32 answers, and its
   stratification used gold status, step count and operations (`code/evaluation/split.py`). DEV
   numbers are in-sample: every prototype rule was designed while looking at DEV.
+- The lock covers gold only (T47). `outputs.read_output` refuses the gold file by identity (same
+  file, or same bytes), whatever the path spelling. Request inputs are not locked; a DEV run
+  selects its cases explicitly.
 
 ## How the baseline was produced (G4)
 - `code/evaluation/prototype_baseline.py` imports the prep prototype (`../research/prototype/solver.py`)
@@ -23,11 +26,31 @@ it is typed by hand. The prose outside the block gives context only and quotes n
   flips against the default are empty. So on DEV neither hand-typed input changes any number.
   Their effect is on test cases only: the screenshots, and the 10 non-deletion texts. DEV has no
   NOT_APPLICABLE case, so it cannot measure that effect.
+- Evidence guard (T47, `code/evaluation/evidence_guard.py`). The producer writes no output when:
+  - a skip reason is outside the allow-list (`png-model-needed` only);
+  - a parsed file yields zero units and declares no empty scope;
+  - a log line's JSON fails to parse.
+
+  One exception is listed instead of refused (T51): "text present, no resource ID". It covers a
+  PDF (recognised by content) whose text layer is non-empty and whose raw text holds no token
+  shaped like a resource ID. If such a token is present while the parser yields nothing, the run
+  refuses. An empty text layer also refuses.
+  `evaluate.py score` checks the producer record next to the prediction file and refuses on any
+  failure. Only runs whose producer check passed feed this file (T51). A run with no record, or with
+  a record from before the guard, is listed by ID with the reason, under "Excluded runs", and nothing else.
+  The producer record carries the evidence skip count, which must be 0 at freeze (G9).
+- T72 tightenings:
+  - A `png-model-needed` skip is allowed only when the file's bytes start with the PNG signature.
+  - The producer record carries `output_sha256`; a record whose hash differs from the scored file is
+    `output-mismatch`, and one without a hash is `unverified`.
+  - The check is re-run with the current rules when this file is rendered, so a run that passed
+    an older, weaker check is excluded and listed with the reason.
 
 ## Reconciliation with report 15 and G2 (by definition, not by tuning)
-- The `prep` block re-implements `research/prototype/score.py`. Each valid baseline run's
-  reconciliation table below compares it, count by count, with G2's re-measure
-  `runs/g2-0137/q2.json` (`g2-q2_reconcile-0137`). G2 found that re-measure equal to report 15 section 1.
+- The `prep` block re-implements `research/prototype/score.py`. Each listed baseline run compares
+  it, count by count, with G2's re-measure `runs/g2-0137/q2.json` (`g2-q2_reconcile-0137`) and states
+  whether every count is equal; the reference values themselves live in that run's `score.json`.
+  G2 found that re-measure equal to report 15 section 1.
 - The published block differs from the prep block by definition only:
   - **row exact** is prep `case_exact`, and **steps exact** is prep `steps_exact`.
   - **step**: the published metric matches on the 4-field key (phase, operation, system, resource).
@@ -42,18 +65,24 @@ it is typed by hand. The prose outside the block gives context only and quotes n
 - One reconciliation failure happened and was fixed; see "Invalidated runs" at the end of the generated block.
 
 <!-- BEGIN GENERATED: evaluate.py numbers (do not edit by hand) -->
-## Scored runs (DEV, 22 cases; holdout never loaded)
+## Scored runs (DEV, 22 cases; holdout never loaded; producer check passed)
 
-| run | status | row exact | steps exact | step P / R / F1 | state | evidence | step_no | seq exact | pairwise order | citation set | prep tuple | prep fields | prep resources | coherence hard / soft |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| `g4-baseline-20261025T0229` | 22/22 | 20/22 | 20/22 | 1.0000 / 0.9851 / 0.9925 | 132/132 | 132/132 | 128/132 | 20/22 | 473/473 | 22/22 | 132/134 | 908/938 | 74/76 | 0 / 0 |
-| `g4-baseline-forceintent-20261025T0229` | 22/22 | 20/22 | 20/22 | 1.0000 / 0.9851 / 0.9925 | 132/132 | 132/132 | 128/132 | 20/22 | 473/473 | 22/22 | 132/134 | 908/938 | 74/76 | 0 / 0 |
-| `g4-baseline-nosig-20261025T0229` | 22/22 | 16/22 | 16/22 | 1.0000 / 0.9552 / 0.9771 | 128/128 | 128/128 | 120/128 | 16/22 | 459/459 | 22/22 | 128/134 | 864/938 | 70/76 | 0 / 0 |
-| `g4-baseline-vision-20261025T0229` | 22/22 | 20/22 | 20/22 | 1.0000 / 0.9851 / 0.9925 | 132/132 | 132/132 | 128/132 | 20/22 | 473/473 | 22/22 | 132/134 | 908/938 | 74/76 | 0 / 0 |
+| run | status | status (c) | row exact | steps exact | step P / R / F1 | state | evidence | step_no | seq exact | pairwise order | citation set | prep tuple | prep fields | prep resources | coherence hard / soft |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `g4fix2-baseline-20261025T0428` | 22/22 | 22/22 | 20/22 | 20/22 | 1.0000 / 0.9851 / 0.9925 | 132/132 | 132/132 | 128/132 | 20/22 | 473/473 | 22/22 | 132/134 | 908/938 | 74/76 | 0 / 0 |
+| `g4fix2-baseline-final-20261025T0429` | 22/22 | 22/22 | 20/22 | 20/22 | 1.0000 / 0.9851 / 0.9925 | 132/132 | 132/132 | 128/132 | 20/22 | 473/473 | 22/22 | 132/134 | 908/938 | 74/76 | 0 / 0 |
+| `g4fix2-baseline-forceintent-20261025T0429` | 22/22 | 22/22 | 20/22 | 20/22 | 1.0000 / 0.9851 / 0.9925 | 132/132 | 132/132 | 128/132 | 20/22 | 473/473 | 22/22 | 132/134 | 908/938 | 74/76 | 0 / 0 |
+| `g4fix2-baseline-nosig-20261025T0429` | 22/22 | 22/22 | 16/22 | 16/22 | 1.0000 / 0.9552 / 0.9771 | 128/128 | 128/128 | 120/128 | 16/22 | 459/459 | 22/22 | 128/134 | 864/938 | 70/76 | 0 / 0 |
+| `g4fix2-baseline-vision-20261025T0429` | 22/22 | 22/22 | 20/22 | 20/22 | 1.0000 / 0.9851 / 0.9925 | 132/132 | 132/132 | 128/132 | 20/22 | 473/473 | 22/22 | 132/134 | 908/938 | 74/76 | 0 / 0 |
+| `g4fix3-baseline-20261025T0453` | 22/22 | 22/22 | 20/22 | 20/22 | 1.0000 / 0.9851 / 0.9925 | 132/132 | 132/132 | 128/132 | 20/22 | 473/473 | 22/22 | 132/134 | 908/938 | 74/76 | 0 / 0 |
+| `g4fix3-baseline-nosig-20261025T0453` | 22/22 | 22/22 | 16/22 | 16/22 | 1.0000 / 0.9552 / 0.9771 | 128/128 | 128/128 | 120/128 | 16/22 | 459/459 | 22/22 | 128/134 | 864/938 | 70/76 | 0 / 0 |
+| `g4fix3-baseline-forceintent-20261025T0453` | 22/22 | 22/22 | 20/22 | 20/22 | 1.0000 / 0.9851 / 0.9925 | 132/132 | 132/132 | 128/132 | 20/22 | 473/473 | 22/22 | 132/134 | 908/938 | 74/76 | 0 / 0 |
+| `g4fix3-baseline-vision-20261025T0453` | 22/22 | 22/22 | 20/22 | 20/22 | 1.0000 / 0.9851 / 0.9925 | 132/132 | 132/132 | 128/132 | 20/22 | 473/473 | 22/22 | 132/134 | 908/938 | 74/76 | 0 / 0 |
 
 Metric definitions (code: `code/evaluation/scorer.py`):
 
-- **status**: cases whose deletion_status equals gold
+- **status**: cases whose deletion_status equals gold; reading (a): an unparseable steps_json row's status is still credited
+- **status (c)**: reading (c): as status, but a row whose steps_json is not a JSON list counts as status-wrong
 - **row exact**: status equal AND parsed steps_json equal (key order ignored, list order kept)
 - **steps exact**: parsed steps_json equal, status ignored (alternative reading of 'row')
 - **step P/R/F1**: multiset match on (phase, operation, system_id, resource_id), micro
@@ -65,118 +94,127 @@ Metric definitions (code: `code/evaluation/scorer.py`):
 - **prep fields**: prep replay: position-aligned 7-field hits / (max(len) x 7) slots
 - **prep resources**: prep replay: (system_id, resource_id) set, tp/gold
 
-### `g4-baseline-20261025T0229`
+### `g4fix2-baseline-20261025T0428`
 
 - What: prep prototype (../research/prototype/solver.py, imported read-only) on the 22 DEV cases; variant: default; vision table off; job-timing signature on; intent tables as in intent.py
-- Scored at 2026-10-25T02:29:43+05:30 by: `python3 -B code/evaluation/evaluate.py score --pred runs/g4-baseline-20261025T0229/output.csv --run-id g4-baseline-20261025T0229 --reconcile runs/g2-0137/q2.json:dev_all --prev g4-baseline-20261025T0228`
-- Produced by: `python3 -B code/evaluation/prototype_baseline.py --run-id g4-baseline-20261025T0229`
-- Config hash `e40b2d6707f9a08b`; scorer code `25fb6007374a62da`; output sha256 `60234e8f847c1526`; model IDs: none; paid calls: 0
+- Scored at 2026-10-25T04:28:54+05:30 by: `python3 -B code/evaluation/evaluate.py score --pred runs/g4fix2-baseline-20261025T0428/output.csv --run-id g4fix2-baseline-20261025T0428 --reconcile runs/g2-0137/q2.json:dev_all --prev g4fix-baseline-20261025T0314`
+- Produced by: `python3 -B code/evaluation/prototype_baseline.py --run-id g4fix2-baseline-20261025T0428`
+- Config hash `89ea06d931587989`; scorer code `91c12d0fecf70fc5`; output sha256 `60234e8f847c1526`; model IDs: none; paid calls: 0
+- Producer check: **ok** (record: `runs/g4fix2-baseline-20261025T0428/producer.json`); evidence skip count 11 (must be 0 at freeze, G9)
+- Allowed evidence skips (11, allow-list `png-model-needed` only): `evidence_04:png-model-needed`, `evidence_09:png-model-needed`, `evidence_14:png-model-needed`, `evidence_19:png-model-needed`, `evidence_23:png-model-needed`, `evidence_28:png-model-needed`, `evidence_32:png-model-needed`, `evidence_37:png-model-needed`, `evidence_42:png-model-needed`, `evidence_46:png-model-needed`, `evidence_60:png-model-needed`
+- Text present, no resource ID (T51; listed, not refused) (2): `evidence_18`, `evidence_27`
 - Cases not row-exact: case_18, case_20
+- Reconciliation with `runs/g2-0137/q2.json:dev_all` (prototype `score.py` definitions; the reference values are not reproduced here): all counts equal
+- Flips against `g4fix-baseline-20261025T0314`: not shown here (that run is excluded below); they are in this run's `flips.json`
 
-Reconciliation with `runs/g2-0137/q2.json:dev_all` (prototype `score.py` definitions):
+### `g4fix2-baseline-final-20261025T0429`
 
-| metric | this run | reference | equal |
-|---|---:|---:|---|
-| status_exact | 22 | 22 | yes |
-| case_exact | 20 | 20 | yes |
-| steps_exact | 20 | 20 | yes |
-| sequence_exact | 20 | 20 | yes |
-| step_tp | 132 | 132 | yes |
-| step_pred | 132 | 132 | yes |
-| step_gold | 134 | 134 | yes |
-| field_hits | 908 | 908 | yes |
-| field_slots | 938 | 938 | yes |
-| res_tp | 74 | 74 | yes |
-| res_pred | 74 | 74 | yes |
-| res_gold | 76 | 76 | yes |
+- What: prep prototype (../research/prototype/solver.py, imported read-only) on the 22 DEV cases; variant: default; vision table off; job-timing signature on; intent tables as in intent.py
+- Scored at 2026-10-25T04:29:53+05:30 by: `python3 -B code/evaluation/evaluate.py score --pred runs/g4fix2-baseline-final-20261025T0429/output.csv --run-id g4fix2-baseline-final-20261025T0429 --reconcile runs/g2-0137/q2.json:dev_all --prev g4fix-baseline-20261025T0314`
+- Produced by: `python3 -B code/evaluation/prototype_baseline.py --run-id g4fix2-baseline-final-20261025T0429`
+- Config hash `ef5876722b2cd3c5`; scorer code `de6ac88cf636cbb8`; output sha256 `60234e8f847c1526`; model IDs: none; paid calls: 0
+- Producer check: **ok** (record: `runs/g4fix2-baseline-final-20261025T0429/producer.json`); evidence skip count 11 (must be 0 at freeze, G9)
+- Allowed evidence skips (11, allow-list `png-model-needed` only): `evidence_04:png-model-needed`, `evidence_09:png-model-needed`, `evidence_14:png-model-needed`, `evidence_19:png-model-needed`, `evidence_23:png-model-needed`, `evidence_28:png-model-needed`, `evidence_32:png-model-needed`, `evidence_37:png-model-needed`, `evidence_42:png-model-needed`, `evidence_46:png-model-needed`, `evidence_60:png-model-needed`
+- Text present, no resource ID (T51; listed, not refused) (2): `evidence_18`, `evidence_27`
+- Cases not row-exact: case_18, case_20
+- Reconciliation with `runs/g2-0137/q2.json:dev_all` (prototype `score.py` definitions; the reference values are not reproduced here): all counts equal
+- Flips against `g4fix-baseline-20261025T0314`: not shown here (that run is excluded below); they are in this run's `flips.json`
 
-Flips against `g4-baseline-20261025T0228`: case_07 status_ok False->True, case_07 row_exact False->True, case_07 order_exact False->True, case_07 citation_set_exact False->True
-
-### `g4-baseline-forceintent-20261025T0229`
+### `g4fix2-baseline-forceintent-20261025T0429`
 
 - What: prep prototype (../research/prototype/solver.py, imported read-only) on the 22 DEV cases; variant: force-intent; vision table off; job-timing signature on; intent tables bypassed (all deletion-authorized)
-- Scored at 2026-10-25T02:29:43+05:30 by: `python3 -B code/evaluation/evaluate.py score --pred runs/g4-baseline-forceintent-20261025T0229/output.csv --run-id g4-baseline-forceintent-20261025T0229 --reconcile runs/g2-0137/q2.json:dev_all --prev g4-baseline-20261025T0229`
-- Produced by: `python3 -B code/evaluation/prototype_baseline.py --run-id g4-baseline-forceintent-20261025T0229 --force-intent`
-- Config hash `4b3101541dd4c446`; scorer code `25fb6007374a62da`; output sha256 `60234e8f847c1526`; model IDs: none; paid calls: 0
+- Scored at 2026-10-25T04:29:54+05:30 by: `python3 -B code/evaluation/evaluate.py score --pred runs/g4fix2-baseline-forceintent-20261025T0429/output.csv --run-id g4fix2-baseline-forceintent-20261025T0429 --reconcile runs/g2-0137/q2.json:dev_all --prev g4fix2-baseline-final-20261025T0429`
+- Produced by: `python3 -B code/evaluation/prototype_baseline.py --run-id g4fix2-baseline-forceintent-20261025T0429 --force-intent`
+- Config hash `bc4e42be5af97976`; scorer code `de6ac88cf636cbb8`; output sha256 `60234e8f847c1526`; model IDs: none; paid calls: 0
+- Producer check: **ok** (record: `runs/g4fix2-baseline-forceintent-20261025T0429/producer.json`); evidence skip count 11 (must be 0 at freeze, G9)
+- Allowed evidence skips (11, allow-list `png-model-needed` only): `evidence_04:png-model-needed`, `evidence_09:png-model-needed`, `evidence_14:png-model-needed`, `evidence_19:png-model-needed`, `evidence_23:png-model-needed`, `evidence_28:png-model-needed`, `evidence_32:png-model-needed`, `evidence_37:png-model-needed`, `evidence_42:png-model-needed`, `evidence_46:png-model-needed`, `evidence_60:png-model-needed`
+- Text present, no resource ID (T51; listed, not refused) (2): `evidence_18`, `evidence_27`
 - Cases not row-exact: case_18, case_20
+- Reconciliation with `runs/g2-0137/q2.json:dev_all` (prototype `score.py` definitions; the reference values are not reproduced here): all counts equal
+- Flips against `g4fix2-baseline-final-20261025T0429`: none
 
-Reconciliation with `runs/g2-0137/q2.json:dev_all` (prototype `score.py` definitions):
-
-| metric | this run | reference | equal |
-|---|---:|---:|---|
-| status_exact | 22 | 22 | yes |
-| case_exact | 20 | 20 | yes |
-| steps_exact | 20 | 20 | yes |
-| sequence_exact | 20 | 20 | yes |
-| step_tp | 132 | 132 | yes |
-| step_pred | 132 | 132 | yes |
-| step_gold | 134 | 134 | yes |
-| field_hits | 908 | 908 | yes |
-| field_slots | 938 | 938 | yes |
-| res_tp | 74 | 74 | yes |
-| res_pred | 74 | 74 | yes |
-| res_gold | 76 | 76 | yes |
-
-Flips against `g4-baseline-20261025T0229`: none
-
-### `g4-baseline-nosig-20261025T0229`
+### `g4fix2-baseline-nosig-20261025T0429`
 
 - What: prep prototype (../research/prototype/solver.py, imported read-only) on the 22 DEV cases; variant: no-signature; vision table off; job-timing signature off; intent tables as in intent.py
-- Scored at 2026-10-25T02:29:43+05:30 by: `python3 -B code/evaluation/evaluate.py score --pred runs/g4-baseline-nosig-20261025T0229/output.csv --run-id g4-baseline-nosig-20261025T0229 --reconcile runs/g2-0137/q2.json:dev_nosig --prev g4-baseline-20261025T0229`
-- Produced by: `python3 -B code/evaluation/prototype_baseline.py --run-id g4-baseline-nosig-20261025T0229 --no-signature`
-- Config hash `0636e701a28a26c1`; scorer code `25fb6007374a62da`; output sha256 `2950ef2780c75a28`; model IDs: none; paid calls: 0
+- Scored at 2026-10-25T04:29:54+05:30 by: `python3 -B code/evaluation/evaluate.py score --pred runs/g4fix2-baseline-nosig-20261025T0429/output.csv --run-id g4fix2-baseline-nosig-20261025T0429 --reconcile runs/g2-0137/q2.json:dev_nosig --prev g4fix2-baseline-final-20261025T0429`
+- Produced by: `python3 -B code/evaluation/prototype_baseline.py --run-id g4fix2-baseline-nosig-20261025T0429 --no-signature`
+- Config hash `2f40f7a09be284b8`; scorer code `de6ac88cf636cbb8`; output sha256 `2950ef2780c75a28`; model IDs: none; paid calls: 0
+- Producer check: **ok** (record: `runs/g4fix2-baseline-nosig-20261025T0429/producer.json`); evidence skip count 11 (must be 0 at freeze, G9)
+- Allowed evidence skips (11, allow-list `png-model-needed` only): `evidence_04:png-model-needed`, `evidence_09:png-model-needed`, `evidence_14:png-model-needed`, `evidence_19:png-model-needed`, `evidence_23:png-model-needed`, `evidence_28:png-model-needed`, `evidence_32:png-model-needed`, `evidence_37:png-model-needed`, `evidence_42:png-model-needed`, `evidence_46:png-model-needed`, `evidence_60:png-model-needed`
+- Text present, no resource ID (T51; listed, not refused) (2): `evidence_18`, `evidence_27`
 - Cases not row-exact: case_03, case_18, case_20, case_21, case_26, case_27
+- Reconciliation with `runs/g2-0137/q2.json:dev_nosig` (prototype `score.py` definitions; the reference values are not reproduced here): all counts equal
+- Flips against `g4fix2-baseline-final-20261025T0429`: case_03 row_exact True->False, case_03 order_exact True->False, case_21 row_exact True->False, case_21 order_exact True->False, case_26 row_exact True->False, case_26 order_exact True->False, case_27 row_exact True->False, case_27 order_exact True->False
 
-Reconciliation with `runs/g2-0137/q2.json:dev_nosig` (prototype `score.py` definitions):
-
-| metric | this run | reference | equal |
-|---|---:|---:|---|
-| status_exact | 22 | 22 | yes |
-| case_exact | 16 | 16 | yes |
-| steps_exact | 16 | 16 | yes |
-| sequence_exact | 16 | 16 | yes |
-| step_tp | 128 | 128 | yes |
-| step_pred | 128 | 128 | yes |
-| step_gold | 134 | 134 | yes |
-| field_hits | 864 | 864 | yes |
-| field_slots | 938 | 938 | yes |
-| res_tp | 70 | 70 | yes |
-| res_pred | 70 | 70 | yes |
-| res_gold | 76 | 76 | yes |
-
-Flips against `g4-baseline-20261025T0229`: case_03 row_exact True->False, case_03 order_exact True->False, case_21 row_exact True->False, case_21 order_exact True->False, case_26 row_exact True->False, case_26 order_exact True->False, case_27 row_exact True->False, case_27 order_exact True->False
-
-### `g4-baseline-vision-20261025T0229`
+### `g4fix2-baseline-vision-20261025T0429`
 
 - What: prep prototype (../research/prototype/solver.py, imported read-only) on the 22 DEV cases; variant: vision; vision table ON (hand-typed, T7: not shippable); job-timing signature on; intent tables as in intent.py
-- Scored at 2026-10-25T02:29:43+05:30 by: `python3 -B code/evaluation/evaluate.py score --pred runs/g4-baseline-vision-20261025T0229/output.csv --run-id g4-baseline-vision-20261025T0229 --reconcile runs/g2-0137/q2.json:dev_all --prev g4-baseline-20261025T0229`
-- Produced by: `python3 -B code/evaluation/prototype_baseline.py --run-id g4-baseline-vision-20261025T0229 --vision`
-- Config hash `61d4fcda98ac2869`; scorer code `25fb6007374a62da`; output sha256 `60234e8f847c1526`; model IDs: none; paid calls: 0
+- Scored at 2026-10-25T04:29:54+05:30 by: `python3 -B code/evaluation/evaluate.py score --pred runs/g4fix2-baseline-vision-20261025T0429/output.csv --run-id g4fix2-baseline-vision-20261025T0429 --reconcile runs/g2-0137/q2.json:dev_all --prev g4fix2-baseline-final-20261025T0429`
+- Produced by: `python3 -B code/evaluation/prototype_baseline.py --run-id g4fix2-baseline-vision-20261025T0429 --vision`
+- Config hash `adb519014d113e9e`; scorer code `de6ac88cf636cbb8`; output sha256 `60234e8f847c1526`; model IDs: none; paid calls: 0
+- Producer check: **ok** (record: `runs/g4fix2-baseline-vision-20261025T0429/producer.json`); evidence skip count 11 (must be 0 at freeze, G9)
+- Allowed evidence skips (11, allow-list `png-model-needed` only): `evidence_04:png-model-needed`, `evidence_09:png-model-needed`, `evidence_14:png-model-needed`, `evidence_19:png-model-needed`, `evidence_23:png-model-needed`, `evidence_28:png-model-needed`, `evidence_32:png-model-needed`, `evidence_37:png-model-needed`, `evidence_42:png-model-needed`, `evidence_46:png-model-needed`, `evidence_60:png-model-needed`
+- Text present, no resource ID (T51; listed, not refused) (2): `evidence_18`, `evidence_27`
 - Cases not row-exact: case_18, case_20
+- Reconciliation with `runs/g2-0137/q2.json:dev_all` (prototype `score.py` definitions; the reference values are not reproduced here): all counts equal
+- Flips against `g4fix2-baseline-final-20261025T0429`: none
 
-Reconciliation with `runs/g2-0137/q2.json:dev_all` (prototype `score.py` definitions):
+### `g4fix3-baseline-20261025T0453`
 
-| metric | this run | reference | equal |
-|---|---:|---:|---|
-| status_exact | 22 | 22 | yes |
-| case_exact | 20 | 20 | yes |
-| steps_exact | 20 | 20 | yes |
-| sequence_exact | 20 | 20 | yes |
-| step_tp | 132 | 132 | yes |
-| step_pred | 132 | 132 | yes |
-| step_gold | 134 | 134 | yes |
-| field_hits | 908 | 908 | yes |
-| field_slots | 938 | 938 | yes |
-| res_tp | 74 | 74 | yes |
-| res_pred | 74 | 74 | yes |
-| res_gold | 76 | 76 | yes |
+- What: prep prototype (../research/prototype/solver.py, imported read-only) on the 22 DEV cases; variant: default; vision table off; job-timing signature on; intent tables as in intent.py
+- Scored at 2026-10-25T04:53:16+05:30 by: `python3 -B code/evaluation/evaluate.py score --pred runs/g4fix3-baseline-20261025T0453/output.csv --run-id g4fix3-baseline-20261025T0453 --reconcile runs/g2-0137/q2.json:dev_all --prev g4fix2-baseline-final-20261025T0429`
+- Produced by: `python3 -B code/evaluation/prototype_baseline.py --run-id g4fix3-baseline-20261025T0453`
+- Config hash `38a838ad884c9737`; scorer code `025bae7413827288`; output sha256 `60234e8f847c1526`; model IDs: none; paid calls: 0
+- Producer check: **ok** (record: `runs/g4fix3-baseline-20261025T0453/producer.json`); evidence skip count 11 (must be 0 at freeze, G9)
+- Allowed evidence skips (11, allow-list `png-model-needed` only): `evidence_04:png-model-needed`, `evidence_09:png-model-needed`, `evidence_14:png-model-needed`, `evidence_19:png-model-needed`, `evidence_23:png-model-needed`, `evidence_28:png-model-needed`, `evidence_32:png-model-needed`, `evidence_37:png-model-needed`, `evidence_42:png-model-needed`, `evidence_46:png-model-needed`, `evidence_60:png-model-needed`
+- Text present, no resource ID (T51; listed, not refused) (2): `evidence_18`, `evidence_27`
+- Cases not row-exact: case_18, case_20
+- Reconciliation with `runs/g2-0137/q2.json:dev_all` (prototype `score.py` definitions; the reference values are not reproduced here): all counts equal
+- Flips against `g4fix2-baseline-final-20261025T0429`: none
 
-Flips against `g4-baseline-20261025T0229`: none
+### `g4fix3-baseline-nosig-20261025T0453`
+
+- What: prep prototype (../research/prototype/solver.py, imported read-only) on the 22 DEV cases; variant: no-signature; vision table off; job-timing signature off; intent tables as in intent.py
+- Scored at 2026-10-25T04:53:16+05:30 by: `python3 -B code/evaluation/evaluate.py score --pred runs/g4fix3-baseline-nosig-20261025T0453/output.csv --run-id g4fix3-baseline-nosig-20261025T0453 --reconcile runs/g2-0137/q2.json:dev_nosig --prev g4fix2-baseline-nosig-20261025T0429`
+- Produced by: `python3 -B code/evaluation/prototype_baseline.py --run-id g4fix3-baseline-nosig-20261025T0453 --no-signature`
+- Config hash `f2b9cd75dfacc75a`; scorer code `025bae7413827288`; output sha256 `2950ef2780c75a28`; model IDs: none; paid calls: 0
+- Producer check: **ok** (record: `runs/g4fix3-baseline-nosig-20261025T0453/producer.json`); evidence skip count 11 (must be 0 at freeze, G9)
+- Allowed evidence skips (11, allow-list `png-model-needed` only): `evidence_04:png-model-needed`, `evidence_09:png-model-needed`, `evidence_14:png-model-needed`, `evidence_19:png-model-needed`, `evidence_23:png-model-needed`, `evidence_28:png-model-needed`, `evidence_32:png-model-needed`, `evidence_37:png-model-needed`, `evidence_42:png-model-needed`, `evidence_46:png-model-needed`, `evidence_60:png-model-needed`
+- Text present, no resource ID (T51; listed, not refused) (2): `evidence_18`, `evidence_27`
+- Cases not row-exact: case_03, case_18, case_20, case_21, case_26, case_27
+- Reconciliation with `runs/g2-0137/q2.json:dev_nosig` (prototype `score.py` definitions; the reference values are not reproduced here): all counts equal
+- Flips against `g4fix2-baseline-nosig-20261025T0429`: none
+
+### `g4fix3-baseline-forceintent-20261025T0453`
+
+- What: prep prototype (../research/prototype/solver.py, imported read-only) on the 22 DEV cases; variant: force-intent; vision table off; job-timing signature on; intent tables bypassed (all deletion-authorized)
+- Scored at 2026-10-25T04:53:17+05:30 by: `python3 -B code/evaluation/evaluate.py score --pred runs/g4fix3-baseline-forceintent-20261025T0453/output.csv --run-id g4fix3-baseline-forceintent-20261025T0453 --reconcile runs/g2-0137/q2.json:dev_all --prev g4fix2-baseline-forceintent-20261025T0429`
+- Produced by: `python3 -B code/evaluation/prototype_baseline.py --run-id g4fix3-baseline-forceintent-20261025T0453 --force-intent`
+- Config hash `3da8216ca111ce6d`; scorer code `025bae7413827288`; output sha256 `60234e8f847c1526`; model IDs: none; paid calls: 0
+- Producer check: **ok** (record: `runs/g4fix3-baseline-forceintent-20261025T0453/producer.json`); evidence skip count 11 (must be 0 at freeze, G9)
+- Allowed evidence skips (11, allow-list `png-model-needed` only): `evidence_04:png-model-needed`, `evidence_09:png-model-needed`, `evidence_14:png-model-needed`, `evidence_19:png-model-needed`, `evidence_23:png-model-needed`, `evidence_28:png-model-needed`, `evidence_32:png-model-needed`, `evidence_37:png-model-needed`, `evidence_42:png-model-needed`, `evidence_46:png-model-needed`, `evidence_60:png-model-needed`
+- Text present, no resource ID (T51; listed, not refused) (2): `evidence_18`, `evidence_27`
+- Cases not row-exact: case_18, case_20
+- Reconciliation with `runs/g2-0137/q2.json:dev_all` (prototype `score.py` definitions; the reference values are not reproduced here): all counts equal
+- Flips against `g4fix2-baseline-forceintent-20261025T0429`: none
+
+### `g4fix3-baseline-vision-20261025T0453`
+
+- What: prep prototype (../research/prototype/solver.py, imported read-only) on the 22 DEV cases; variant: vision; vision table ON (hand-typed, T7: not shippable); job-timing signature on; intent tables as in intent.py
+- Scored at 2026-10-25T04:53:17+05:30 by: `python3 -B code/evaluation/evaluate.py score --pred runs/g4fix3-baseline-vision-20261025T0453/output.csv --run-id g4fix3-baseline-vision-20261025T0453 --reconcile runs/g2-0137/q2.json:dev_all --prev g4fix2-baseline-vision-20261025T0429`
+- Produced by: `python3 -B code/evaluation/prototype_baseline.py --run-id g4fix3-baseline-vision-20261025T0453 --vision`
+- Config hash `0974d771959072ee`; scorer code `025bae7413827288`; output sha256 `60234e8f847c1526`; model IDs: none; paid calls: 0
+- Producer check: **ok** (record: `runs/g4fix3-baseline-vision-20261025T0453/producer.json`); evidence skip count 11 (must be 0 at freeze, G9)
+- Allowed evidence skips (11, allow-list `png-model-needed` only): `evidence_04:png-model-needed`, `evidence_09:png-model-needed`, `evidence_14:png-model-needed`, `evidence_19:png-model-needed`, `evidence_23:png-model-needed`, `evidence_28:png-model-needed`, `evidence_32:png-model-needed`, `evidence_37:png-model-needed`, `evidence_42:png-model-needed`, `evidence_46:png-model-needed`, `evidence_60:png-model-needed`
+- Text present, no resource ID (T51; listed, not refused) (2): `evidence_18`, `evidence_27`
+- Cases not row-exact: case_18, case_20
+- Reconciliation with `runs/g2-0137/q2.json:dev_all` (prototype `score.py` definitions; the reference values are not reproduced here): all counts equal
+- Flips against `g4fix2-baseline-vision-20261025T0429`: none
 
 ## Scorer discrimination `g4-discrim-20261025T0229`
 
 - Command: `python3 -B code/evaluation/evaluate.py discriminate --run-id g4-discrim-20261025T0229` at 2026-10-25T02:29:49+05:30
-- Variants are built in memory from DEV gold (`code/evaluation/discrimination.py`).
+- Variants are built in memory from DEV gold (`code/evaluation/discrimination.py`). Producer check: not applicable (no evidence file is parsed).
 
 | variant | status_accuracy.rate | row_exact.rate | step.f1 | field_on_matched.state.rate | field_on_matched.evidence_id.rate | field_on_matched.step_no.rate | sequence_exact.rate | sequence_pairwise_order.rate | citation_set_exact.rate | field_positional.rate |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
@@ -191,7 +229,78 @@ Flips against `g4-baseline-20261025T0229`: none
 | step_no_shift | 1.0000 | 0.0000 | 1.0000 | 1.0000 | 1.0000 | 0.0000 | 1.0000 | 1.0000 | 1.0000 | 0.8571 |
 | flip_status | 0.0000 | 0.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 |
 
+## Scorer discrimination `g4fix-discrim-20261025T0318`
+
+- Command: `python3 -B code/evaluation/evaluate.py discriminate --run-id g4fix-discrim-20261025T0318` at 2026-10-25T03:16:08+05:30
+- Note: the time suffix `T0318` in this run ID was chosen before the run and does not match its created_at; the created_at shown is the run's real time.
+- Variants are built in memory from DEV gold (`code/evaluation/discrimination.py`). Producer check: not applicable (no evidence file is parsed).
+
+| variant | status_accuracy.rate | row_exact.rate | step.f1 | field_on_matched.state.rate | field_on_matched.evidence_id.rate | field_on_matched.step_no.rate | sequence_exact.rate | sequence_pairwise_order.rate | citation_set_exact.rate | field_positional.rate |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| gold | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 |
+| gold_reformatted | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 |
+| majority_empty | 0.6818 | 0.0000 | 0.0000 | n/a | n/a | n/a | 0.0000 | n/a | 0.0000 | 0.0000 |
+| drop_last_step | 1.0000 | 0.0000 | 0.9106 | 1.0000 | 1.0000 | 1.0000 | 0.0000 | 1.0000 | 0.9091 | 0.8358 |
+| extra_step | 1.0000 | 0.0000 | 0.9241 | 1.0000 | 1.0000 | 1.0000 | 0.0000 | 1.0000 | 1.0000 | 0.8590 |
+| swap_first_two | 1.0000 | 0.0909 | 1.0000 | 1.0000 | 1.0000 | 0.7015 | 0.0909 | 0.9594 | 1.0000 | 0.8486 |
+| wrong_state | 1.0000 | 0.0000 | 1.0000 | 0.8358 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 0.9765 |
+| wrong_evidence | 1.0000 | 0.0000 | 1.0000 | 1.0000 | 0.6119 | 1.0000 | 1.0000 | 1.0000 | 0.0000 | 0.9446 |
+| step_no_shift | 1.0000 | 0.0000 | 1.0000 | 1.0000 | 1.0000 | 0.0000 | 1.0000 | 1.0000 | 1.0000 | 0.8571 |
+| flip_status | 0.0000 | 0.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 |
+
+## Scorer discrimination `g4fix2-discrim-20261025T0429`
+
+- Command: `python3 -B code/evaluation/evaluate.py discriminate --run-id g4fix2-discrim-20261025T0429` at 2026-10-25T04:29:55+05:30
+- Variants are built in memory from DEV gold (`code/evaluation/discrimination.py`). Producer check: not applicable (no evidence file is parsed).
+
+| variant | status_accuracy.rate | row_exact.rate | step.f1 | field_on_matched.state.rate | field_on_matched.evidence_id.rate | field_on_matched.step_no.rate | sequence_exact.rate | sequence_pairwise_order.rate | citation_set_exact.rate | field_positional.rate |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| gold | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 |
+| gold_reformatted | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 |
+| majority_empty | 0.6818 | 0.0000 | 0.0000 | n/a | n/a | n/a | 0.0000 | n/a | 0.0000 | 0.0000 |
+| drop_last_step | 1.0000 | 0.0000 | 0.9106 | 1.0000 | 1.0000 | 1.0000 | 0.0000 | 1.0000 | 0.9091 | 0.8358 |
+| extra_step | 1.0000 | 0.0000 | 0.9241 | 1.0000 | 1.0000 | 1.0000 | 0.0000 | 1.0000 | 1.0000 | 0.8590 |
+| swap_first_two | 1.0000 | 0.0909 | 1.0000 | 1.0000 | 1.0000 | 0.7015 | 0.0909 | 0.9594 | 1.0000 | 0.8486 |
+| wrong_state | 1.0000 | 0.0000 | 1.0000 | 0.8358 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 0.9765 |
+| wrong_evidence | 1.0000 | 0.0000 | 1.0000 | 1.0000 | 0.6119 | 1.0000 | 1.0000 | 1.0000 | 0.0000 | 0.9446 |
+| step_no_shift | 1.0000 | 0.0000 | 1.0000 | 1.0000 | 1.0000 | 0.0000 | 1.0000 | 1.0000 | 1.0000 | 0.8571 |
+| flip_status | 0.0000 | 0.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 |
+
+## Scorer discrimination `g4fix3-discrim-20261025T0453`
+
+- Command: `python3 -B code/evaluation/evaluate.py discriminate --run-id g4fix3-discrim-20261025T0453` at 2026-10-25T04:53:17+05:30
+- Variants are built in memory from DEV gold (`code/evaluation/discrimination.py`). Producer check: not applicable (no evidence file is parsed).
+
+| variant | status_accuracy.rate | row_exact.rate | step.f1 | field_on_matched.state.rate | field_on_matched.evidence_id.rate | field_on_matched.step_no.rate | sequence_exact.rate | sequence_pairwise_order.rate | citation_set_exact.rate | field_positional.rate |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| gold | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 |
+| gold_reformatted | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 |
+| majority_empty | 0.6818 | 0.0000 | 0.0000 | n/a | n/a | n/a | 0.0000 | n/a | 0.0000 | 0.0000 |
+| drop_last_step | 1.0000 | 0.0000 | 0.9106 | 1.0000 | 1.0000 | 1.0000 | 0.0000 | 1.0000 | 0.9091 | 0.8358 |
+| extra_step | 1.0000 | 0.0000 | 0.9241 | 1.0000 | 1.0000 | 1.0000 | 0.0000 | 1.0000 | 1.0000 | 0.8590 |
+| swap_first_two | 1.0000 | 0.0909 | 1.0000 | 1.0000 | 1.0000 | 0.7015 | 0.0909 | 0.9594 | 1.0000 | 0.8486 |
+| wrong_state | 1.0000 | 0.0000 | 1.0000 | 0.8358 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 0.9765 |
+| wrong_evidence | 1.0000 | 0.0000 | 1.0000 | 1.0000 | 0.6119 | 1.0000 | 1.0000 | 1.0000 | 0.0000 | 0.9446 |
+| step_no_shift | 1.0000 | 0.0000 | 1.0000 | 1.0000 | 1.0000 | 0.0000 | 1.0000 | 1.0000 | 1.0000 | 0.8571 |
+| flip_status | 0.0000 | 0.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 |
+
+## Excluded runs (producer check not passed; T51: listed by ID and reason only)
+
+- `g4-baseline-20261025T0229`: scored before the producer check existed (T47): its evidence skips and failures were never checked
+- `g4-baseline-forceintent-20261025T0229`: scored before the producer check existed (T47): its evidence skips and failures were never checked
+- `g4-baseline-nosig-20261025T0229`: scored before the producer check existed (T47): its evidence skips and failures were never checked
+- `g4-baseline-vision-20261025T0229`: scored before the producer check existed (T47): its evidence skips and failures were never checked
+- `g4fix-rescore-20261025T0302`: producer check unverified: producer record predates the evidence guard (no evidence_failures field): zero-unit files and swallowed log-line errors were not checked
+- `g4fix-baseline-20261025T0314`: passed the producer check at scoring time, but the current check says unverified: producer record carries no output_sha256: it cannot be tied to the file being scored
+- `g4fix-baseline-nosig-20261025T0316`: passed the producer check at scoring time, but the current check says unverified: producer record carries no output_sha256: it cannot be tied to the file being scored
+- `g4fix-baseline-forceintent-20261025T0316`: passed the producer check at scoring time, but the current check says unverified: producer record carries no output_sha256: it cannot be tied to the file being scored
+- `g4fix-baseline-vision-20261025T0316`: passed the producer check at scoring time, but the current check says unverified: producer record carries no output_sha256: it cannot be tied to the file being scored
+
 ## Invalidated runs (kept as evidence; their numbers are not results)
 
 - `g4-baseline-20261025T0228`: INVALID: produced while code/evaluation/numbers.py shadowed the stdlib `numbers` module (the script's folder was sys.path[0]), so pdfplumber failed to import, the prototype skipped evidence_58 (the one DEV PDF) and case_07 came out COMPLETE with 1 step. Fixed by renaming the module to numbers_md.py, dropping the script folder from sys.path, and refusing to write output on any evidence parse failure. Superseded by the g4-baseline*-20261025T0229 runs.
+  - **Correction:** the guard that note describes refused output only on `:FAILED:` or `-failed` skip labels, that is, on raised exceptions. An empty parse, other skip labels (`unknown-json`, `unknown`) and a log line whose JSON failed to parse still passed (verifier finding B2, `notes/verify/g4_verify.md`). Replaced under T47 by `code/evaluation/evidence_guard.py`: a skip allow-list holding only `png-model-needed`, a zero-unit check with the T38 declared-scope exception, and a log-line JSON check; `evaluate.py score` checks the producer record.
+- `g4fix-baseline-nosig --no-signature-20261025T0314`: INVALID: mislabelled. A shell quoting error (zsh does not word-split) put the variant flag into the run ID instead of passing it, so this is the DEFAULT variant (producer.json variant: ['default']), not the variant its name says. Superseded by the correctly named g4fix-baseline-*-20261025T0316 runs.
+- `g4fix-baseline-forceintent --force-intent-20261025T0314`: INVALID: mislabelled. A shell quoting error (zsh does not word-split) put the variant flag into the run ID instead of passing it, so this is the DEFAULT variant (producer.json variant: ['default']), not the variant its name says. Superseded by the correctly named g4fix-baseline-*-20261025T0316 runs.
+- `g4fix-baseline-vision --vision-20261025T0314`: INVALID: mislabelled. A shell quoting error (zsh does not word-split) put the variant flag into the run ID instead of passing it, so this is the DEFAULT variant (producer.json variant: ['default']), not the variant its name says. Superseded by the correctly named g4fix-baseline-*-20261025T0316 runs.
 <!-- END GENERATED -->

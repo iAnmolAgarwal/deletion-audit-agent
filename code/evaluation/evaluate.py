@@ -12,6 +12,13 @@ Usage (from the repo root; ``-B`` keeps bytecode out of the tree):
 separate, explicitly unlocked call after freeze (``gold.load_gold(holdout=True, ...)``).
 ``score`` and ``coherence`` exit with status 2 when a hard coherence rule fails, after
 listing every offending row (``--allow-incoherent`` keeps exit status 0 for score).
+
+``score`` reads the producer record (``producer.json``) next to the prediction file, else in
+``runs/<run_id>/``, and checks it with ``evidence_guard.check_producer`` against the sha256 of
+the file being scored. It refuses (exit status 3, ``refused.json`` only, no ``score.json``)
+when the record lists a skip outside the allow-list or any evidence failure. A missing,
+pre-guard or hash-mismatched record is printed and recorded in ``score.json``
+(``producer_check``), never passed silently, and such a run cannot feed ``NUMBERS.md``.
 """
 from __future__ import annotations
 
@@ -31,7 +38,7 @@ if __package__ in (None, ""):  # run as a script: make the ``evaluation`` packag
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     __package__ = "evaluation"
 
-from evaluation import coherence, discrimination, drift, numbers_md, runs  # noqa: E402
+from evaluation import coherence, discrimination, drift, evidence_guard, numbers_md, runs  # noqa: E402
 from evaluation.gold import load_gold, load_requests  # noqa: E402
 from evaluation.outputs import read_output  # noqa: E402
 from evaluation.paths import REPO_ROOT, SAMPLE_REQUESTS, TEST_REQUESTS  # noqa: E402
@@ -95,23 +102,42 @@ def reconcile(prep: dict[str, Any], spec: str) -> dict[str, Any]:
 
 def cmd_score(a: argparse.Namespace) -> int:
     pred_path = Path(a.pred).resolve()
-    out = read_output(pred_path)
+    if a.prev:
+        runs.check_run_id(a.prev)  # T80 M2: a bad --prev fails before anything is written
+    d = runs.run_dir(a.run_id)
+    out = read_output(pred_path)  # first: refuses the gold file before anything else touches it
+    pred_sha256 = out.sha256  # the hash of the exact bytes parsed: one read, no race (T80)
+    producer, producer_path = {}, None
+    for cand in (pred_path.parent / "producer.json", d / "producer.json"):
+        if cand.exists():
+            producer, producer_path = json.loads(cand.read_text(encoding="utf-8")), cand
+            break
+    pcheck = {**evidence_guard.check_producer(producer, pred_sha256=pred_sha256),
+              "producer_record": _rel(producer_path) if producer_path else None}
+    print(f"producer check: {pcheck['status']} ({pcheck['producer_record'] or 'no record'}); "
+          f"allowed skips {len(pcheck['allowed_skips'])}; text present, no resource ID: "
+          f"{pcheck['no_resource_id_files'] or 'none'}")
+    for r in pcheck["reasons"]:
+        print(f"  {r}")
+    if pcheck["status"] == "refused":
+        runs.write_json(d / "refused.json", {"run_id": a.run_id, "kind": "score-refused", "created_at": runs.now_ist(),
+                                             "command": _command(), "pred_file": _rel(pred_path),
+                                             "producer_check": pcheck})
+        print("score refused: the producer record lists evidence failures or skips outside the allow-list",
+              file=sys.stderr)
+        return 3
     gold = load_gold()  # DEV only
     result = score_predictions(out.rows, gold)
     violations = coherence.check_file(out, audit_at=_audit_times(), evidence=coherence.load_evidence_index(),
                                       expected_ids=_expected(a.expect, set(out.rows)))
     coh = coherence.summarize(violations)
-    d = runs.run_dir(a.run_id)
-    producer = {}
-    if (d / "producer.json").exists():
-        producer = json.loads((d / "producer.json").read_text(encoding="utf-8"))
     config = {
         "run_id": a.run_id,
         "kind": "score",
         "created_at": runs.now_ist(),
         "command": _command(),
         "pred_file": _rel(pred_path),
-        "pred_sha256": runs.sha256_file(pred_path),
+        "pred_sha256": pred_sha256,
         "gold": "DEV only (evaluation.gold.load_gold default; holdout rows dropped before JSON parsing)",
         "gold_dev_hash": runs.gold_hash(gold),
         "scorer_code_sha256": runs.code_hash(),
@@ -123,7 +149,9 @@ def cmd_score(a: argparse.Namespace) -> int:
     config["config_hash"] = runs.canonical_hash({k: config[k] for k in
                                                  ("pred_sha256", "gold_dev_hash", "scorer_code_sha256", "producer")})
     score = {"run_id": a.run_id, "kind": "score", "created_at": config["created_at"], "command": config["command"],
-             "description": a.description or producer.get("description", ""), **result,
+             "description": a.description or producer.get("description", ""), "producer_check": pcheck,
+             "allowed_skips": pcheck["allowed_skips"], "no_resource_id_files": pcheck["no_resource_id_files"],
+             "evidence_skip_count": pcheck["skip_count"], **result,
              "coherence": {k: coh[k] for k in ("hard", "soft", "by_rule", "hard_cases")}}
     if a.reconcile:
         score["reconciliation"] = reconcile(result["aggregate"]["prep"], a.reconcile)
@@ -160,8 +188,11 @@ def _readme(config: dict[str, Any], score: dict[str, Any]) -> str:
         "",
         "Headline (DEV):",
         f"  status {p['status_accuracy']['n']}/{p['status_accuracy']['of']}, row exact {p['row_exact']['n']}/{p['row_exact']['of']},"
-        f" step F1 {p['step']['f1']:.4f}, sequence exact {p['sequence_exact']['n']}/{p['sequence_exact']['of']}",
+        f" step F1 {_f4(p['step']['f1'])}, sequence exact {p['sequence_exact']['n']}/{p['sequence_exact']['of']}",
+        f"  status with an unparseable row counted wrong (reading c): {p['status_accuracy_unparseable_wrong']['n']}/"
+        f"{p['status_accuracy_unparseable_wrong']['of']}",
         f"  coherence: {score['coherence']['hard']} hard, {score['coherence']['soft']} soft",
+        f"  producer check: {score['producer_check']['status']}; allowed skips: {len(score['allowed_skips'])}",
         "",
         "Files: output.csv (DEV rows only), score.json (aggregate + per-case diffs), coherence.json,",
         "config.json (hashes), flips.json (vs --prev), producer.json (if the producer wrote one).",
@@ -171,13 +202,20 @@ def _readme(config: dict[str, Any], score: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _f4(v: Any) -> str:
+    """A rate to 4 places, or n/a when undefined (e.g. precision with no predicted step)."""
+    return "n/a" if v is None else f"{v:.4f}"
+
+
 def _print_summary(score: dict[str, Any]) -> None:
     p, q = score["aggregate"]["published"], score["aggregate"]["prep"]
     f = p["field_on_matched"]
     print(f"run {score['run_id']}: {score['aggregate']['cases']} DEV cases")
-    print(f"  status {p['status_accuracy']['n']}/{p['status_accuracy']['of']}  row exact {p['row_exact']['n']}  "
+    sc = p["status_accuracy_unparseable_wrong"]
+    print(f"  status (a) {p['status_accuracy']['n']}/{p['status_accuracy']['of']}  (c) {sc['n']}/{sc['of']}  "
+          f"row exact {p['row_exact']['n']}  "
           f"steps exact {p['steps_exact']['n']}")
-    print(f"  step P/R/F1 {p['step']['precision']:.4f}/{p['step']['recall']:.4f}/{p['step']['f1']:.4f} "
+    print(f"  step P/R/F1 {_f4(p['step']['precision'])}/{_f4(p['step']['recall'])}/{_f4(p['step']['f1'])} "
           f"(tp {p['step']['tp']}, pred {p['step']['pred']}, gold {p['step']['gold']})")
     print(f"  fields on matched: state {f['state']['n']}/{f['state']['of']}  evidence {f['evidence_id']['n']}/{f['evidence_id']['of']}"
           f"  step_no {f['step_no']['n']}/{f['step_no']['of']}")
