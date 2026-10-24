@@ -241,14 +241,24 @@ def cmd_coherence(a: argparse.Namespace) -> int:
 
 
 def cmd_drift(a: argparse.Namespace) -> int:
+    """Drift table. Rows the reader skipped as unreadable are reported, recorded in
+    ``drift.json`` and make the exit status 2: the table then covers fewer rows (T81)."""
     out = read_output(Path(a.pred).resolve())
     table = drift.drift_table(out.rows, load_gold(), a.threshold)
+    skipped = [i for i in out.issues if "skipped" in i or "duplicate" in i]
     d = runs.run_dir(a.run_id)
     runs.write_json(d / "drift.json", {"run_id": a.run_id, "kind": "drift", "created_at": runs.now_ist(),
                                        "command": _command(), "pred_file": _rel(Path(a.pred)),
-                                       "threshold_pts": a.threshold, "table": table})
+                                       "threshold_pts": a.threshold, "rows_read": len(out.rows),
+                                       "read_issues": out.issues, "unreadable_records_skipped": skipped,
+                                       "table": table})
+    if out.issues:
+        print(f"drift: {len(out.issues)} read issue(s); {len(skipped)} record(s) skipped as unreadable or "
+              f"duplicate, so the table covers {len(out.rows)} row(s) read:")
+        for i in out.issues:
+            print(f"  {i}")
     print(drift.format_table(table))
-    return 0
+    return 2 if skipped else 0
 
 
 def cmd_discriminate(a: argparse.Namespace) -> int:

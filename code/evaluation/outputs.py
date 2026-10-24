@@ -107,21 +107,34 @@ def _sha256(path: Path) -> str:
 def is_gold_file(path: Path, data: bytes | None = None) -> bool:
     """True when ``path`` is the gold file (``paths.SAMPLE_OUTPUT``, read at call time).
 
-    Same file by ``os.path.samefile`` (any spelling, hard link or symlink), or the same
-    bytes by sha256 (a copy). With ``data``, the bytes already read are compared instead of
-    re-reading ``path``. Only ``stat`` is used unless the sizes are equal.
+    Without ``data`` (the check before reading): same file by ``os.path.samefile`` (any
+    spelling, hard link or symlink), or the same bytes by sha256 (a copy); only ``stat`` is
+    used unless the sizes are equal. A missing candidate returns False (the read then fails).
+
+    With ``data`` (the check on the bytes actually read; T81): the held bytes are compared
+    FIRST, by size and sha256, so nothing that happens to ``path`` afterwards (renamed,
+    removed) can make the check skip them. It fails closed: any error while reading the
+    gold side counts as gold, except a gold file that does not exist at all (nothing to
+    protect).
     """
     gold = paths.SAMPLE_OUTPUT
+    if data is not None:
+        try:
+            if len(data) != os.stat(gold).st_size:
+                return False
+            return hashlib.sha256(data).hexdigest() == _sha256(gold)
+        except FileNotFoundError:
+            return False
+        except Exception:  # noqa: BLE001 -- fail closed: cannot prove the held bytes are not gold
+            return True
     try:
         if os.path.samefile(path, gold):
             return True
-        size = len(data) if data is not None else os.stat(path).st_size
-        if size != os.stat(gold).st_size:
+        if os.stat(path).st_size != os.stat(gold).st_size:
             return False
     except OSError:  # a missing gold file or candidate: nothing to protect or compare
         return False
-    mine = hashlib.sha256(data).hexdigest() if data is not None else _sha256(path)
-    return mine == _sha256(gold)
+    return _sha256(path) == _sha256(gold)
 
 
 def _has_bad_bytes(fields: list[str]) -> bool:

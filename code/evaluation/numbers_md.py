@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
-from . import evidence_guard
+from . import evidence_guard, runs
 from .paths import NUMBERS_MD, RUNS
 
 BEGIN = "<!-- BEGIN GENERATED: evaluate.py numbers (do not edit by hand) -->"
@@ -102,10 +102,25 @@ def _load_runs(runs_dir: Path) -> list[dict[str, Any]]:
         except (OSError, json.JSONDecodeError):
             continue
         if s.get("kind") in ("score", "discrimination"):
+            s["_dir_name"] = p.parent.name  # the directory it was found in, not a value from the file
             inv = p.parent / "INVALID.txt"
             s["_invalid"] = inv.read_text(encoding="utf-8").strip() if inv.exists() else None
             out.append(s)
-    return sorted(out, key=lambda s: (s.get("created_at", ""), s["run_id"]))
+    return sorted(out, key=lambda s: (str(s.get("created_at", "")), str(s.get("run_id"))))
+
+
+def run_dir_of(s: Mapping[str, Any], runs_dir: Path = RUNS) -> tuple[Path | None, str | None]:
+    """(directory, None) for a score.json whose ``run_id`` is a valid run ID (``runs.check_run_id``)
+    AND, when known, equals the directory it was found in; else (None, why). Every read by a
+    run ID taken from file content goes through here (T81)."""
+    rid = s.get("run_id")
+    try:
+        runs.check_run_id(rid)  # type: ignore[arg-type]
+    except ValueError:
+        return None, "the run_id inside its score.json is not a valid run ID; nothing is read by it"
+    if "_dir_name" in s and s["_dir_name"] != rid:
+        return None, "the run_id inside its score.json differs from the directory it is in"
+    return runs_dir / rid, None
 
 
 def _exclusion_reason(s: Mapping[str, Any], runs_dir: Path = RUNS) -> str | None:
@@ -115,12 +130,15 @@ def _exclusion_reason(s: Mapping[str, Any], runs_dir: Path = RUNS) -> str | None
     pass on the run's stored producer record and scored-file hash (``config.json``), so a
     run checked under an older, weaker rule cannot feed this file after the rule tightens.
     """
+    d, why = run_dir_of(s, runs_dir)
+    if d is None:
+        return why
     pc = s.get("producer_check")
     if not pc:
         return "scored before the producer check existed (T47): its evidence skips and failures were never checked"
     if pc.get("status") != "ok":
         return f"producer check {pc.get('status')}: " + "; ".join(pc.get("reasons") or [])
-    cfg_path = runs_dir / s["run_id"] / "config.json"
+    cfg_path = d / "config.json"
     if not cfg_path.exists():
         return "no config.json: the producer record cannot be re-checked"
     cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
@@ -160,8 +178,9 @@ def render(runs_dir: Path = RUNS) -> str:
         L += ["", f"### `{s['run_id']}`", "", f"- What: {s.get('description') or '(no description)'}",
               f"- Scored at {s['created_at']} by: `{s['command']}`",
               *([f"- Note: {RUN_NOTES[s['run_id']]}"] if s["run_id"] in RUN_NOTES else [])]
-        cfg_path = runs_dir / s["run_id"] / "config.json"
-        if cfg_path.exists():
+        d, _ = run_dir_of(s, runs_dir)
+        cfg_path = d / "config.json" if d is not None else None
+        if cfg_path is not None and cfg_path.exists():
             cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
             prod = cfg.get("producer") or {}
             if prod.get("command"):

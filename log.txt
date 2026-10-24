@@ -2788,3 +2788,242 @@ directed_by=2026-10-25T04:50:18+05:30
 worktree=main
 branch=main
 repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T05:00:02+05:30] [auto] G4 round-3 verifier PASS; four non-blockers to G9; G4 committed
+
+User Prompt (verbatim, secrets redacted):
+(none: background-agent completion notice for orch-verifier, G4 fix round 3, directed_by 2026-10-25T04:50:18+05:30)
+
+Agent Response Summary:
+The round-3 verifier returned PASS, with no BLOCKER, 1 MAJOR and 3 MINOR findings. Under T80 those go on the G9 list instead of a fourth round, and G4 is committed. The MAJOR one touches the holdout lock (the second gold check fails open if the file vanishes mid-read), so I reproduced it on synthetic gold before listing it. G4 is committed as dad20d0 and pushed.
+
+Actions:
+* Saved the report verbatim to notes/verify/g4fix3_verify.md. Reproduced M1 with /tmp/verify-g4fix3/gold2.py (synthetic gold in a temp dir): "held gold bytes, path gone: False / RACE: read gold rows: ['case_99']".
+* TASKS.md: the G9 list (1 MAJOR gold check fails open on a vanished path; MINOR numbers_md run ID from content; MINOR two round-3 tests that don't pin; MINOR drift hides read issues), the G4 row and the queue.
+* Found notes/verify/g4fix_verify.md untracked (never committed); staged it.
+* git commit dad20d0 "fix(eval): G4 fix rounds 1-3 - holdout guard, fail-closed evidence, robust reads": code/evaluation (18 files), notes/verify/g4fix_verify.md, g4fix3_verify.md, TASKS.md, log.txt. No GM or G5 paths staged. Pushed to github main, https://github.com/iAnmolAgarwal/orchestrate-oct26-ghost-data.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T05:01:41+05:30] GM model client built
+
+User Prompt (verbatim, secrets redacted):
+[brief written by main; approved in developer turn 2026-10-25T04:39:02+05:30]
+directed_by: 2026-10-25T04:39:02+05:30
+
+Gate GM: build the model client package to its pinned interface. Repo root: `/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26`. Rules: `../CLAUDE.md` (loads automatically), especially §5 "Model calls" and "Reply cache". Use the project venv: `.venv/bin/python` (it has `anthropic==1.13.0`, `pydantic`, `ruff==0.17.0`, `mypy==2.4.0`).
+
+## Read first
+- The pinned interface: `notes/INTERFACES.md` §8. It points to `notes/ARCHITECTURE_OPTIONS.md` §5 (the `model/` block), §7 (the model test names) and §8 (caching, determinism, retries).
+- Decisions: `notes/DECISIONS.md` T63 (pins 5 and 6), T73, T76.
+- `../research/13_sonnet55_api_facts.md` with `../research/verify/13_verify.md` (the verify file wins). Those facts were checked against SDK 2.3.0; **we use 1.13.0**. Check every SDK detail you rely on against the installed 1.13.0 source in `.venv`, and list any difference you find.
+
+## Build (paths you own)
+- `code/deletion_audit/model/**`. The modules and names follow §5:
+  - `ModelRequest` (key = sha256 of the canonical body plus the API version; never a case ID or row position);
+  - `ModelReply`;
+  - `ModelCallFailed` (reasons as in §5, with `error_class` and `status`);
+  - the `Transport` protocol, `AnthropicTransport` (SDK `max_retries=0`) and `FakeTransport`;
+  - `ModelClient.call` (cache → budget → send/ladder → cache.put → log);
+  - `RetryPolicy`: the one place that decides retry, repair or give up;
+  - `ReplyCache`: atomic, never overwrites; it stores the raw reply, the model ID, the original `usage` and the run that bought it;
+  - `BudgetGuard`: per-run dollar and call caps, reserving each call's worst case; the project ledger stops at $110;
+  - a call log with each failed call's error class and status.
+- `code/tests/model/**`.
+- Lint configuration for the whole repo: `ruff.toml`, `mypy.ini` and `scripts/lint.sh` (ruff and mypy over `code/`). Another agent is building other packages at the same time and must not edit these files.
+- Do not touch anything else (`code/deletion_audit/` outside `model/`, `code/evaluation/`, `notes/`, `TASKS.md`).
+
+## Rules the code must enforce
+- Structured output through `output_config.format`, with the reply re-validated in code.
+- `tool_choice` is `auto` or `none` only; anything else is rejected when the request is built.
+- No `temperature`, `top_p` or `top_k`; reject them.
+- One retry ladder for 408, 409, 429, 529, `InternalServerError`, `APIConnectionError` and `APITimeoutError`.
+- `stop_reason == "max_tokens"` and refusals are failed calls, with a bounded repair decided by `RetryPolicy`.
+- A replay-only mode: a cache miss raises `ModelCallFailed(REPLAY_MISS)` and makes no network call.
+- Prices for the budget come from `research/13` / `verify/13`; cite the source next to the constants.
+- **No live API calls, of any kind.** Never read `.env`. `AnthropicTransport` reads the key from the environment only when constructed; no test constructs it with a real key.
+
+## Tests (unittest, on `FakeTransport`)
+- the retry ladder for each status class, and give-up in one place;
+- a cache hit makes no call; the cache stores raw replies only; keys don't depend on any case ID;
+- the dollar cap, the call cap and the ledger stop;
+- `max_tokens` and refusals fail;
+- a failed call logs its error class and status;
+- a forced `tool_choice` and `temperature` are rejected;
+- the same request gives the same key in two separate processes.
+
+No snapshot or self-confirming tests: each assertion states its expected value independently of the code under test.
+
+## Hygiene
+Docstrings on every module, class and function. No sample case IDs in comments or docstrings (developer ruling Q8, T71).
+
+## Done means (show the command output)
+1. `.venv/bin/python -B -m unittest discover -s code/tests -t code` passes. That includes the existing tests: don't break them.
+2. `scripts/lint.sh` is clean on `code/deletion_audit/model/`. Report what it says about the rest of `code/`, but don't fix other packages.
+3. A list of every place where the build differs from the pinned interface (or "none").
+4. The SDK 1.13.0 differences from `research/13` that matter for G7.
+
+If something in the pinned interface can't work on 1.13.0, stop and report it, with your hypothesis and the signal you expect to change.
+
+## Log entry (required)
+Append exactly one entry to `log.txt` with a single Bash heredoc (`cat >> "<repo root>/log.txt" <<'EOF' … EOF`), never Write or Edit. Get the time with `TZ=Asia/Kolkata date -Iseconds` first. Write the finished header line into the heredoc, brackets included; its shape, shown in backticks: `## [<time>] GM model client built`. Title at most 80 characters. When you quote this brief in the User Prompt section, put any line that starts with `## [` inside backticks. Sections in order:
+- `User Prompt (verbatim, secrets redacted):` (this brief);
+- `Agent Response Summary:` (2–5 sentences);
+- `Actions:`;
+- `Context:`, with tool=Claude Code, model=claude-opus-5-5, agent_type=orch-builder, parent_agent=main, directed_by=2026-10-25T04:39:02+05:30, worktree=main, branch=main, repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26, one per line.
+
+Then run `python3 -I scripts/check_log.py`. If it reports a blocking failure in your own entry, append a short correction note entry (same format) that names the defect; never rewrite the log.
+
+Agent Response Summary:
+Built code/deletion_audit/model/ to the INTERFACES §8 / ARCHITECTURE_OPTIONS §5 pin: ModelRequest (build-time rejection of forced tool_choice, sampling params, streaming, unpriced models, unsupported output schemas), ModelClient.call (cache, replay-only, budget reservation, send ladder, cache.put, reply check with bounded repair, call log), RetryPolicy as the only give-up decider, an atomic never-overwrite ReplyCache, BudgetGuard with run caps and the $110 ledger stop, and AnthropicTransport for SDK 1.13.0 with max_retries=0. 50 new tests on FakeTransport or offline SDK stubs; no live call was made, no .env was read, and no test builds the transport with a real key. The full suite passes (145 tests) and scripts/lint.sh is clean on model/; the rest of code/ has 102 ruff and 101 mypy findings, left unfixed as briefed. Interface deviations and the SDK 1.13.0 differences are reported to main for the developer (notably: API version 2023-06-01, X-Api-Key auth, and a transport envelope carrying request_id).
+
+Actions:
+* Wrote code/deletion_audit/model/{__init__,errors,request,reply,prices,schema_check,structure,policy,repair,transport,cache,budget,calllog,client}.py
+* Wrote code/tests/model/{__init__,_support,test_request,test_retry,test_cache,test_structure,test_budget,test_calllog,test_transport,test_hygiene}.py
+* Wrote ruff.toml, mypy.ini, scripts/lint.sh
+* Read SDK 1.13.0 source in .venv (_constants.py, _client.py, _base_client.py, _exceptions.py, _response.py, resources/messages/messages.py, types/)
+* Ran .venv/bin/python -B -m unittest discover -s code/tests -t code: Ran 145 tests, OK
+* Ran scripts/lint.sh code/deletion_audit/model code/tests/model: ruff all checks passed; mypy (strict on model) no issues in 24 files
+* Ran scripts/lint.sh (all of code/): ruff 102 findings, mypy 101 errors in 21 files, none in model/
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=orch-builder
+parent_agent=main
+directed_by=2026-10-25T04:39:02+05:30
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T05:04:15+05:30] GM done and checked; G5b and G4 G9-list fixes launched (T81)
+
+User Prompt (verbatim, secrets redacted):
+(This turn began with GM's completion notice. The developer's message below arrived during it.)
+
+Yes, one slot is free. Use it for G5b now, and queue G4's G9-list fixes for the slot GM frees.
+
+G5b: orch-redteam at high, directed_by = this turn. Goal: fixtures F1–F10 from research/16 (read with its verify file if there is one), for the test families DEV has no example of: legal hold, tombstone with PII, export, non-deletion → [], and the rest of that list. Rules:
+- Each fixture is a small dataset folder in the same layout as dataset/, with fictional people and made-up IDs (never a real case's data), plus its expected output row.
+- Each expected row is derived by hand from deletion_rules.csv, the spec and our T-rulings, citing the rule for each step. Fixtures resting on the T9 provisional defaults are marked provisional.
+- The expected rows are committed before G5's engine ever runs on them, so the commit order shows they didn't come from the engine. The agent never runs the engine and never reads G5's code.
+- Paths: its own fixture folder only (propose code/tests/fixtures/), nothing under G5's or GM's paths.
+- At least 3 of them double as the custom eval cases G8 needs.
+It gates G6's check of G5 and G7's intent tests (F1, the negation trap).
+
+Then, in the slot GM frees: G4's four G9-list items, by orch-eval-engineer at high:
+- the second gold check compares the held bytes first and fails closed on any error, with a test;
+- numbers_md checks the run ID it reads from score.json;
+- the two round-3 tests that still pass with their fix removed are rewritten so they fail without it (show that);
+- drift reports the rows it skipped as unreadable.
+G9's verifier reviews this diff.
+
+Time is not a factor.
+
+Agent Response Summary:
+Orchestration decisions (developer): G5b (orch-redteam, high) builds fixtures F1-F10 with hand-derived expected rows, gating G6's check of G5 and G7's intent tests. The G4 G9-list fixes go to the same orch-eval-engineer at high. GM had already finished and freed its slot, so both started at about 05:04, with G5 still running (3 agents). GM checks out: its tests and the full suite pass, and lint is clean on model/. It left six interface choices for the developer, and I proposed a GM verifier.
+
+Actions:
+* GM (orch-builder, directed_by 2026-10-25T04:39:02+05:30) returned. Checked: .venv/bin/python -B -m unittest discover -s code/tests/model -t code OK; the full suite (-s code/tests) OK; scripts/lint.sh on model/ and its tests: mypy "Success: no issues found in 24 source files"; no API endpoint, .env or case_N in model/.
+* Agent orch-redteam (high, background), G5b, directed_by 2026-10-25T05:02:15+05:30; brief at scratchpad g5b_brief.md (0 lines starting with "## ["). Paths: code/tests/fixtures/ only; never runs the engine or reads G5 code; may run GP's parse_all on fixtures.
+* SendMessage to the G4 fix agent (orch-eval-engineer): the G9-list fixes, directed_by 2026-10-25T05:02:15+05:30; brief at scratchpad g4g9_msg.txt (0 lines starting with "## [").
+* notes/DECISIONS.md T81. TASKS.md: the GM row (built; six choices pending; verifier proposed), the G5b row and the queue.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T05:04:53+05:30] GM verifier approved (T82); queued for the first free slot
+
+User Prompt (verbatim, secrets redacted):
+GM: before any paid call, a fresh orch-verifier (high) on the GM diff, in the first free slot. directed_by = this turn. Check:
+- the retry ladder (408, 409, 429, 529, server, connection and timeout errors; SDK max_retries=0; one place that gives up);
+- refusals and max_tokens as failed calls;
+- the budget guard stops a run at its dollar and call caps;
+- a cache entry can't be overwritten or served for a different request;
+- each failed call's error class and status in the call log.
+Fake transport only, no API calls, never read .env. GM commits after its verdict and my reply.
+
+Time is not a factor.
+
+Agent Response Summary:
+Orchestration decision (developer): a fresh orch-verifier at high reviews the GM diff before any paid call; it gates the GM commit and every live call. All 3 slots are in use (G5, G5b, the G4 G9-list fixes), so the verifier is queued with its brief ready and will launch when the first slot frees. I recorded T82 and updated TASKS and RESUME.
+
+Actions:
+* Wrote the GM verifier brief (scratchpad gm_verifier_brief.md; 0 lines starting with "## ["; fake transport only; six questions covering the developer's five checks plus the request rules).
+* notes/DECISIONS.md T82; TASKS.md queue; notes/RESUME.md.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T05:06:59+05:30] G4 G9-list fixes: gold check, run IDs, tests, drift
+
+User Prompt (verbatim, secrets redacted):
+[brief written by main; approved in developer turn 2026-10-25T05:02:15+05:30]
+G4 G9-list fixes (developer decision T81, turn 2026-10-25T05:02:15+05:30). These are the four non-BLOCKER findings from the round-3 verifier, in notes/verify/g4fix3_verify.md and on the G9 list in TASKS.md.
+
+directed_by: 2026-10-25T05:02:15+05:30
+
+Same scope and rules as before:
+- edit only code/evaluation/**;
+- new run IDs prefixed g4g9-;
+- never edit ../research/;
+- no paid calls; never read .env;
+- lock probes on synthetic gold only;
+- never open dataset/sample_output.csv.
+Use .venv/bin/python. The verifier's repro scripts are in /tmp/verify-g4fix3/ (gold2.py, nm.py, mutate.sh, score_tmp.py).
+
+Fix each, with a test that fails before the fix and passes after (show both runs):
+1. The second gold check compares the held bytes first and fails closed on any error (outputs.py around 115-122). Re-run gold2.py and show the refusal.
+2. numbers_md checks the run ID it reads from score.json (numbers_md.py around 124, 162). Re-run nm.py and show it refused.
+3. The two round-3 tests that still pass with their fix removed (test_round3.py around 105 and 120-124) are rewritten so they fail without the fix. Show it with mutate.sh: each mutation must now fail.
+4. drift reports the rows it skipped as unreadable (evaluate.py around 243-251).
+
+Done list:
+- all tests;
+- a guarded producer re-run under a new g4g9- ID, scored. Its output sha256 must be 60234e8f…, with 0 flips against g4fix3-baseline-20261025T0453;
+- NUMBERS.md regenerated.
+If anything fails, stop and report the hypothesis and the signal you expect to change. G9's verifier reviews this diff later.
+
+Report back short: per item the change (file:line), the test, before/after evidence, then the done list.
+
+Log: append exactly one new entry with a single Bash heredoc (never Write or Edit). Get the time with TZ=Asia/Kolkata date -Iseconds and write the finished header line into the heredoc, brackets included. The shape, shown here in backticks: `## [<time>] G4 G9-list fixes: gold check, run IDs, tests, drift`. When you quote this message in the User Prompt section, put any line that starts with "## [" inside backticks. Title at most 80 characters. Sections in order: User Prompt (verbatim, secrets redacted):, Agent Response Summary: (2-5 sentences), Actions:, Context: with tool=Claude Code, model=claude-opus-5-5, agent_type=orch-eval-engineer, parent_agent=main, directed_by=2026-10-25T05:02:15+05:30, worktree=main, branch=main, repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26. Then run python3 -I scripts/check_log.py; fix any blocking failure in your own entry with a correction note entry.
+
+Agent Response Summary:
+All four repros reproduced, and all four are fixed. gold2.py now refuses (the path vanishes after the read but the held bytes are gold), nm.py refuses the run ID "../outside" and reads nothing, every mutate.sh mutation now fails the tests (before, no-early-prev and rehash-hashlib passed), and drift reports the skipped record and exits 2. I applied the item 1, 2 and 4 fixes before writing their tests, so I showed fail-before by running the new tests on a /tmp copy with exactly those edits reversed: 7 failures there, all passing on the fixed tree (150/150). The guarded re-run g4g9-baseline-20261025T0506 has output sha256 60234e8f… and 0 flips against g4fix3-baseline-20261025T0453; the variants have 0 flips against their g4fix3 runs, and NUMBERS.md is regenerated with scorer code hash 5b928a4c3405196d.
+
+Actions:
+* outputs.py is_gold_file: with data, size and sha256 of the held bytes are compared first; a missing gold file gives False; any other gold-side error fails closed (True).
+* numbers_md.py: _load_runs records the directory name; run_dir_of checks runs.check_run_id and that the ID equals the directory, and every read by a run ID taken from score.json goes through it (_exclusion_reason, render).
+* evaluate.py cmd_drift: read issues are printed and recorded in drift.json (rows_read, read_issues, unreadable_records_skipped); exit 2 when a record was skipped.
+* tests/test_round3.py: test_pred_hashed_from_the_parsed_bytes counts every read of the pred file and changes it after the first read; test_prev_refused_before_anything_is_written asserts that no run directory exists. New: TestG9GoldCheckOnHeldBytes (synthetic gold), TestG9NumbersRunIds, TestG9DriftReportsSkips.
+* Before/after: /tmp/g4g9/pre (pre-fix tree with the edits reversed, 7 failures); bash /tmp/verify-g4fix3/mutate.sh (8 of 8 mutations fail); gold2.py, nm.py and drift via score_tmp.py (run g4g9-drift-after under /tmp/verify-g4fix3/runs).
+* Runs: g4g9-baseline-20261025T0506 and its nosig, vision and forceintent variants, plus g4g9-discrim-20261025T0506; NUMBERS.md regenerated.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=orch-eval-engineer
+parent_agent=main
+directed_by=2026-10-25T05:02:15+05:30
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
