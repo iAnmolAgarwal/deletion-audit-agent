@@ -1,0 +1,3 @@
+user_id,name,email,phone,email_hash,updated_at
+user_901201,Fenwick Brindle,fenwick.brindle@example.net,+44 7700 901201,8ab9268d2586cb3bb7823b4efdd22fd367a7304d66cdd2cb20b91a269c252dd8,2026-03-01T10:00:00Z
+user_901202,Kestrel Imrie,kestrel.imrie@example.net,+44 7700 901202,98d9d008755f3f7529e14aea883cc6152715aa3d04cecbb666dd88dd2e1b7b0d,2026-03-01T10:00:00Z

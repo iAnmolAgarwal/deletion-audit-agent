@@ -1,0 +1,3 @@
+audit_id,user_id,event_time,field_name,old_value,new_value
+audit_90001,user_900301,2026-03-01T10:00:00Z,email,n.voss77@example.net,nadine.voss@example.org
+audit_90002,user_900301,2026-03-01T10:00:00Z,email_hash,994e5fa045e08591de80a9d0c039ca09dd0ca3dcb626d0e09a33211fee96b476,f5a5d7fb2440e54fb5085bac70308da6fc9f9667aa4d516e8fc43e4db38af8ec

@@ -1,0 +1,39 @@
+{
+  "exported_at": "2026-06-10T11:40:00Z",
+  "origin": "customer_export_service",
+  "record_count": 4,
+  "records": [
+    {
+      "recorded_at": "2026-06-10T09:30:00Z",
+      "system": "account_service",
+      "resource_id": "account_900510",
+      "record_type": "USER_PROFILE",
+      "result": "FOUND",
+      "subject_reference": "ivo.trembath@example.com"
+    },
+    {
+      "recorded_at": "2026-06-10T11:00:00Z",
+      "system": "account_service",
+      "resource_id": "account_900510",
+      "record_type": "USER_PROFILE",
+      "result": "NOT_FOUND",
+      "subject_reference": "ivo.trembath@example.com"
+    },
+    {
+      "recorded_at": "2026-06-12T09:00:00Z",
+      "system": "account_service",
+      "resource_id": "account_900510",
+      "record_type": "USER_PROFILE",
+      "result": "FOUND",
+      "subject_reference": "ivo.trembath@example.com"
+    },
+    {
+      "recorded_at": "2026-06-10T11:00:00Z",
+      "system": "security_service",
+      "resource_id": "audit_record_900511",
+      "record_type": "SECURITY_AUDIT_LOG",
+      "result": "FOUND",
+      "subject_reference": "user_900501"
+    }
+  ]
+}

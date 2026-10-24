@@ -1,0 +1,4 @@
+case_id,email,requested_at,reported_status,reported_at,audit_at,request_text
+case_90101,ROWAN.PELLAM@example.com,2026-06-08T08:00:00Z,NOT_STARTED,2026-06-09T02:00:00Z,2026-06-10T12:00:00Z,Please take me off your promotional mailing list only. Do not close or delete my account; I still order from you every month.
+case_90102,marisol.quenby@example.org,2026-06-08T08:00:00Z,NOT_STARTED,2026-06-09T02:00:00Z,2026-06-10T12:00:00Z,I am not asking for deletion. Please send me a copy of the personal information you hold about me and tell me which of your systems store it.
+case_90103,teodor.halvik@example.net,2026-06-08T08:00:00Z,NOT_STARTED,2026-06-09T02:00:00Z,2026-06-10T12:00:00Z,My phone number has changed. Please correct it on my profile without removing or erasing any of my records.

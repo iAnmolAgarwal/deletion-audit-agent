@@ -1,0 +1,2 @@
+activity_id,event_time,event_type,source_system,target_system,resource_id,reported_result,details
+activity_90101,2026-06-08T09:15:00Z,CLASSIFY_REQUEST,privacy_intake,privacy_case_management,account_900110,SUCCESS,Privacy intake classified request for account_900110 as non-deletion; no destructive action was authorized.

@@ -1,0 +1,4 @@
+user_id,name,email,phone,email_hash,updated_at
+user_900101,Rowan Pellam,rowan.pellam@example.com,+44 7700 900101,2445b242ceeabadaa02d702a03f8864847f50d01b7456298f40f3d7fd068edbe,2026-03-01T10:00:00Z
+user_900102,Marisol Quenby,marisol.quenby@example.org,+44 7700 900102,b54f2dfd45da282337ab049be647dd38fadc4b93173fd5b415c80d68007b9504,2026-03-01T10:00:00Z
+user_900103,Teodor Halvik,teodor.halvik@example.net,+44 7700 900103,256b7ad828506a3d4f150aaac12fda017869ce1d87c55355112f13671dc85e99,2026-03-01T10:00:00Z

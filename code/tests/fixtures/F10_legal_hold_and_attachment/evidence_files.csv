@@ -1,0 +1,3 @@
+file_id,file_path,origin,captured_at
+evidence_10001,evidence/databases/customer_data_read_replica_20260610.sql,customer_data_read_replica_capture,2026-06-10T11:40:00Z
+evidence_10002,evidence/logs/resource_lookup_trace_20260610_113000.log,service_readback_logs,2026-06-10T11:30:00Z

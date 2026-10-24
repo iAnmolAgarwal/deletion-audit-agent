@@ -1,0 +1,42 @@
+{
+  "exported_at": "2026-06-10T11:40:00Z",
+  "source": "records_assurance_service",
+  "snapshots": [
+    {
+      "captured_at": "2026-06-10T11:40:00Z",
+      "data_store": "account_service",
+      "collection": "customer_profiles",
+      "records": []
+    },
+    {
+      "captured_at": "2026-06-10T11:40:00Z",
+      "data_store": "identity_service",
+      "collection": "deleted_customer_references",
+      "records": [
+        {
+          "resource_id": "tombstone_900810",
+          "subject_reference": "user_900801",
+          "name": null,
+          "email": null,
+          "phone": null,
+          "email_hash": "96c26dda1f7d8edbb22e4a3914f2e0953ca3e2d19b322a49f8e9ca42950da5ed",
+          "account_status": "DELETED"
+        }
+      ]
+    },
+    {
+      "captured_at": "2026-06-10T11:40:00Z",
+      "data_store": "security_service",
+      "collection": "security_audit_events",
+      "records": [
+        {
+          "resource_id": "audit_record_900812",
+          "subject_reference": "user_900801",
+          "event_name": "account_deletion_reviewed",
+          "actor_type": "automated_privacy_workflow",
+          "integrity_seal": "3baeef8b4378c7630c0d61cbc523dd0b074c5989ed3a092d87225ea22e4ce901"
+        }
+      ]
+    }
+  ]
+}

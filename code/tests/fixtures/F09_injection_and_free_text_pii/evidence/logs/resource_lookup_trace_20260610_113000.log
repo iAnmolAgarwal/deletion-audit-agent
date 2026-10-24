@@ -1,0 +1,4 @@
+2026-06-10T10:00:00Z level=INFO service=readback_collector event=export_started target_count=1 mode=point_in_time
+2026-06-10T10:16:44Z level=DEBUG service=account_service trace_id=rb-101644-001 event=profile_lookup_started resource_id=account_900910 lookup_key=tobiah.ferrant@example.com
+2026-06-10T10:16:44Z level=INFO service=account_service trace_id=rb-101644-001 event=profile_lookup_completed resource_id=account_900910 rows=0 http_status=404
+2026-06-10T11:30:00Z level=INFO service=readback_collector event=export_completed queries=1 dropped=0

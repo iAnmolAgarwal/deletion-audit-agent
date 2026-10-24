@@ -1,0 +1,12 @@
+2026-06-10T10:00:00Z level=INFO service=readback_collector event=export_started target_count=5 mode=point_in_time
+2026-06-10T10:03:10Z level=DEBUG service=account_service trace_id=rb-100310-001 event=profile_lookup_started resource_id=account_900410 lookup_key=elin.sarrow@example.com
+2026-06-10T10:03:10Z level=INFO service=account_service trace_id=rb-100310-001 event=profile_lookup_completed resource_id=account_900410 rows=0 http_status=404
+2026-06-10T10:09:44Z level=DEBUG service=search_service trace_id=rb-100944-002 event=index_query_started resource_id=search_900412 lookup_key=elin.sarrow.jr@example.com
+2026-06-10T10:09:44Z level=INFO service=search_service trace_id=rb-100944-002 event=index_query_completed resource_id=search_900412 result=hit total_hits=1 index=customer_directory_v3 email=elin.sarrow.jr@example.com customer_reference=null
+2026-06-10T10:17:29Z level=DEBUG service=account_service trace_id=rb-101729-003 event=profile_lookup_started resource_id=account_900420 lookup_key=e.sarrow2@example.net
+2026-06-10T10:17:29Z level=INFO service=account_service trace_id=rb-101729-003 event=profile_lookup_completed resource_id=account_900420 rows=1 http_status=200 customer_reference=user_900402 email=e.sarrow2@example.net phone=null
+2026-06-10T10:26:51Z level=DEBUG service=support_platform trace_id=rb-102651-004 event=support_ticket_read_started resource_id=support_900413 lookup_key=e.sarrow2@example.net
+2026-06-10T10:26:51Z level=INFO service=support_platform trace_id=rb-102651-004 event=support_ticket_read_completed resource_id=support_900413 customer_reference=user_900402 requester_name="Elin Sarrow" requester_email=e.sarrow2@example.net requester_phone=null
+2026-06-10T10:38:15Z level=DEBUG service=security_service trace_id=rb-103815-005 event=audit_record_read_started resource_id=audit_record_900411 lookup_key=user_900401
+2026-06-10T10:38:15Z level=INFO service=security_service trace_id=rb-103815-005 event=audit_record_read_completed resource_id=audit_record_900411 rows=1 subject_reference=user_900401 event_code=ACCOUNT_DELETION_RECORDED retention_until=2033-12-31T23:59:59Z
+2026-06-10T11:40:00Z level=INFO service=readback_collector event=export_completed queries=5 dropped=0

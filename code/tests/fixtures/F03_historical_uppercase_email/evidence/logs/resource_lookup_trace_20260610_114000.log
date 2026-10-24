@@ -1,0 +1,8 @@
+2026-06-10T10:00:00Z level=INFO service=readback_collector event=export_started target_count=3 mode=point_in_time
+2026-06-10T10:05:12Z level=DEBUG service=account_service trace_id=rb-100512-001 event=profile_lookup_started resource_id=account_900310 lookup_key=n.voss77@example.net
+2026-06-10T10:05:12Z level=INFO service=account_service trace_id=rb-100512-001 event=profile_lookup_completed resource_id=account_900310 rows=0 http_status=404
+2026-06-10T10:21:40Z level=DEBUG service=support_platform trace_id=rb-102140-002 event=support_ticket_read_started resource_id=support_900311 lookup_key=N.Voss77@Example.NET
+2026-06-10T10:21:40Z level=INFO service=support_platform trace_id=rb-102140-002 event=support_ticket_read_completed resource_id=support_900311 customer_reference=null requester_name=null requester_email=N.Voss77@Example.NET requester_phone=null
+2026-06-10T10:48:03Z level=DEBUG service=security_service trace_id=rb-104803-003 event=audit_record_read_started resource_id=audit_record_900312 lookup_key=user_900301
+2026-06-10T10:48:03Z level=INFO service=security_service trace_id=rb-104803-003 event=audit_record_read_completed resource_id=audit_record_900312 rows=1 subject_reference=user_900301 event_code=SUBJECT_REQUEST_AUDITED retention_until=2033-12-31T23:59:59Z
+2026-06-10T11:40:00Z level=INFO service=readback_collector event=export_completed queries=3 dropped=0

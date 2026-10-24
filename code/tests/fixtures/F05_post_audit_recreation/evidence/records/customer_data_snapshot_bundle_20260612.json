@@ -1,0 +1,44 @@
+{
+  "exported_at": "2026-06-12T12:00:00Z",
+  "source": "records_assurance_service",
+  "snapshots": [
+    {
+      "captured_at": "2026-06-10T11:55:00Z",
+      "data_store": "account_service",
+      "collection": "customer_profiles",
+      "records": []
+    },
+    {
+      "captured_at": "2026-06-12T12:00:00Z",
+      "data_store": "account_service",
+      "collection": "customer_profiles",
+      "records": [
+        {
+          "resource_id": "account_900510",
+          "customer_reference": "user_900501",
+          "full_name": "Ivo Trembath",
+          "email": "ivo.trembath@example.com",
+          "phone": "+44 7700 900501",
+          "account_status": "ACTIVE",
+          "signup_channel": "referral"
+        }
+      ]
+    },
+    {
+      "captured_at": "2026-06-12T12:00:00Z",
+      "data_store": "search_service",
+      "collection": "customer_search_documents",
+      "records": [
+        {
+          "resource_id": "search_900512",
+          "index_name": "customer_directory_v3",
+          "document": {
+            "display_name": "Ivo Trembath",
+            "email": "ivo.trembath@example.com",
+            "customer_reference": "user_900501"
+          }
+        }
+      ]
+    }
+  ]
+}

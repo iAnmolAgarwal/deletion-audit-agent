@@ -1,0 +1,95 @@
+{
+  "exported_at": "2026-06-10T11:40:00Z",
+  "origin": "security_audit_service",
+  "record_count": 11,
+  "records": [
+    {
+      "recorded_at": "2026-06-10T10:05:00Z",
+      "system": "account_service",
+      "resource_id": "account_900110",
+      "record_type": "USER_PROFILE",
+      "result": "FOUND",
+      "subject_reference": "rowan.pellam@example.com"
+    },
+    {
+      "recorded_at": "2026-06-10T10:05:00Z",
+      "system": "search_service",
+      "resource_id": "search_900111",
+      "record_type": "SEARCH_INDEX_ENTRY",
+      "result": "FOUND",
+      "subject_reference": "rowan.pellam@example.com"
+    },
+    {
+      "recorded_at": "2026-06-10T10:05:00Z",
+      "system": "integration_service",
+      "resource_id": "data_flow_900112",
+      "record_type": "DATA_FLOW",
+      "result": "ACTIVE",
+      "subject_reference": "rowan.pellam@example.com"
+    },
+    {
+      "recorded_at": "2026-06-10T10:05:00Z",
+      "system": "security_service",
+      "resource_id": "audit_record_900113",
+      "record_type": "SECURITY_AUDIT_LOG",
+      "result": "FOUND",
+      "subject_reference": "user_900101"
+    },
+    {
+      "recorded_at": "2026-06-10T10:20:00Z",
+      "system": "account_service",
+      "resource_id": "account_900120",
+      "record_type": "USER_PROFILE",
+      "result": "FOUND",
+      "subject_reference": "marisol.quenby@example.org"
+    },
+    {
+      "recorded_at": "2026-06-10T10:20:00Z",
+      "system": "support_platform",
+      "resource_id": "support_900121",
+      "record_type": "SUPPORT_MESSAGE",
+      "result": "IDENTIFIABLE",
+      "subject_reference": "marisol.quenby@example.org"
+    },
+    {
+      "recorded_at": "2026-06-10T10:20:00Z",
+      "system": "security_service",
+      "resource_id": "audit_record_900122",
+      "record_type": "SECURITY_AUDIT_LOG",
+      "result": "FOUND",
+      "subject_reference": "user_900102"
+    },
+    {
+      "recorded_at": "2026-06-10T10:35:00Z",
+      "system": "account_service",
+      "resource_id": "account_900130",
+      "record_type": "USER_PROFILE",
+      "result": "FOUND",
+      "subject_reference": "teodor.halvik@example.net"
+    },
+    {
+      "recorded_at": "2026-06-10T10:35:00Z",
+      "system": "analytics_platform",
+      "resource_id": "analytics_900131",
+      "record_type": "ANALYTICS_PROFILE",
+      "result": "IDENTIFIABLE",
+      "subject_reference": "teodor.halvik@example.net"
+    },
+    {
+      "recorded_at": "2026-06-10T10:35:00Z",
+      "system": "backup_service",
+      "resource_id": "backup_900132",
+      "record_type": "BACKUP_ARCHIVE",
+      "result": "ACTIVE",
+      "subject_reference": "teodor.halvik@example.net"
+    },
+    {
+      "recorded_at": "2026-06-10T10:35:00Z",
+      "system": "security_service",
+      "resource_id": "audit_record_900133",
+      "record_type": "SECURITY_AUDIT_LOG",
+      "result": "FOUND",
+      "subject_reference": "user_900103"
+    }
+  ]
+}
