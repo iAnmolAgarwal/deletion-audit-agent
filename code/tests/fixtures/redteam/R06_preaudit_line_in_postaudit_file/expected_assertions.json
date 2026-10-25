@@ -1,12 +1,22 @@
 {
   "fixture": "R06_preaudit_line_in_postaudit_file",
-  "status": "UNSETTLED",
-  "rulings_in_conflict": ["R15-R4", "R15-R14", "T66 rule 1", "T77 rule 3", "CD-F21"],
+  "status": "SETTLED by T101 (developer, 2026-10-25): reading (d)",
+  "rulings_in_conflict": [
+    "R15-R4",
+    "R15-R14",
+    "T66 rule 1",
+    "T77 rule 3",
+    "CD-F21"
+  ],
   "cases": {
     "case_93051": {
-      "deletion_status_never": ["NOT_APPLICABLE"],
-      "never_cite": ["evidence_930602"],
-      "leaning": "reading (a): expected_output.csv",
+      "deletion_status_never": [
+        "NOT_APPLICABLE",
+        "COMPLETE"
+      ],
+      "never_cite": [
+        "evidence_930602"
+      ],
       "acceptable_readings": {
         "a": "INCOMPLETE; FINDING REPORT_REMAINING_RECORD search_service search_9305102 cites evidence_930601; rest as expected_output.csv",
         "b": "INCOMPLETE; as (a) but the FINDING has evidence_id \"\" (breaks T77 rule 3)",
@@ -14,7 +24,14 @@
       },
       "flagged_reading": {
         "c": "COMPLETE with VERIFY_RECORD_ABSENT account_9305101 and VERIFY_RECORD_PRESENT audit_record_9305103, both citing evidence_930601; breaks R15-R4 and leaves a pre-audit record unreported"
-      }
+      },
+      "ruling": "T101: a finding whose record only a post-audit file holds fails its row closed",
+      "deletion_status": "INCOMPLETE",
+      "failed_closed": true,
+      "failed_closed_reason_names": [
+        "search_9305102"
+      ],
+      "exact_row": "not asserted: the steps of a FAILED_CLOSED row are the engine's validated steps (T71 Q5, T86); expected_output.csv shows the superseded reading (a)"
     }
   }
 }

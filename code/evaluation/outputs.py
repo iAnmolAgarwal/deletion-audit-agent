@@ -9,7 +9,7 @@ file by identity, not by path spelling. A file is the gold file when ``os.path.s
 says so (case variants on a case-insensitive disk, hard links, symlinks) or when its bytes
 have the same sha256 as ``sample_output.csv`` (copies). The sha256 is computed only when the
 two sizes are equal, in memory; the digest is never stored, printed or logged. The guard
-opens only through ``evaluation.gold``'s unlock phrase, which logs the access.
+has no unlock route (T99 C): the HOLDOUT EVALUATION RUN scores through ``gold.load_gold``.
 Limit: a copy with even one byte changed is not caught by this guard.
 
 Field size (verifier F3, ruling T72): ``csv``'s default field limit (131072 characters)
@@ -44,7 +44,7 @@ from typing import Any
 
 from . import paths
 from .contract import STEP_KEYS
-from .gold import HoldoutLockedError, check_unlock
+from .gold import HoldoutLockedError
 
 OUTPUT_HEADER: list[str] = ["case_id", "deletion_status", "steps_json"]
 FIELD_SIZE_CAP: int = 16 * 1024 * 1024  # characters per CSV field while reading a prediction file
@@ -143,28 +143,23 @@ def _has_bad_bytes(fields: list[str]) -> bool:
     return any("\udc80" <= ch <= "\udcff" for f in fields for ch in f)
 
 
-def read_output(path: Path, *, unlock_phrase: str | None = None, run_id: str | None = None) -> OutputFile:
-    """Read a prediction file. Refuses the gold file, which only gold.py may read.
+def read_output(path: Path) -> OutputFile:
+    """Read a prediction file. Refuses the gold file, which only gold.py may read; there is no
+    unlock route here (T99 C).
 
     Raises:
-        HoldoutLockedError: ``path`` is the gold file (see :func:`is_gold_file`) and the
-            unlock phrase was not given. With the phrase, the access is logged by
-            ``evaluation.gold.check_unlock`` and the file is read.
+        HoldoutLockedError: ``path`` is the gold file (see :func:`is_gold_file`).
     """
-    def refuse_or_unlock() -> None:
-        if unlock_phrase is None:
-            raise HoldoutLockedError(
-                f"{path} is the gold file (sample_output.csv by identity or content); load gold only "
-                "through evaluation.gold")
-        check_unlock(True, unlock_phrase, "gold via outputs.read_output", run_id)
+    def refuse() -> None:
+        raise HoldoutLockedError(
+            f"{path} is the gold file (sample_output.csv by identity or content); load gold only "
+            "through evaluation.gold")
 
-    unlocked = False
     if is_gold_file(path):
-        refuse_or_unlock()
-        unlocked = True
+        refuse()
     raw_bytes = path.read_bytes()  # the only read: hash, gold check and parse all use these bytes
-    if not unlocked and is_gold_file(path, raw_bytes):  # the file changed into gold after the check
-        refuse_or_unlock()
+    if is_gold_file(path, raw_bytes):  # the file changed into gold after the check
+        refuse()
     issues: list[str] = []
     if b"\r\n" in raw_bytes:
         issues.append("CRLF line endings (the sample file uses LF)")

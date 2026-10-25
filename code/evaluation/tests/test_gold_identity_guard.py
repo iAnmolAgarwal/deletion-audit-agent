@@ -7,7 +7,6 @@ gold file into a temp directory and points ``paths.SAMPLE_OUTPUT`` at it; the re
 from __future__ import annotations
 
 import csv
-import io
 import os
 import shutil
 import tempfile
@@ -88,18 +87,16 @@ class TestIdentityGuard(unittest.TestCase):
         self.assertFalse(is_gold_file(other))
         read_output(other)  # a prediction file reads normally
 
-    def test_wrong_phrase_still_refused(self) -> None:
-        with self.assertRaises(HoldoutLockedError):
-            read_output(self.gold, unlock_phrase="yes")
-
-    def test_unlock_reads_and_logs(self) -> None:
+    def test_read_output_has_no_unlock_route(self) -> None:
+        """T99 C: read_output takes no phrase and refuses the gold file even when handed the
+        right one; nothing is logged, because nothing is unlocked."""
         log = self.dir / "HOLDOUT_ACCESS.log"
-        with mock.patch.object(gold_mod, "HOLDOUT_ACCESS_LOG", log), \
-                mock.patch("sys.stderr", new_callable=io.StringIO):
-            out = read_output(self.gold, unlock_phrase=UNLOCK_PHRASE, run_id="synthetic-test")
-        self.assertEqual(len(out.rows), 32)
-        self.assertIn("gold via outputs.read_output", log.read_text(encoding="utf-8"))
-        self.assertIn("synthetic-test", log.read_text(encoding="utf-8"))
+        with mock.patch.object(gold_mod, "HOLDOUT_ACCESS_LOG", log):
+            with self.assertRaises(TypeError):
+                read_output(self.gold, unlock_phrase=UNLOCK_PHRASE)  # type: ignore[call-arg]
+            with self.assertRaises(HoldoutLockedError):
+                read_output(self.gold)
+        self.assertFalse(log.exists())
 
 
 if __name__ == "__main__":

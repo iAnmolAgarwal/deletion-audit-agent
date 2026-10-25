@@ -11,9 +11,8 @@ An AST scan over ``code/`` (every ``tests`` directory excluded). Only the three 
 * splat keywords (``**``) into ``load_gold``, ``check_unlock``, ``read_output`` or ``run``,
   or import ``check_unlock``/``load_gold`` under another name.
 
-One forwarder is allowed, narrowly: ``evaluation/outputs.py`` may call
-``check_unlock(True, unlock_phrase, ...)`` where ``unlock_phrase`` is its own parameter (T47
-B1's gold-identity guard). The keyword rule still stops every caller from handing it a phrase.
+No forwarder is allowed: ``outputs.read_output``'s unlock route was removed (T99 C), so a
+``check_unlock`` call with a true first argument anywhere outside :data:`UNLOCKERS` is a finding.
 
 In ``holdout_run.py`` the phrase reaches the unlock only from argv: no environment access, no
 ``input``/``stdin``, every unlock value is the keyword-only parameter ``phrase``, ``phrase`` is
@@ -35,7 +34,6 @@ from pathlib import Path
 CODE = Path(__file__).resolve().parents[2]
 UNLOCKERS: frozenset[str] = frozenset({"evaluation/gold.py", "deletion_audit/pipeline.py",
                                        "evaluation/holdout_run.py"})
-FORWARDER = "evaluation/outputs.py"
 HOLDOUT_RUN = "evaluation/holdout_run.py"
 PHRASE_KEY = "HOLDOUTEVALUATIONRUN"
 GUARDED_CALLS = frozenset({"load_gold", "check_unlock", "read_output", "run"})
@@ -110,10 +108,7 @@ def unlock_findings(root: Path) -> list[str]:
                     elif kw.arg is None and name in GUARDED_CALLS:
                         hits.append((line, f"splats keywords into {name}"))
                 if name == "check_unlock" and n.args and not _is_const(n.args[0], False, None):
-                    forwarded = rel == FORWARDER and len(n.args) > 1 and isinstance(n.args[1], ast.Name) \
-                        and n.args[1].id == "unlock_phrase"
-                    if not forwarded:
-                        hits.append((line, "calls check_unlock with holdout true"))
+                    hits.append((line, "calls check_unlock with holdout true"))
         if rel not in UNLOCKERS:
             bad += [f"{rel}:{ln}: {why}" for ln, why in hits]
     return sorted(bad)
@@ -261,9 +256,11 @@ class TestPlantedViolations(unittest.TestCase):
                          "from .gold import check_unlock\n\ndef _u(p):\n    check_unlock(True, p, 'gold', None)")
         self.assertTrue(any("numbers_md.py" in b and "check_unlock with holdout true" in b for b in bad), bad)
 
-    def test_forwarder_with_another_value_is_caught(self) -> None:
-        bad = self.plant(FORWARDER, "def _u2(p):\n    check_unlock(True, p, 'gold', None)")
-        self.assertTrue(any(FORWARDER in b and "check_unlock with holdout true" in b for b in bad), bad)
+    def test_outputs_may_not_unlock(self) -> None:
+        """T99 C: outputs.py is no longer a forwarder; any unlock call there is caught."""
+        rel = "evaluation/outputs.py"
+        bad = self.plant(rel, "def _u2(unlock_phrase):\n    check_unlock(True, unlock_phrase, 'gold', None)")
+        self.assertTrue(any(rel in b and "check_unlock with holdout true" in b for b in bad), bad)
 
     def test_read_output_with_a_phrase(self) -> None:
         bad = self.plant("evaluation/evaluate.py", "def _r(p, x):\n    return read_output(p, unlock_phrase=x)")

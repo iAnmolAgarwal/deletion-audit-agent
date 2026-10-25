@@ -46,7 +46,8 @@ Rebuilt at the developer's direction (turn 2026-10-25T00:08:45+05:30). Updated a
     4. the G7 verifier;
     5. stage 1 plus vision ($5, 170 sends);
     - (T100: the wiring builds the model-on regression gate; main runs it on the mode-A run after stage 2. A row changed with no cause stops the run.)
-    6. **stop** and show stage 1's results, the vision readings, the A+ re-projection and the R06 count.
+    6. **stop** and show stage 1's results, the vision readings and the A+ re-projection (T101: the R06 count is no longer needed).
+  - **Output lock (T101):** the approved file is in `notes/approved_output.json` (`g5-test-20261025T0530`, `cf2a90b0…`). Any change to the test output needs re-approval; at freeze, print the sha256 and compare.
 - **R06 count (T99 D), done at 11:40:**
   - **DEV gold:** all 29 FINDINGs cite a file captured at or before `audit_at` that holds the resource. 0 of 52 cited steps cite a post-audit file. Only 4 steps have the R06 shape, all VERIFICATION steps with `""` in INCOMPLETE rows.
   - **Test, the engine `g5fix1-test`:** 712 of 713 FINDINGs have a pre-audit holder and cite a holder. The one exception (case_33 `export_1842`) is the known PDF-without-ID case, not R06.

@@ -50,3 +50,8 @@ Every person has account 404 and an audit record in `evidence_931201` (kv log, c
   - (ii) the claim is ignored → COMPLETE with VERIFY_RECORD_ABSENT `account_9311401` and VERIFY_RECORD_PRESENT `audit_record_9311402`, both citing `evidence_931201`.
 
   Both are allowed by assertion 5. The developer should pick one. The timed account rule (T4 step 2) does read `reported_status`, so under (ii) a case with no identifier link would need a defined fallback.
+
+## Rulings (T99 E and T101, 2026-10-25)
+- **case_93112 (duplicated case_id):** one FAILED_CLOSED (MALFORMED_REQUEST) row. The duplication is reported in the run artifacts, and the row is never answered from either copy (T99 E).
+- **case_93114 (`reported_status=DONE`):** a FAILED_CLOSED malformed-request row whose reason names the `reported_status` column (T101). The field feeds the account rule, so an unmapped value cannot be audited as normal.
+- `expected_assertions.json` holds both rulings.

@@ -41,3 +41,6 @@ All three are captured after the readable file (11:30) and before `audit_at`. Ea
   - Reading (ii): only cases whose person can be tied to the file fail closed. That ties no one to `evidence_931102`, so case_93101 would be COMPLETE on the readable file alone.
   - I assert (i). T42's "never COMPLETE" is the precedence rule, and (ii) can report COMPLETE while the unread file holds a live record. On real data T60 requires 0 such files at freeze, so the question matters only for robustness.
 - **Whether a FAILED_CLOSED row may carry the readable file's two verification steps.** T86 (1) says "whatever steps the remaining inputs still give". In an INCOMPLETE row those verifications carry `""` (T77 rule 1). The assertions allow either `[]` or those two steps with empty citations.
+
+## Ruling (T99 E, 2026-10-25)
+The developer adopted reading (i) for a missing file: every case whose `audit_at` is after that file's capture time is never COMPLETE. `expected_assertions.json` holds it.

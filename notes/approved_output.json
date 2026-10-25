@@ -1,0 +1,19 @@
+{
+  "approved_output": {
+    "run_id": "g5-test-20261025T0530",
+    "path": "runs/g5-test-20261025T0530/output.csv",
+    "sha256": "cf2a90b070db785456b2cb26398add0eba95a69ae8a763eb838a367f135751fc",
+    "rows": 518,
+    "approved_by": "developer",
+    "ruling": "T101",
+    "approved_at": "2026-10-25T11:49:46+05:30 (the developer's T101 turn)"
+  },
+  "rule": "The submitted output.csv must be byte-identical to the approved file. G7 may change test rows only by (1) a non-deletion request becoming NOT_APPLICABLE with [] where the model's answer and the intake cross-check agree in both replicate runs, or (2) a screenshot-dependent row changing where both vision readings agree and the extracted IDs cross-check. Any other change stops the run for the developer. A later change to the test output needs the developer's re-approval before freeze, or it is reverted. At freeze, print the output's sha256 and confirm it equals the approved file.",
+  "history": [
+    {
+      "sha256": "cf2a90b070db785456b2cb26398add0eba95a69ae8a763eb838a367f135751fc",
+      "run_id": "g5-test-20261025T0530",
+      "ruling": "T101"
+    }
+  ]
+}

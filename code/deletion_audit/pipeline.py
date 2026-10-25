@@ -10,13 +10,19 @@
   an explicit case list that names a holdout case, and, after resolving ``"test"``, any resolved
   case that is one. It raises :class:`HoldoutRefused` and writes nothing. The holdout cases'
   request inputs still join the global stages (T32, T47); only running or writing them is
-  refused. There is no unlock path (the HOLDOUT EVALUATION RUN mechanism is a later decision).
+  refused. **The one unlock (T96):** ``holdout_unlock`` must be the developer's exact phrase,
+  checked by ``evaluation.gold.check_unlock``, which raises ``HoldoutLockedError`` on any other
+  value and logs a granted unlock once per run. Only ``evaluation/holdout_run.py`` passes it
+  (``code/evaluation/tests/test_holdout_static.py``); the CLI never does.
+* The producer record carries ``git_head`` (the 40-hex HEAD, or None outside a git checkout), so a
+  freeze run names the commit it ran on (T96: ``holdout_run`` checks it against the freeze tag).
 """
 
 from __future__ import annotations
 
 import hashlib
 import re
+import subprocess
 import sys
 import time
 from collections.abc import Iterable, Sequence
@@ -56,6 +62,34 @@ def refuse_holdout(cases: Iterable[str]) -> None:
             f"refused: {len(named)} holdout case(s) requested; holdout cases are never run or written "
             "(../CLAUDE.md section 4)"
         )
+
+
+def guard_holdout(cases: Iterable[str], holdout_unlock: str | None, run_id: str, granted: bool) -> bool:
+    """Refuse holdout cases unless ``holdout_unlock`` is the developer's phrase (module docstring).
+
+    Returns whether the unlock is granted for this run; a granted unlock is logged once (the
+    second call of a run, after ``"test"`` is resolved, passes ``granted=True``).
+    """
+    if not set(cases) & holdout_ids():
+        return granted
+    if holdout_unlock is None:
+        refuse_holdout(cases)
+    if not granted:
+        from evaluation.gold import check_unlock  # code/ is on sys.path: holdout_ids() put it there
+
+        check_unlock(True, holdout_unlock, "engine run", run_id)
+    return True
+
+
+def git_head() -> str | None:
+    """The repo's HEAD commit (40 hex), or None when it cannot be read."""
+    try:
+        out = subprocess.run(["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"], capture_output=True,
+                             text=True, timeout=10, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    head = out.stdout.strip()
+    return head if out.returncode == 0 and re.fullmatch(r"[0-9a-f]{40}", head) else None
 
 
 @dataclass(frozen=True)
@@ -100,16 +134,18 @@ def run(
     write_root: bool = False,
     runs_dir: Path | None = None,
     command: str = "",
+    holdout_unlock: str | None = None,
 ) -> RunSummary:
     """Run the engine on ``cases`` and write the run directory (module docstring)."""
     if RUN_ID_RE.fullmatch(run_id) is None:
         raise ValueError("run id must match ^[A-Za-z0-9][A-Za-z0-9._-]*$")
+    granted = False
     if cases != "test":
-        refuse_holdout(cases)  # before any input is read
+        granted = guard_holdout(cases, holdout_unlock, run_id, granted)  # before any input is read
     t0 = time.monotonic()
     ctx = build_context(dataset_dir)
     wanted = resolve_cases(ctx, cases)
-    refuse_holdout(wanted)  # also a "test" run whose request file names a holdout case
+    granted = guard_holdout(wanted, holdout_unlock, run_id, granted)  # also a resolved "test" run
     world = build_world(ctx)
     records = audit_all(ctx, wanted, FailClosedIntent(), world)
     run_dir = (runs_dir or REPO_ROOT / "runs") / run_id
@@ -137,6 +173,8 @@ def run(
         "paid_model_calls": 0,
         "created_at": now_ist(),
         "code_sha256": code_hash(),
+        "git_head": git_head(),
+        "holdout_unlocked": granted,
         **evidence_record(ctx, world),
         "request_issues": [
             {"file": i.file, "line": i.line, "case_id": i.case_id, "reason": i.reason} for i in ctx.request_issues

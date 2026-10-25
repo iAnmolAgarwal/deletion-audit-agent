@@ -47,3 +47,9 @@ In DEV, R15-R4 only ever supplied *verification* steps of INCOMPLETE rows (empty
 
 ## What the developer should rule on
 Whether T66 rule 1's hard check exempts a finding discovered through R15-R4, and if so what it cites. 179 test cases have this file shape, so the answer may change real rows.
+
+## Ruling (T101, 2026-10-25): reading (d)
+The developer ruled: **a finding whose record only a post-audit file holds fails its row closed**, and the rule gets its own fixture test.
+- case_93051's row is FAILED_CLOSED. It is INCOMPLETE, never COMPLETE and never NOT_APPLICABLE, and its reason names `search_9305102`. It never cites `evidence_930602`.
+- `expected_assertions.json` is the authority for this fixture. `expected_output.csv` shows the superseded reading (a) and is not asserted.
+- Measured impact on real data (main, 2026-10-25): 0 of 29 DEV FINDINGs and 0 of the engine's 713 test FINDINGs have this shape.

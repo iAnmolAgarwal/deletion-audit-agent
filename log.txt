@@ -4803,3 +4803,37 @@ parent_agent=none
 worktree=main
 branch=main
 repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T11:55:42+05:30] Pipeline unlock (T96) and read_output route removed (T99 C); T101 output lock
+
+User Prompt (verbatim, secrets redacted):
+Output lock, from now until submission:
+- The submitted output.csv must be byte-identical to an output file I have approved. The approved file today is runs/g5-test-20261025T0530/output.csv (sha256 cf2a90b0...).
+- G7 may change test rows only in two ways: a non-deletion request becomes NOT_APPLICABLE with [] where the model's answer and the intake cross-check agree in both replicate runs; and a screenshot-dependent row changes where both vision readings agree and the extracted IDs cross-check. After the mode-A run, diff its output against the approved file and list every changed row with its case, cause and before/after status in the run artifacts. Anything else stops the run for me.
+- I'll review the mode-A output and approve it or not. Once a file is approved, any later change that alters the test output (G8 fixes, G9 judge fixes, anything) needs my re-approval before freeze; otherwise revert it. At freeze, print the output's sha256 and confirm it equals the approved file.
+
+Rulings, if not already recorded: R12 reported_status: keep the FAILED_CLOSED malformed-request row that names the column. R06: approved now. A finding whose record only a post-audit file holds fails its row closed, with its own fixture test. The stop after stage 1 then needs only stage 1's results, the vision readings and the A+ re-projection.
+
+Time is not a factor.
+
+Agent Response Summary:
+Developer decisions: the output lock (T101; the approved file is recorded in notes/approved_output.json), R12's reported_status kept as a FAILED_CLOSED malformed-request row, and R06's fail-closed rule. I finished main's pipeline unlock: pipeline.run takes holdout_unlock through check_unlock (logged once per run) and records git_head, and read_output lost its unlock route (T99 C), with 8 engine-guard tests. code/tests runs 421 OK and evaluation 251 OK, the DEV and test outputs are unchanged (641dbc8d…, cf2a90b0…), and no real access log exists. I settled the R06, R11 and R12 fixture assertions by the rulings and added T101's narrowed gate, the R06 engine rule and the approved-output freeze check to the G7 wiring brief.
+
+Actions:
+* code/deletion_audit/pipeline.py: guard_holdout() (no phrase raises HoldoutRefused; a wrong phrase raises HoldoutLockedError via evaluation.gold.check_unlock before any input is read; granted once and logged as "engine run"); git_head(); producer.json gets git_head and holdout_unlocked; the module docstring says how the unlock works.
+* code/evaluation/outputs.py: read_output(path) has no unlock_phrase or run_id and always refuses gold; the check_unlock import is gone. Tests: test_gold_identity_guard (the two unlock tests replaced by test_read_output_has_no_unlock_route); test_holdout_static (the FORWARDER allowance removed; test_outputs_may_not_unlock).
+* code/tests/pipeline/test_holdout_unlock.py: 8 tests (no phrase, 6 wrong forms, the phrase in the environment, one access line when granted, DEV needs no phrase, a phrase without holdout cases unlocks nothing, git_head, guard removed). Synthetic dataset; the access log patched to a temp file. The hygiene rule flagged a temp dir named "runs", so it was renamed run_out.
+* Checks: unittest code/tests Ran 421 OK; code/evaluation/tests Ran 251 OK; lint clean on the 5 changed files; scratch DEV and test runs give 641dbc8d921186ef and cf2a90b070db7854; git_head 5819121bb4e3 = HEAD; ls runs/HOLDOUT_ACCESS.log: no such file.
+* Fixtures (no engine has run on them): R06 expected_assertions.json and EXPECTED.md settled to reading (d) FAILED_CLOSED (expected_output.csv keeps the superseded reading (a), marked; deleting it needs the developer's OK); R12 93112 and 93114 settled; R11 reading (i) settled.
+* notes/approved_output.json: path, sha256 cf2a90b0…, ruling T101, approved_at 2026-10-25T11:49:46+05:30, history.
+* scratchpad g7wiring_brief.md: the approved file read from notes/approved_output.json; the two allowed changes with their conditions, everything else stops; the R06 engine rule and fixture test; the freeze_check approved-output check; test_properties.py:108 (T63 pin 5).
+* notes/DECISIONS.md T101; TASKS.md. git commit pushed to github main (hash in the next entry). The previous turn's G5 commit was 5819121.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
