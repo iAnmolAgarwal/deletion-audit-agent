@@ -300,5 +300,11 @@ The full prep-era log (D1–D19) is in the kit at `../research/DECISIONS.md`. Th
 |---|---|---|
 | T103 | **(1) Delete R06's superseded `expected_output.csv`.** Git history keeps it, and each fixture should carry one expectation, so a reader can't mistake the old one for current. *Done:* `git rm`; `EXPECTED.md` now heads reading (a) as superseded and names `expected_assertions.json` as the one expectation. **(2) The dependency gap goes into the G7 verifier's brief:** an unread screenshot newer than a record's text evidence isn't counted as a dependency (case_34 / account_5762 / evidence_04). *Done:* item 9 of `notes/g7_verifier_items.md`, the collected item list for that brief. | Developer. |
 
+## Developer message 2026-10-25T12:04:44+05:30 (received while main logged the G8 run): review checkpoints 1 and 2
+
+| # | Decision | Reason given / basis |
+|---|---|---|
+| T104 | **Review checkpoints 1 and 2** (`../PLAYBOOK.md` §11; the developer read both modules). **1. `policy/rules.py`:** the decision table matches the spec and DEV. Two changes: **(a)** a record whose system has no category mapping currently gets NO_STEP silently (`decide()`, line 187); flag it and fail the row closed instead, since a silent drop is how a COMPLETE row could hide a record. **(b)** A retained record (an audit log or legal hold) whose derived state is ABSENT still gets VERIFY_RECORD_PRESENT. That is right for the output (DEV gold does the same on 9 audit records judged absent by omission), but flag it, so the run artifacts don't claim presence over the engine's own state without saying so. Neither changes today's DEV or test output; confirm that with the hashes. **2. `validate/prewrite.py`:** the checks match T66/T74/T77 and the G1 invariants, and `gate()` never drops a step. No change. **Both changes go in after G7's wiring, under the output lock** (no output change expected). *For the README (G10):* this message is the log.txt timestamp of checkpoints 1 and 2. | Developer. |
+
 ## Organiser claims adopted
 (None yet. G1's `notes/CONTRACT_DRAFT.md` will propose them; each adoption is added here with its DEV evidence.)

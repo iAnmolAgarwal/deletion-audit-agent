@@ -52,6 +52,13 @@ Rebuilt at the developer's direction (turn 2026-10-25T00:08:45+05:30). Updated a
     1. the four §11 review checkpoints have no log.txt entries yet;
     2. "I chose" and the D4c approval show only in the SESSION START provenance line (the prep session's, D16), so G10 must cite them truthfully;
     3. cite `g5-dev22-20261025T0530` for DEV 19/22.
+  - **G8 engine run done** (about 12:08; report `notes/agent_reports/g8_engine_run.md`). **Waiting for the developer's ruling on the fixes (T43):**
+    1. **R04 case_93031 FAIL (custom eval case):** the engine plans to delete three other people's records. The cause is own-key precedence applied per line, not per trace and resource (`links.py:105-119`). The approved test output is unaffected (0 of 2895 trace groups).
+    2. **R06:** the reason does not name the resource, and the written row keeps a citation that fails `HARD_CONTAINS`. The wiring adds the dedicated rule; the gate's handling of a failed `HARD_CONTAINS` citation is a G5 gap.
+    3. **R11:** the reason labels are wrong (a SQL error and an unknown family are shown as `MISSING_EVIDENCE_FILE`).
+    4. **No committed test runs R01–R12.**
+    - Passed or waiting: everything else passes. 11 rows wait for G7 (intent).
+  - **T104 (review checkpoints 1 and 2, 2026-10-25T12:04:44+05:30):** after the G7 wiring and under the output lock, (a) a system with no category mapping is flagged and fails the row closed (`policy/rules.py` `decide()` ~line 187), and (b) VERIFY_RECORD_PRESENT on a retained record whose state is ABSENT is flagged. Confirm the DEV and test hashes are unchanged. The validator: no change.
   - **G7 verifier items** are collected in `notes/g7_verifier_items.md` (13 items, including the T103 dependency gap). The full brief is written when the wiring finishes.
   - **At the stage-1 stop (T102):** the seven showcase cases. For each: what its screenshot shows for the linked resource, the capture time, and the state with the reading applied (latest observation wins). A resource present or active before `audit_at` means a finding citing the screenshot. The map, from main's pre-check, is case_34→evidence_04 (account_5762; its row is COMPLETE today), 35→09 (search_428), 39→14 (data_flow_1121), 50→19 (analytics_7438), 52→23 (export_1260), 53→28 (support_1034), 55→32 (backup_9287).
   - **Output lock (T101):** the approved file is in `notes/approved_output.json` (`g5-test-20261025T0530`, `cf2a90b0…`). Any change to the test output needs re-approval; at freeze, print the sha256 and compare.

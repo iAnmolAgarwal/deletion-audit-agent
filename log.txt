@@ -4938,3 +4938,100 @@ parent_agent=none
 worktree=main
 branch=main
 repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T12:03:30+05:30] G8 engine run on red-team and G5b fixtures
+
+User Prompt (verbatim, secrets redacted):
+directed_by: 2026-10-25T11:55:27+05:30
+
+G8 engine run: run the committed engine, replay-only, on the committed red-team fixtures and on G5b's fixtures, and report every failure. No code edits.
+(full brief from main)
+
+Agent Response Summary:
+Exported commit 64e203f with git archive into the scratchpad and ran pipeline.run(cases="test") replay-only on all 24 fixture folders (F01-F11b, R01-R12), with no model calls; runs are under the scratchpad's g8run/runs. Every settled row passes except case_93031 (R04, custom eval case). There the engine links the look-alike search hit, the same-name person's live account and the look-alike analytics hash through the requester's trace lookup line, so the row deletes another person's account. The validator and coherence both pass that row. Root cause: own-key precedence in discovery/links.py link_observation is applied per line, not per trace, and the "started" line carries only the lookup key. R06 fails closed (VALIDATOR_REFUSED via HARD_CONTAINS), but its reason does not name search_9305102. The 11 NOT_APPLICABLE expectations are WAITING-FOR-G7, and their intent-independent checks pass. A measured 0 contradicted trace groups on the dataset evidence and 0 S1_SEVERAL_ACCOUNTS flags in the approved test run suggest an R04 fix changes no test row.
+
+Actions:
+* git archive 64e203f | tar -x into the scratchpad g8run/engine; ran pipeline.run on 24 fixture folders (run ids g8-F01..g8-R12)
+* compared output.csv against expected_output.csv/expected_partial.csv; checked expected_assertions.json for R06, R08, R11, R12, F11a and F11b by hand-written scripts in the scratchpad
+* ran evaluation.coherence on every run; ran the export's tests.pipeline.test_fixtures (4 OK)
+* traced R04 observations and links through the export's engine; counted trace-link contradictions on the dataset evidence (counts only, no IDs); counted S1_SEVERAL_ACCOUNTS in runs/g5-test-20261025T0530/cases.jsonl (read-only)
+* no repo edits besides this entry; no model calls; .env, sample_output.csv and gold never opened
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=orch-redteam
+parent_agent=main
+directed_by=2026-10-25T11:55:27+05:30
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T12:05:19+05:30] [auto] G8 engine run: R04 custom eval FAIL (other people linked); fixes for ruling
+
+User Prompt (verbatim, secrets redacted):
+(Background-agent notification: the G8 engine run, orch-redteam, directed_by 2026-10-25T11:55:27+05:30, finished. No developer text.)
+
+Agent Response Summary:
+The G8 run (an export of 64e203f, replay-only, 24 fixture folders) found one serious failure: in custom eval case R04 case_93031 the engine adds FINDING/DELETE/VERIFY steps for three other people's records, including a same-name person's live account, and neither the validator nor coherence catches it. Main reproduced it (14 steps against the expected 5) and confirmed the cause in links.py: own-key precedence is applied per line, so a lookup-only line links a resource whose own key belongs to someone else. On the real dataset, 0 of 2,895 trace groups have that conflict, and the approved run has 0 S1_SEVERAL_ACCOUNTS flags, so the approved test output is not affected. R06 is behind the T101 ruling (the wiring adds that rule), R11's reason labels are wrong, and no committed test runs the red-team fixtures; all of it waits for the developer's ruling (T43).
+
+Actions:
+* Checks: git show 64e203f:code/deletion_audit/discovery/links.py lines 95-125 read; the R04 re-run on the export (main-R04-check): 14 steps, extras account_9303103, search_9303102, analytics_9303105; scratchpad g8run/scripts/trace_conflict.py (read first, counts only) on dataset/: trace_groups 2895, contradicted pairs 0; S1_SEVERAL_ACCOUNTS in runs/g5-test-20261025T0530: 0.
+* Results: 30 PASS, 11 WAITING-FOR-G7 (F01 ×3, R01 ×5, R02 ×3; intent), 2 FAIL (R04 93031; R06 93051's reason). Custom eval cases: 93021, 93041, 93061 and 93082 PASS; 93031 FAIL.
+* notes/agent_reports/g8_engine_run.md (the report verbatim, with main's check); TASKS.md.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T12:05:40+05:30] Correction: 12:05:19 header title is 82 characters (max 80)
+
+User Prompt (verbatim, secrets redacted):
+(No developer text; main's own correction, made when the pre-commit check refused the G8 report commit.)
+
+Agent Response Summary:
+The 2026-10-25T12:05:19+05:30 entry's title ("[auto] G8 engine run: R04 custom eval FAIL (other people linked); fixes for ruling") is 82 characters, 2 over the 80-character limit, so the pre-commit check_log refused the commit. The log is append-only, so this note corrects the defect and scripts/check_log.py lists it as an excused H2 defect pointing here.
+
+Actions:
+* Defect: H2 on the 2026-10-25T12:05:19+05:30 header; check_log EXCEPTIONS gains ("H2", "2026-10-25T12:05:19+05:30") with this note.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T12:06:11+05:30] T104: review checkpoints 1-2 (policy, validator); two policy flags after wiring
+
+User Prompt (verbatim, secrets redacted):
+Review checkpoints 1 and 2 (I read both modules):
+1. policy/rules.py: the decision table matches the spec and DEV. Two changes: (a) a record whose system has no category mapping currently gets NO_STEP silently (decide(), line 187). Flag it, and fail the row closed instead, since a silent drop is how a COMPLETE row could hide a record. (b) A retained record (audit log or legal hold) whose derived state is ABSENT still gets VERIFY_RECORD_PRESENT. That's right for output (DEV gold does the same on 9 audit records judged absent by omission), but flag it, so the run artifacts don't claim presence over the engine's own state without saying so. Neither changes today's DEV or test output. Confirm that with the hashes.
+2. validate/prewrite.py: checks match T66/T74/T77 and the G1 invariants, and gate() never drops a step. No change.
+Both go in after G7's wiring, under the output lock (no output change expected).
+
+Time is not a factor.
+
+Agent Response Summary:
+Developer decision: the developer personally reviewed checkpoints 1 (the policy module) and 2 (the validator). Two policy flags go in after G7's wiring under the output lock, failing an unmapped-category record closed and flagging presence-over-absence on retained records; the validator is unchanged. I recorded T104, which also gives the README its timestamp for these two checkpoints, and read decide() (the NO_STEP return when no compliant operation exists, line 187). The G8 commit had been refused by the pre-commit log check (an 82-character title), so I appended a correction note, listed the defect, and commit everything together now.
+
+Actions:
+* notes/DECISIONS.md T104; TASKS.md (the T104 item; the G8 fix questions pending).
+* log.txt: a correction note for the 12:05:19 H2 defect; scripts/check_log.py adds NOTE_1205 and the ("H2", "2026-10-25T12:05:19+05:30") exception; check_log PASS (0 blocking); test_check_log OK.
+* git commit of notes/agent_reports/g8_engine_run.md, TASKS.md, notes/DECISIONS.md, scripts/check_log.py and log.txt, pushed to github main. The G7 wiring is still running.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
