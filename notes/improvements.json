@@ -248,7 +248,7 @@
         "clause": "(b) `agent/regression.py::_intent_condition`"
       },
       "evidence": {
-        "test": "code/tests/pipeline/test_regression_gate.py::test_intent_change_stops_when_the_agent_loop_failed"
+        "test": "code/tests/pipeline/test_regression_gate.py::test_intent_change_kept_approved_when_the_agent_loop_failed"
       }
     },
     {

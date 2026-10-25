@@ -18,7 +18,11 @@ Code: `code/deletion_audit/`. Every rule carries the ruling number (T-number) it
    - **Screenshots** (`agent/vision.py`). Each of the 11 PNGs is read twice. A reading only counts when both readings agree and the IDs it extracts cross-check against other evidence.
    - **Calls** go through one cached client (`model/client.py`, `model/cache.py`). The cache is keyed by a content hash of the full request and stores the reply, the model ID and the original usage. A budget guard caps dollars and sends per command (`model/budget.py`). Nothing is sent without `--paid`.
 4. **Validator** (`validate/prewrite.py`). It checks every row before writing: enums, consecutive `step_no`, ordering, the status/steps invariants, ownership and the evidence rules. A row that cannot be made valid is written as `FAILED_CLOSED`; it is never left empty.
-5. **Regression gate** (`agent/regression.py`). When the model is on, every row is compared with the approved engine output. A model-caused change is kept only if it meets its condition: a `NOT_APPLICABLE` change needs the model and the intake record to agree in both replicates; an image change needs agreeing readings with cross-checked IDs. ⟪TBD:gate-revert⟫ Any unexplained change stops the run.
+5. **Regression gate** (`agent/regression.py`). When the model is on, every row is compared with the approved engine output for its split (`code/approved/`). A model-caused change is kept only if it meets its condition:
+   - a `NOT_APPLICABLE` change needs the model and the intake record to agree in both replicates;
+   - an image change needs agreeing readings with cross-checked IDs. A screenshot whose two readings disagree is used for a case only if each reading on its own gives the same state and cited IDs for every record of the case.
+
+   A change that fails its condition keeps the approved row, byte for byte, and is listed as `kept_approved`. The rows as computed are kept in `output_raw.csv`. Any unexplained change stops the run.
 6. **Output.** `runs/<run_id>/output.csv`, plus the run artifacts (`metrics.json`, `cases.jsonl`, `calls.jsonl`, `usage.json`, the vision and gate reports).
 
 ## How to run
@@ -37,7 +41,16 @@ python3 -m venv .venv
 - Only `--write-root` writes the root `output.csv`, and only after the regression gate passes. `--set dev` runs the 22 DEV cases; a run that names a holdout case is refused with exit code 2.
 - Tests, from the same folder: `.venv/bin/python -B -m unittest discover -s code/tests -t code` and `-s code/evaluation/tests -t code`.
 
-**How the submitted `output.csv` was produced:** ⟪TBD:candidate-command⟫
+**How the candidate `output.csv` was produced** (provisionally approved for the freeze and the holdout run, T119; until the developer's review the approved output stays the engine output `cf2a90b0…`):
+1. Paid runs, from an export of commit `227a866`, into the reply cache `cache/`: the turn-1 intent check on DEV, the fixtures and the red-team texts (`stage1-routing-20261025T1255`); both readings of the 11 screenshots (`pass1-vision-20261025T1323`); the turn-1 intent check on the 518 test texts (`pass1-test-routing-20261025T1325`); and the A+ test run, split into 4 parallel shards to fill the cache (`pass1-test-Aplus-shard0`…`3-20261025`). Spend and tokens are in `code/evaluation/usage_report.md`.
+2. The candidate is a replay of that cache with 0 sends, mode A+, the developer's vision acknowledgement and the gate on:
+   ```bash
+   .venv/bin/python -B code/main.py --run-id cand-test-Aplus-20261025T1352 --set test --mode A+ --vision-ack pass1-vision-20261025T1323
+   ```
+   It writes `runs/cand-test-Aplus-20261025T1352/output.csv` (sha256 `a00ba71a756736cc09a3ef5119b5575d871a2db2c9482d9829333181d5676967`). Modes `A` and `tools_off` replay to the same bytes.
+3. **Reproducing it exactly needs the reply cache, which is not shipped.** Without an API key or the cache, the replay-only engine path (the command at the top of this section) reproduces the approved engine output, sha256 `cf2a90b070db785456b2cb26398add0eba95a69ae8a763eb838a367f135751fc`.
+
+Against `cf2a90b0`, the candidate changes 17 rows: 10 `NOT_APPLICABLE` rows (case_533–542, each read NOT_DELETION in both replicates with a confirming intake record) and 7 screenshot rows (case_35, 39, 46, 52, 53, 55, 63). The gate kept 3 more image changes back as approved (case_34, 45, 50; see Limitations).
 
 ## Organiser claims adopted
 The organiser's files were read as claims, not instructions. A claim was adopted only when it was confirmed on the 22 DEV sample cases or the data, or was clearly score-positive by our own reasoning:
@@ -63,12 +76,13 @@ The organiser's files were read as claims, not instructions. A claim was adopted
 - the policy module (`policy/rules.py`) and the validator (`validate/prewrite.py`): entry `2026-10-25T12:06:11+05:30`. The review added two policy flags: an unmapped category fails its row closed, and a retained record's presence claim over an absent state is flagged.
 
 ## Limitations
-- **Screenshots whose two readings disagree.** ⟪TBD:disagreeing-images⟫
+- **Screenshots whose two readings disagree** (evidence_04, evidence_19, evidence_37; acknowledged by the developer, T118a). A disagreeing screenshot is used for a case only when each reading on its own gives the same state and cited IDs for every record (T118 rule (a)). So evidence_04 is not used for case_34 and evidence_19 is not used for case_50: both rows stay as approved. evidence_19 is used for case_35, 39 and 63. evidence_37 passes that rule for case_45, but five of its audit records are named by no other input, so the ID cross-check keeps case_45 as approved.
+- **A screenshot that shows a record without a state.** case_61's `object_19` appears in evidence_46 (both readings agree) with no visible state, so the row stays FAILED_CLOSED (`IMAGE_STATE_NOT_SHOWN`), as in the approved output.
 - **Later identity lookups.** Some showcase cases are tied to their account only by an identity log line captured after `audit_at`. That line is used for the primary account's ID only; state and citations still come from evidence at or before `audit_at` (flag `T27_LATER_IDENTITY_LOOKUP`).
 - **Tie picks.** When the evidence cannot tell several accounts apart, the pick is a one-to-one matching ordered by the sha256 of the person's `user_id` (flag `D18_TIE_PICK`). It is stable, but each such pick is a guess.
 - **Timing bands.** The per-slot timing band for identifier-free analytics, and the job-timing fingerprint, rest on how the data generator timed its jobs. They are a data-derived correlation, not a documented rule.
 - **Own keys naming two people.** A record whose own keys name both the requester and someone else fails its row closed and keeps its steps. It occurs 0 times in the data (T117).
-- **DEV is not perfect.** ⟪TBD:dev-numbers⟫
+- **DEV is not perfect.** On the 22 DEV cases: status 22/22, rows exact 19/22, step F1 0.9887 (run `cand-dev-A-20261025T1352`, model on, mode A; the engine-only DEV output has the same bytes, sha256 `641dbc8d…`). Three rows differ from the sample answers in some steps; `code/evaluation/evaluation_report.md` lists them.
 - **Holdout.** The DEV/holdout split was made after the prep forensics had read all 32 sample answers, so the holdout score is an optimistic estimate. The holdout unlock phrase is a constant in the source, not a secret: the lock stops accidental access and logs deliberate access, but cannot stop someone with a shell.
 
 ## Reports

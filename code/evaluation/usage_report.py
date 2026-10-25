@@ -55,6 +55,9 @@ TOKEN_FIELDS: tuple[str, ...] = ("input_tokens", "output_tokens", "cache_read_in
 PER_MILLION = 1_000_000
 COST_TOLERANCE = 1e-9
 CALL_LOG_GLOB = "*calls*.jsonl"
+#: The reply namespaces under the cache directory, in order (the same pair as
+#: ``deletion_audit.config.REPLY_NAMESPACES``; a test keeps them equal).
+REPLY_NAMESPACES: tuple[str, ...] = ("replies", "replies-replica-1")
 PROVIDER = "Anthropic (Messages API)"
 TOTAL_PARTS: tuple[str, ...] = ("input_tokens", "output_tokens", "cache_read_input_tokens",
                                 "cache_creation_input_tokens")
@@ -238,24 +241,33 @@ def _close(a: float | None, b: float | None) -> bool:
     return a is not None and b is not None and abs(a - b) <= COST_TOLERANCE
 
 
-def _buying_cost(runs_root: Path, buyer: str, key: str) -> tuple[float | None, str | None]:
-    """The settled cost of the send that bought ``key``, from the buying run's own call logs."""
+def _buying_costs(runs_root: Path, buyer: str, key: str) -> tuple[list[float], str | None]:
+    """The settled costs of the sends that bought ``key``, from the buying run's own call logs.
+
+    A run that sends the same request in both reply namespaces (the turn-1 replicate, the second
+    vision reading) logs one successful send per namespace under the same key.
+    """
     d = runs_root / buyer
     if not d.is_dir():
-        return None, f"buying run {buyer} has no folder under runs/"
+        return [], f"buying run {buyer} has no folder under runs/"
     hits = []
     for p in sorted(d.glob(CALL_LOG_GLOB)):
         calls, _ = read_calls(p)
         hits += [c for c in calls if c.key == key and c.event == "send" and c.outcome == "ok" and not c.from_cache
                  and c.run_id == buyer]
-    if len(hits) != 1:
-        return None, f"buying run {buyer}'s call logs hold {len(hits)} successful sends of this key (expected 1)"
-    return hits[0].cost_usd, None
+    return [h.cost_usd for h in hits], None
 
 
-def attribute(calls: Sequence[Call], *, runs_root: Path, cache_root: Path, ledger: Sequence[tuple[str, float]],
-              table: Mapping[str, Price]) -> dict[str, Any]:
-    """Part (a): every distinct reply the run used, followed to the run that bought it."""
+def attribute(calls: Sequence[Call], *, runs_root: Path, cache_roots: Sequence[Path],
+              ledger: Sequence[tuple[str, float]], table: Mapping[str, Price]) -> dict[str, Any]:
+    """Part (a): every distinct reply the run used, followed to the run that bought it.
+
+    A request key can have an entry in each reply namespace (``cache_roots``, in order): the
+    turn-1 replicate and the second vision reading reuse the request, and so its key, in a second
+    namespace. The call log names no namespace, so every entry of a used key counts as used; the
+    cross-check against the pipeline's own ``usage.json`` count (made per namespace) confirms it.
+    Costs are checked per key: the settled sends, the re-priced entries and the ledger lines.
+    """
     used: dict[str, int] = {}
     for c in calls:
         if c.outcome == "ok" and c.event in ("cache_hit", "send"):
@@ -266,40 +278,69 @@ def attribute(calls: Sequence[Call], *, runs_root: Path, cache_root: Path, ledge
     replies: list[dict[str, Any]] = []
     problems: list[str] = []
     for key, uses in used.items():
-        entry, why = read_entry(cache_root, key)
-        if entry is None:
+        entries: list[dict[str, Any]] = []
+        whys: list[str] = []
+        for root in cache_roots:
+            entry, why = read_entry(root, key)
+            if entry is not None:
+                entries.append(entry)
+            elif why != "no reply cache entry":
+                whys.append(why or "unreadable")
+        if not entries or whys:
+            why = "; ".join(whys) or "no reply cache entry"
             problems.append(f"{key[:12]}: {why}")
             replies.append({"key": key, "uses": uses, "error": why})
             continue
-        settled, why_cost = _buying_cost(runs_root, entry["bought_by_run"], key)
-        repriced = reprice(entry["model"], entry["usage"], table)
         led = ledger_by_key.get(key)
-        checks = {"settled_vs_repriced": _close(settled, repriced), "settled_vs_ledger": _close(settled, led)}
-        if why_cost:
-            problems.append(f"{key[:12]}: {why_cost}")
+        groups: dict[tuple[str, str], list[dict[str, Any]]] = {}
+        for e in entries:
+            groups.setdefault((e["bought_by_run"], e["model"]), []).append(e)
+        key_settled: list[float | None] = []
+        key_repriced: list[float | None] = []
+        records: list[dict[str, Any]] = []
+        for (buyer, model), es in sorted(groups.items()):
+            costs, why_cost = _buying_costs(runs_root, buyer, key)
+            n_bought = sum(1 for e in entries if e["bought_by_run"] == buyer)
+            settled: float | None = round(sum(costs), 9) if len(costs) == n_bought else None
+            if why_cost:
+                problems.append(f"{key[:12]}: {why_cost}")
+            elif settled is None:
+                problems.append(f"{key[:12]}: buying run {buyer}'s call logs hold {len(costs)} successful sends of "
+                                f"this key (expected {n_bought}, one per namespace entry)")
+            if len(groups) > 1 and settled is not None:  # split a buyer's settled sum across its models
+                settled = round(settled * len(es) / n_bought, 9) if n_bought else None
+            repriced = _sum(reprice(model, e["usage"], table) for e in es)
+            key_settled.append(settled)
+            key_repriced.append(repriced)
+            records.append({"key": key, "uses": uses, "entries": len(es), "model": model, "bought_by_run": buyer,
+                            "tokens": _tokens(e["usage"] for e in es), "cost_settled_usd": settled,
+                            "cost_repriced_usd": repriced, "cost_ledger_usd": led})
+        s_tot, r_tot = _sum(key_settled), _sum(key_repriced)
+        checks = {"settled_vs_repriced": _close(s_tot, r_tot), "settled_vs_ledger": _close(s_tot, led)}
         for name, ok in checks.items():
             if not ok:
-                problems.append(f"{key[:12]} (bought by {entry['bought_by_run']}): {name} disagree "
-                                f"(settled {settled}, repriced {repriced}, ledger {led})")
-        replies.append({"key": key, "uses": uses, "model": entry["model"], "bought_by_run": entry["bought_by_run"],
-                        "tokens": _tokens([entry["usage"]]), "cost_settled_usd": settled,
-                        "cost_repriced_usd": repriced, "cost_ledger_usd": led, "checks": checks})
+                problems.append(f"{key[:12]} (bought by {', '.join(sorted({g[0] for g in groups}))}): {name} "
+                                f"disagree (settled {s_tot}, repriced {r_tot}, ledger {led})")
+        replies += [{**r, "checks": checks} for r in records]
     ok_replies = [r for r in replies if "error" not in r]
 
     def group(field_name: str) -> dict[str, Any]:
         out: dict[str, Any] = {}
         for name in sorted({r[field_name] for r in ok_replies}):
             rs = [r for r in ok_replies if r[field_name] == name]
-            out[name] = {"replies": len(rs), "uses": sum(r["uses"] for r in rs), **_tokens(r["tokens"] for r in rs),
+            out[name] = {"replies": sum(r["entries"] for r in rs), "uses": sum(r["uses"] for r in rs),
+                         **_tokens(r["tokens"] for r in rs),
                          "cost_settled_usd": _sum(r["cost_settled_usd"] for r in rs),
                          "cost_repriced_usd": _sum(r["cost_repriced_usd"] for r in rs)}
         return out
-    total = {"replies": len(ok_replies), **_tokens(r["tokens"] for r in ok_replies),
+    n_entries = sum(r["entries"] for r in ok_replies)
+    total = {"replies": n_entries, **_tokens(r["tokens"] for r in ok_replies),
              "cost_settled_usd": _sum(r["cost_settled_usd"] for r in ok_replies),
              "cost_repriced_usd": _sum(r["cost_repriced_usd"] for r in ok_replies)}
-    return {"replies_used": len(used), "uses": sum(used.values()), "replies_unresolved": len(replies) - len(ok_replies),
+    return {"replies_used": len(used), "uses": sum(used.values()),
+            "replies_unresolved": sum(1 for r in replies if "error" in r),
             "by_buying_run": group("bought_by_run"), "by_model": group("model"), "total": total,
-            "per_reply": _per(total, total["cost_settled_usd"], len(ok_replies)),
+            "per_reply": _per(total, total["cost_settled_usd"], n_entries),
             "replies": replies, "problems": problems}
 
 
@@ -392,7 +433,8 @@ def build_usage(run_id: str, *, runs_root: Path, cache_root: Path, calls_file: s
     problems += [f"{calls_file} line {c.line_no}: names run {c.run_id}, not {run_id}; left out" for c in other]
     calls = [c for c in calls_all if c.run_id == run_id]
     ledger, lproblems = read_ledger(cache_root / "ledger.jsonl")
-    attributed = attribute(calls, runs_root=runs_root, cache_root=cache_root / "replies", ledger=ledger, table=table)
+    roots = [cache_root / ns for ns in REPLY_NAMESPACES]
+    attributed = attribute(calls, runs_root=runs_root, cache_roots=roots, ledger=ledger, table=table)
     own = own_calls(calls, cache_root=cache_root / "replies", run_id=run_id)
     sent_keys = sorted({c.key for c in calls if c.event == "send"})
     led_sent = round(sum(cost for k, cost in ledger if k in set(sent_keys)), 9)

@@ -5691,3 +5691,334 @@ parent_agent=none
 worktree=main
 branch=main
 repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T13:13:00+05:30] G5 fix round 2: own-key per record and five more
+
+User Prompt (verbatim, secrets redacted):
+[brief written by main; approved in developer turn 2026-10-25T12:07:17+05:30]
+directed_by: 2026-10-25T12:07:17+05:30
+
+G5 fix round 2: the G8 engine-run findings (T105) and the developer's policy review (T104). Each fix comes with a test that fails before and passes after, and the approved test output must stay byte-identical.
+(full brief from main)
+
+Agent Response Summary:
+I applied the own-key rule per record (a trace lookup may link a record only to a person its own keys name) and the other T104/T105 fixes, then the items main relayed mid-run (T108 item 7 widened, T109 item 8, T112 items 9-12 and 4(b), T114 item 13). The R04 custom eval case now gives its 5 expected steps; of all 24 fixtures, only R04 and R06 changed against the base engine (R06: the finding's non-containing citation is now blanked). Replay-only runs with fresh run IDs keep DEV at 641dbc8d... and test at cf2a90b0..., the approved hash. Both suites pass (code/tests 542, code/evaluation/tests OK) and lint is clean on every touched file; item 12 is blocked, because no agent tool returns evidence text, so R03's evidence-side code flag cannot fire without a change to agent/tools.py or agent/loop.py.
+
+Actions:
+* code/deletion_audit/discovery/links.py: record_own_keys, LinkIndex.own_keyed/own_persons, link_observation(record_owners=...) (T105 item 1).
+* code/deletion_audit/engine.py, record.py: reasons OWN_KEY_CONFLICT, EVIDENCE_PARSE_ERROR, UNKNOWN_EVIDENCE_FAMILY, NO_CATEGORY_RULE, IMAGE_OMITS_CATALOG_RECORD, IMAGE_STATE_NOT_SHOWN; flags FAILED_DEPENDENCY, PRESENT_CLAIM_OVER_STATE (T104 a/b, T105, T108 item 7 widened by T112).
+* code/deletion_audit/validate/prewrite.py, artifacts.py: hard OWN_KEY_OTHER_PERSON check (part "ownership"), HARD_CONTAINS blanking, single count on re-check (T105 item 2).
+* code/deletion_audit/pipeline.py, agent/regression.py: AGENT_CALL_FAILED engine-path row, loop-status gate condition (T109 item 8, developer turn 2026-10-25T12:44:22+05:30); mandatory gate when the model is on, root output.csv only after the gate passes, review list of row-changing images, review.acknowledged with reading_sha256 (T112, developer turn about 13:00; coordinator shape note).
+* code/deletion_audit/agent/vision.py, agent/schemas.py, agent/prompts/vision.md, state/observe.py, __main__.py: visible_markers/status_label, image_state rule (T112 item 9), backup rule F for images (T114 item 13, developer turn about 13:05).
+* T108 item 7 (developer turn 2026-10-25T12:41:01+05:30) and T114's no-verifier scope cut noted.
+* Tests: new test_fix_round2.py, test_fix_round2_wiring.py, test_redteam_fixtures.py (R01-R12 named one by one), test_agent_call_failed.py, test_real_data_vision.py; updated test_links, test_prewrite, test_regression_gate, test_cli_paid, test_pipeline, vision/report/injection builders; test_fixtures and test_real_data made hermetic (empty reply cache).
+* Before/after: new tests run on an export of 4dcd719 (scratchpad g5fix2/before); probe p4 "agree" (with the new reading fields) on the working tree.
+* Runs: g5fix2-dev-final, g5fix2-test-final (replay-only, empty cache, scratchpad g5fix2/runs).
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=orch-builder-core
+parent_agent=main
+directed_by=2026-10-25T12:07:17+05:30
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T13:21:47+05:30] [auto] Fix round 2 committed (227a866); paid pass started; T116 caps
+
+User Prompt (verbatim, secrets redacted):
+[auto] Background-agent notification: "G5 fix round 2" finished. During the turn the developer sent: "budget isnt a issue , set the budget bar higher if needed"
+
+Agent Response Summary:
+I checked fix round 2 on an export of the staged index: code/tests 542 OK, evaluation 308 OK, and replay-only DEV 641dbc8d and test cf2a90b0 unchanged. Then I committed it with the vision adapter as 227a866 and pushed it to github; its open decisions (R03 evidence flag, DEV gate exit 5, OWN_KEY_CONFLICT handling, the image citation change) go to the developer in the one message. The paid pass started from an export of 227a866: the DEV routing check replayed 22/22 at 0 sends, and vision read all 11 images OK (22 sends, $0.311696), with readings disagreeing on evidence_04, evidence_19 and evidence_37. Developer decision T116: budget is not a constraint, so main raised the total caps from $40 / 1,200 to $60 / 2,500 sends, because A+ needs about one more send per deletion case. Stage 2 (test texts) is running.
+
+Actions:
+* Export of the staged index (git checkout-index) in scratchpad fr2chk/: unittest code/tests (542 OK) and code/evaluation/tests (308 OK); python -m deletion_audit --set dev|test replay-only, empty cache, run IDs mainchk-fr2-dev / mainchk-fr2-test: sha256 641dbc8d... / cf2a90b0...; scripts/lint.sh on the staged paths (mypy clean; 3 old ruff findings in inputs/__init__.py).
+* notes/agent_reports/g5_fix2.md (main's check plus the agent's report); secret scan PASS; commit 227a866; git push github main.
+* Paid pass from scratchpad paid_export_227a866/code, --runs-dir <repo>/runs --cache-dir <repo>/cache --env-file <repo>/.env: routing-check pass1-dev-routing-20261025T1322 --texts dev (replay-only, 0 sends); vision pass1-vision-20261025T1323 --paid --dollar-cap 3 --call-cap 26 (22 sends, $0.311696); routing-check pass1-test-routing-20261025T1325 --texts test --paid --dollar-cap 20 --call-cap 800 (running).
+* notes/DECISIONS.md T116 (caps $60 / 2,500 sends).
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T13:28:40+05:30] Reports part 2: improvements ledger, headline, usage fields
+
+User Prompt (verbatim, secrets redacted):
+directed_by: 2026-10-25T12:52:06+05:30
+
+Reports, part 2: the "failures found and improvements made" section from a ledger, a headline block in both reports, and usage_report.md checked against the organiser's required fields. G10 generates the final reports from the paid-pass runs.
+(full brief from main)
+
+Agent Response Summary:
+Built the ledger-driven section 11 (code/evaluation/improvements.py) with a drafted notes/improvements.json of 19 entries: 8 with committed fixes and passing tests, 11 marked PENDING, which the generator shows as pending and counts as cross-check failures so --publish refuses. Added a generated headline block at the top of both reports (code/evaluation/headline.py); any number not yet available reads "not run yet", including tool use and cost on a run that used no model reply. usage_report.md now opens with a seven-row table of the fields required at ORGANISER_README.md:97, with a test, and reports.py has --publish, which refuses unless the spec says final, the usage run is the final run, the final run covers the full dataset and no cross-check fails. The evaluation suite passes (330 OK) and lint is clean; the demo build reports2-demo-20261025T1345 exits 2 and lists the 11 PENDING entries.
+
+Actions:
+* code/evaluation/improvements.py, headline.py, tests/test_improvements.py (new); evaluation_report.py, usage_report.py, reports.py, report_spec.py, tests/test_reports.py (edited); notes/improvements.json (draft ledger).
+* .venv/bin/python -B -m unittest discover -s code/evaluation/tests -t code: 330 OK; bash scripts/lint.sh code/evaluation: clean.
+* reports.py demo on g7wire-test/dev22-20261025T1233: runs/reports2-demo-20261025T1345 (exit 2, 11 PENDING); --publish probe runs/reports2-publishprobe-20261025T1340 (exit 3, nothing written to code/evaluation/).
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=orch-eval-engineer
+parent_agent=main
+directed_by=2026-10-25T12:52:06+05:30
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T13:29:59+05:30] T117: per-image rulings requested; fix round 2 questions ruled
+
+User Prompt (verbatim, secrets redacted):
+For the one message, and rulings on fix round 2's four questions.
+
+A. The three disagreeing images (evidence_04, evidence_19, evidence_37). For each one, show:
+   - the field paths where the two readings differ;
+   - for every record in the affected cases (case_34, case_50, case_45), the state and cited IDs each reading derives on its own;
+   - the row each reading would produce, next to the approved row.
+   I'll rule per image. T101 stays as it is until then.
+
+B. Fix round 2's questions. Implement these in the judge's single fix round, not during the paid pass:
+   1. R03's evidence-side flag: if no tool ever returns raw evidence text, that is the defence. Remove the evidence-side path that can't fire, and replace item 12's test with one asserting that no tool result carries raw evidence text, with R03's row unaffected. Screenshots stay covered by the vision reading's instruction_like_text flag. No safety code that can never run.
+   2. DEV with the model on: give the gate a baseline per split, DEV against 641dbc8d… and test against the approved test file, so model-on DEV runs complete and their numbers reach the reports.
+   3. Keys naming both the requester and someone else: accepted as is, since it has 0 effect on the data. List it under Limitations.
+   4. case_45: it depends on evidence_37, so it waits for my ruling in A. If evidence_37 is accepted, the switch to the newer citation stands only if it comes from the engine's normal citation rule (latest observation at or before audit_at, T54), not from an image-specific path. Say which it is.
+
+Time is not a factor.
+
+Agent Response Summary:
+Developer decision T117: per-image rulings on the three disagreeing images, and fix round 2's four questions ruled (R03 path removed with a no-raw-text test, a per-split gate baseline, the dual-owner case accepted as a Limitation, case_45 tied to the normal citation rule). I built replay-only per-reading probes ($0): each disagreeing image's reading 1 and reading 2 applied to both namespaces, run on all 518 test cases. Running them showed the gate's baseline path (runs/...) is missing from a fresh export, so I copied the approved file into the paid export (sha256 checked) and noted it as a packaging item. With the real readings the gate allows 4 image rows (case_46, 52, 53, 55) and stops 6 (case_34, 35, 39, 45, 50, 63). case_45's citation comes from R14_linked in steps/citation.py, the engine's normal latest-file rule, with no image-specific branch.
+
+Actions:
+* notes/DECISIONS.md T117.
+* scratchpad readprobe/build_and_run.sh: variants base, 04r1, 04r2, 19r1, 19r2, 37r1, 37r2; python -m deletion_audit --set test --mode A replay-only from paid_export_227a866/code; all exit 5 (gate stop), 9-10 image rows changed each.
+* Copied runs/g5-test-20261025T0530/output.csv into the paid export (sha256 cf2a90b0...).
+* Read steps/citation.py (choose_citation, R14_linked) and the manifest times: evidence_37 2026-09-05T07:00Z, evidence_55 06:30Z, case_45 audit_at 2026-09-06T09:00Z.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T13:29:59+05:30] T118: candidate and code.zip on the Desktop by 14:45
+
+User Prompt (verbatim, secrets redacted):
+Change of plan: I need two files on my Desktop by 14:45 for my review: the candidate output.csv and code.zip. Record as T117. Work in this order, with up to 3 agents at once.
+
+1. Now, in parallel with the paid pass: one cold orch-judge (xhigh), directed_by = this turn, read-only, on the code at 227a866 and its tests. It reports findings ranked by how much they would cost us with a code reviewer, by about 14:15.
+
+2. Paid pass: finish it. Build the candidate mechanically; don't wait for my rulings:
+   (a) Disagreeing images: accept an image only if each reading on its own gives the same state and the same cited IDs for every record of the case. Differences only in review-only fields such as status_label, or in which of two IDs on the same screen line names the record, don't count. Otherwise that image's rows stay as approved.
+   (b) case_45's citation switch stands only if it comes from the engine's normal citation rule (latest observation at or before audit_at), not from an image-only path.
+   (c) NOT_DELETION texts without an intake row stay as approved (T101).
+   (d) The candidate is the A+ output if its gate passes. Otherwise the mode-A output if its gate passes. Otherwise cf2a90b0.
+   Don't overwrite the root output.csv; I'll rule on that after my review.
+
+3. One fix round, about 14:15–14:35, by main or orch-builder-core (high), directed_by = this turn. It covers:
+   - the judge's quick, high-value findings;
+   - fix round 2's Q1 (remove the evidence-side flag path that can't fire, and add a test that no tool result carries raw evidence text);
+   - Q2 (a gate baseline per split, so model-on DEV runs complete).
+   Done = both suites pass, the engine-only DEV and test outputs keep their hashes, and the candidate replays from the cache byte-identical, with 0 sends.
+
+4. Freeze, then the HOLDOUT EVALUATION RUN ($1 cap). If the freeze check refuses only because of FAILED_CLOSED rows that are identical to cf2a90b0's rows, I accept those rows for this freeze. List them in the freeze record. Ask me for the phrase when you're ready.
+
+5. Reports: generate evaluation_report.md and usage_report.md with --publish into code/evaluation/, from the candidate's runs and the holdout run.
+
+6. README final, with T111's items:
+   - a run command that works from a fresh unzip;
+   - no ../ links;
+   - the command and mode that produced the candidate;
+   - "I personally reviewed" listing only checkpoints actually logged in log.txt, with their timestamps.
+
+7. code.zip by orch-packager (low), directed_by = this turn, per ORGANISER_README: secret scan, no nested archives, and the run command tested from a fresh export. Then check_log PASS.
+
+8. By 14:45, put both files in ~/Desktop/oct26_candidate/: output.csv and code.zip, each with its sha256. Send me one message saying:
+   - which output file the candidate is and the rows it changes against cf2a90b0, by class;
+   - what's in code.zip;
+   - anything not finished.
+   If time runs short, drop step 3's judge fixes first and step 4 second. The files still arrive by 14:45.
+
+Time is short for this one deliverable: 14:45.
+
+Agent Response Summary:
+Developer decision, recorded as T118 because T117 was already the previous message's rulings: the candidate output.csv and code.zip go on the Desktop by 14:45, with the candidate built mechanically by rules (a)-(d). Orchestration decision (developer): a cold orch-judge (xhigh), read-only, on the code at 227a866 and its tests, findings ranked by reviewer cost by about 14:15; one fix round by orch-builder-core (high); orch-packager (low) for code.zip, all directed_by this turn. Main started orch-builder-core now rather than at 14:15. Its first part is the per-row candidate assembly that rules (a) and (c) need, since the gate today can only pass or fail a whole run; then fix round 2's Q1 and Q2; the judge's quick findings join at about 14:15. The paid pass continues without stopping on the gate; rule (d) picks the candidate.
+
+Actions:
+* notes/DECISIONS.md T118.
+* Agent orch-judge (xhigh) on an export of 227a866; Agent orch-builder-core (high), candidate assembly then Q1/Q2.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T13:38:18+05:30] T118 step 2 under way: judge and builder running; README; shards ready
+
+User Prompt (verbatim, secrets redacted):
+(continuation of the T118 turn; the developer's message is quoted verbatim in the 2026-10-25T13:29:59+05:30 entry)
+
+Agent Response Summary:
+Orchestration decision (developer, T118): a cold orch-judge (xhigh) reviews an export of 227a866, and orch-builder-core (high) builds the per-row candidate rule (T118 a, c) and the per-split gate baseline (T117 B2), both directed_by 2026-10-25T13:29:59+05:30. Main then told the builder to put the baselines under code/, because code.zip ships only README.md and code/. Reports part 2 was checked (evaluation 330 OK on an index export; ledger 19 entries, 0 pending, 0 refused, with the 11 PENDING commits filled as 227a866) and committed as d60934c. Main made code/main.py, an empty starter file, a thin CLI entry point, drafted the final README to T111 with TBD markers for the candidate, and wrote the 4-shard A+ cache-fill and merge scripts, because one paid run per cache is locked and a sequential A+ run would end after 14:30. Stage 2 is still running (about 481 of 736 sends, 0 errors).
+
+Actions:
+* Agent orch-judge (xhigh), export scratchpad judge_export_227a866; Agent orch-builder-core (high); SendMessage to the builder (baselines under code/).
+* notes/improvements.json PENDING -> 227a866 (I09-I19); evaluation.reports demo build reports2-ledgercheck-20261025T1335; commit d60934c (reports part 2, DECISIONS T116-T118), pushed to github.
+* code/main.py (entry point; ruff and mypy clean); README.md rewritten (DRAFT banner, stale phrases and ../ links removed; organiser claims adopted; the logged review checkpoint only).
+* scratchpad shards/run_shards.sh and shards/merge_shards.py; read model/budget.py (per-run caps use the run's own spend; the $110 project cap reads the ledger) and evaluation/holdout_run.py (needs a clean tree at the freeze tag; key from the process environment).
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T13:39:35+05:30] Cold judge: code review of 227a866
+
+User Prompt (verbatim, secrets redacted):
+[brief written by main; approved in developer turn 2026-10-25T13:29:59+05:30]
+directed_by: 2026-10-25T13:29:59+05:30
+
+Cold code review: the code at commit 227a866 and its tests, findings ranked by how much each would cost us with a code reviewer. Deadline: your report by about 14:15 IST (it is about 13:31 now). Stop at 14:12 at the latest and report what you have.
+(full brief from main)
+
+Agent Response Summary:
+Read the export of 227a866 (engine, agent loop and tools, harness, answers, intent, prompts, model client and transport, validator, policy, state, citation, identity, pipeline, CLI) and ran the 542 unit tests (OK), ruff (4 errors) and mypy (clean) read-only. The top finding is that the pre-write check STATUS_DERIVED is tautological, because CaseRecord.status is derive_status of the same inputs, so it can never fire. Other findings: code/main.py is an empty file; the engine docstring still says the model is not built; the "never NOT_APPLICABLE" claim for unresolved identities does not hold under a model NOT_DELETION; the agent loop has no explicit iteration bound; audit_case is 246 lines. Larger reviewer risks: the model has narrow authority over output, account picks rely on generator timing bands plus a flagged coin flip (27 S5 rows in g5-test-20261025T0530), and 18 approved test rows are INCOMPLETE with no FINDING. No files were modified, no model calls were made, and no gold or holdout data was read.
+
+Actions:
+* Read code/deletion_audit/* and code/tests/* in the 227a866 export (scratchpad judge_export_227a866); problem_statement.md as data.
+* Ran unittest discover (542 OK), ruff check code (4 errors), mypy code/deletion_audit (clean) from the export, read-only.
+* Counted row shapes and flags in our own run artifacts runs/g5-test-20261025T0530/output.csv and cases.jsonl (no gold); measured 0 test cases with identity changes after audit_at (inputs only).
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=orch-judge
+parent_agent=main
+directed_by=2026-10-25T13:29:59+05:30
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T13:45:39+05:30] T118a: vision acknowledgement; code.zip contents; judge quick fixes
+
+User Prompt (verbatim, secrets redacted):
+Two additions to T118 so the 14:45 files don't stall:
+
+1. Vision acknowledgement, so the freeze can pass: I acknowledge the reading disagreements on evidence_04, evidence_19 and evidence_37 as recorded in runs/pass1-vision-20261025T1323/vision_readings.md. Record the acknowledgement with each image's two reading hashes from that run. Under T108 4(a) it only unblocks the freeze. The rows still follow T117 rule (a). If a case's agent call failed, re-run it per T110.
+
+2. code.zip contents: code reads notes/approved_output.json at runtime (config.py:109). The builder's move to code/ must cover it, and the packager's fresh-export test must run the README command end to end with the gate. The docstrings also point to files that won't ship (../CLAUDE.md 34×, research/15 27×, notes/*.md) and use T-numbers 711 times. Don't mass-edit them now. Instead:
+   - ship notes/DECISIONS.md as code/docs/DECISIONS.md, since it defines every T-number;
+   - add one README line: references in docstrings to notes/, research/ and ../CLAUDE.md point to the build workspace and aren't shipped, and code/docs/DECISIONS.md defines the T-numbers.
+   The packager's secret scan covers the new file.
+
+Deadline unchanged: both files in ~/Desktop/oct26_candidate/ by 14:45.
+
+Agent Response Summary:
+Developer decision T118a: the reading disagreements on evidence_04, evidence_19 and evidence_37 are acknowledged, recorded in DECISIONS with each image's two reading sha256 values from pass1-vision-20261025T1323, and carried into the runs through --vision-ack (it only unblocks the freeze; rows still follow rule (a)). Main told the builder that config.py:109 must move with the record and that the packager will test the README command end to end with the gate, copied notes/DECISIONS.md to code/docs/DECISIONS.md, and added the README line on unshipped references. The cold judge reported 17 findings (code zip about 22.5/30); main applied the quick ones outside the builder's files: the three old ruff findings, an explicit hard bound on the agent loop (LOOP_BOUND, with a test), STATUS_DERIVED stated on the steps alone (with a test that it can fail), and the overclaiming docstrings (engine, identity, harness, tools, intent). code/tests runs 560 OK on the working tree; the 4 A+ shards start automatically when stage 2 ends.
+
+Actions:
+* notes/DECISIONS.md T118a; SendMessage to the builder (config.py:109; end-to-end gate test); code/docs/DECISIONS.md; README.md line.
+* code/deletion_audit/inputs/__init__.py (UP035, B905 strict zip, UP047, import order); agent/loop.py (LOOP_SLACK, hard bound) and tests/agent/test_loop.py; validate/prewrite.py (status_agrees_with_steps) and tests/validate/test_prewrite.py; docstrings in engine.py, identity/resolve.py, agent/harness.py, agent/tools.py, agent/intent.py. ruff and mypy clean on each; unittest code/tests: 560 OK.
+* Background: wait for stage 2, then scratchpad shards/run_shards.sh (4 paid A+ shards, each $10 / 400 sends).
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T13:45:41+05:30] Candidate assembly by row; per-split gate baseline
+
+User Prompt (verbatim, secrets redacted):
+[brief written by main; approved in developer turn 2026-10-25T13:29:59+05:30]
+directed_by: 2026-10-25T13:29:59+05:30
+Candidate assembly by row (T118 rules a and c) and a per-split, committed gate baseline (T117 B2). Part 1 is needed by about 14:05 IST (it is about 13:32 now); report then, even if part 2 is not done.
+(full brief from main; plus main's two mid-task corrections: put the gate record and both baselines under code/approved/, and report the fresh-unzip check `python -B code/main.py --run-id demo --set test --regression-gate`)
+
+Agent Response Summary:
+The regression gate now has a third verdict, kept_approved: a changed row whose cause is intent, image or intent+image and whose condition fails gets the approved row byte for byte, with its reason in the gate artifacts. Only unexplained rows stop the run (T100), and the computed rows are written to output_raw.csv. A disagreeing image counts as agreeing for a case only under T118 rule (a): the case is recompiled once per combination of its disagreeing images' readings, the per-record derivation (state, cited evidence IDs, FAILED_CLOSED reason) is compared, and it must also match the merged reading. On the real readings (mode A test, replay-only, 22 vision entries, 0 sends) the gate passes: 7 rows allowed, case_34/45/50 kept as approved, engine-only hashes unchanged (DEV 641dbc8d, test cf2a90b0). Part 2: the per-split baselines and the record are under code/approved/ (sha256-checked), notes/approved_output.json is a byte-identical copy guarded by a test, and a fresh unzip exits 0 with output cf2a90b0.
+
+Actions:
+* Edited code/deletion_audit/agent/regression.py (kept_approved verdict, assembly, rule (a) types and judge_single_readings, per-split load_baseline), agent/vision.py (reading_observations), pipeline.py (record_derivation, single_readings, output_raw.csv plus assembled output.csv, _split_of, _kept_record), steps/serialize.py (render_text_rows, write_output_bytes), config.py (APPROVED_OUTPUT_RECORD = code/approved/approved_output.json), __main__.py (prints kept and stop cases)
+* Added code/approved/{approved_output.json,test_output.csv,dev_output.csv}; rewrote notes/approved_output.json (byte-identical to the code record)
+* Tests: updated code/tests/pipeline/test_regression_gate.py and test_cli_paid.py; added TestRuleA, TestAssembly, test_one_baseline_per_split, and code/tests/pipeline/test_approved_baselines.py
+* Ran both unittest suites (560 OK, 330 OK), scripts/lint.sh on the touched files (clean), engine-only DEV/test replays, the real-readings mode-A test and DEV replays, and the fresh-unzip gate check (all in the scratchpad; runs/ and cache/ untouched)
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=orch-builder-core
+parent_agent=main
+directed_by=2026-10-25T13:29:59+05:30
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T13:50:06+05:30] [auto] Builder done; fix-round code b03bbed; stage 2 done; A+ shards running
+
+User Prompt (verbatim, secrets redacted):
+[auto] Background-agent notification: "Candidate assembly and gate baselines" (orch-builder-core) finished; then the stage-2 background command finished.
+
+Agent Response Summary:
+The builder's per-row assembly passes the gate on the real readings (mode-A replay, 0 sends): 10 image rows changed, 7 allowed and 3 kept as approved (case_34 and case_50 fail rule (a); case_45 passes rule (a) but its screenshot-only IDs fail the cross-check), and model-on DEV and the fresh-unzip command with the gate both exit 0. Main checked the builder's work plus its own judge fixes on an index export (both suites OK; engine-only DEV 641dbc8d and test cf2a90b0 unchanged; ruff and mypy clean) and committed it as b03bbed, pushed to github. Stage 2 finished: 518 cases, 375 texts, 736 sends, $7.973494, replicates agree 375/375, and the 10 NOT_DELETION cases (case_533 to case_542) each have a confirming intake row. Step 4 cannot run before the developer's review: the freeze check requires the output to equal the approved file, and the holdout run requires the freeze check, so main defers it per T118's fallback order. The 4 A+ shards started at 13:47 and are about halfway.
+
+Actions:
+* Index export scratchpad c3chk: unittest code/tests and code/evaluation/tests OK; engine-only c3-dev / c3-test sha256 641dbc8d... / cf2a90b0...; ruff and mypy on code/; secret scan PASS; commit b03bbed; git push github main.
+* README item 5 (gate, kept_approved, output_raw.csv); scratchpad shards/after_shards.sh (merge, then 5 replays); scratchpad packager_brief.md.
+* Read code/evaluation/freeze_check.py (blocking counts; output must equal the approved file) and report_spec.py.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T13:58:12+05:30] Part 3: freeze check fixes for the rule-(d) candidate (T118 step 4, T119)
+
+User Prompt (verbatim, secrets redacted):
+[brief written by main; approved in developer turn 2026-10-25T13:29:59+05:30]
+directed_by: 2026-10-25T13:29:59+05:30
+From main, part 3 of your brief (directed_by 2026-10-25T13:29:59+05:30; developer rulings T118 step 4 and T119 at ~13:52). Deadline: report by 14:10 IST.
+(full message from main: four freeze_check refusals on runs/cand-test-Aplus-20261025T1352 to fix, each with a test)
+
+Agent Response Summary:
+I fixed the four refusals. (1) A kept row's cases.jsonl record is now the image-free recompile with the case's own validated intent; case_34, 45 and 50 all reproduce the approved row this way, so none fell back. (2) freeze_check lists FAILED_CLOSED rows byte-identical to the approved test file (sha256-checked) as accepted under T118 step 4 rather than counting them. (3) agent_report accepts a review list that is a superset of the failed and disagreeing images. (4) The approved output also matches on a provisional_freeze sha (T119); both new keys are in both records, which stay byte-identical. A fresh replay of the candidate (0 sends) gives a00ba71a and passes the freeze check, listing case_50 and case_61 as accepted and the provisional match; engine-only hashes and the fresh-unzip gate run are unchanged.
+
+Actions:
+* Edited code/deletion_audit/pipeline.py (_kept_record), code/evaluation/freeze_check.py (accepted_failed_closed, provisional match, printing), code/evaluation/agent_report.py (_check_review_file); added both keys to code/approved/approved_output.json and notes/approved_output.json
+* Tests: test_kept_record_carries_the_case_s_own_validated_intent; test_provisional_freeze_sha_passes_and_says_which_matched; test_failed_closed_row_identical_to_the_approved_file_is_accepted; test_failed_closed_row_that_differs_from_the_approved_file_still_blocks; test_without_the_ruling_key_no_failed_closed_row_is_accepted; test_review_list_may_add_row_changing_images_but_never_omit_a_disagreeing_one; updated test_review_file_must_match and the match-print test
+* Ran both suites (561 OK, 336 OK), lint on the touched files (clean), replay run runs/t119-cand-replay-20261025T1356 (repo cache, 0 sends) and its freeze check (PASSED), engine-only DEV and test runs, and the fresh-unzip gate run (exit 0)
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=orch-builder-core
+parent_agent=main
+directed_by=2026-10-25T13:29:59+05:30
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26

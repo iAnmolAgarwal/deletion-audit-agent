@@ -463,5 +463,13 @@ class TestCommand(Base):
             self.assertEqual(reports.main(["--spec", str(path)], ctx=self.w.ctx()), 3)
 
 
+class TestUsageNamespaces(unittest.TestCase):
+    """The usage report reads both reply namespaces, as the pipeline does."""
+
+    def test_reply_namespaces_match_the_pipeline(self) -> None:
+        from deletion_audit import config
+        self.assertEqual(usage_report.REPLY_NAMESPACES, tuple(config.REPLY_NAMESPACES))
+
+
 if __name__ == "__main__":
     unittest.main()
