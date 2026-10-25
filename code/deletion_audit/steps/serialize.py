@@ -28,17 +28,27 @@ def steps_json(steps: Sequence[Step]) -> str:
 
 def render_output(rows: Iterable[tuple[str, str, Sequence[Step]]]) -> bytes:
     """The bytes of ``output.csv`` for ``(case_id, status, steps)`` rows, sorted by case number."""
+    return render_text_rows((case_id, status, steps_json(steps)) for case_id, status, steps in rows)
+
+
+def render_text_rows(rows: Iterable[tuple[str, str, str]]) -> bytes:
+    """The bytes of ``output.csv`` for ``(case_id, status, steps_json text)`` rows, sorted by case
+    number; a row taken from another output file is written byte for byte (T118 assembly)."""
     buf = io.StringIO()
     writer = csv.writer(buf, lineterminator="\n")
     writer.writerow(OUTPUT_HEADER)
-    for case_id, status, steps in sorted(rows, key=lambda r: case_number(r[0])):
-        writer.writerow([case_id, status, steps_json(steps)])
+    for case_id, status, text in sorted(rows, key=lambda r: case_number(r[0])):
+        writer.writerow([case_id, status, text])
     return buf.getvalue().encode("utf-8")
 
 
 def write_output(rows: Iterable[tuple[str, str, Sequence[Step]]], path: Path) -> str:
     """Write ``output.csv`` atomically and return its sha256."""
-    data = render_output(rows)
+    return write_output_bytes(render_output(rows), path)
+
+
+def write_output_bytes(data: bytes, path: Path) -> str:
+    """Write rendered ``output.csv`` bytes atomically and return their sha256."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + ".tmp")

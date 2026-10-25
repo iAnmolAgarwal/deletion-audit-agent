@@ -6,12 +6,14 @@ import unittest
 from collections.abc import Sequence
 from dataclasses import replace
 from typing import Any
+from unittest import mock
 
 from deletion_audit.identity.resolve import IdentifierSet, IdentityResolution
 from deletion_audit.record import CaseRecord, CrossCheck, FailedClosedReason, IntentDecision, fail_closed_intent
 from deletion_audit.state import ResourceKey
 from deletion_audit.steps.model import CitationPlan, Step
 from deletion_audit.validate import CheckResult, ValidationContext, gate, hard_failures, validate_row
+from deletion_audit.validate.prewrite import status_agrees_with_steps
 
 from ..engine_fixtures import req
 
@@ -146,6 +148,19 @@ class RowRules(unittest.TestCase):
         uncited = (s(1, "VERIFICATION", "account_service", "account_1", "VERIFY_RECORD_ABSENT", "ABSENT", ""),)
         self.assertIn("T77_COMPLETE_VERIFICATION_CITES", failed_rules(validate_row(record(uncited), ctx())))
         self.assertIn("T77_FINDING_CITES", failed_rules(validate_row(record(finding_row("")), ctx())))
+
+    def test_status_derived_can_fail(self) -> None:
+        """STATUS_DERIVED states the invariant on the steps, so a wrong derivation is caught (judge finding 1)."""
+        finding = finding_row("ev_pdf")
+        verify = (s(1, "VERIFICATION", "account_service", "account_1", "VERIFY_RECORD_ABSENT", "ABSENT", "ev_pdf"),)
+        self.assertFalse(status_agrees_with_steps("COMPLETE", finding, None))
+        self.assertFalse(status_agrees_with_steps("COMPLETE", (), None))
+        self.assertFalse(status_agrees_with_steps("INCOMPLETE", verify, None))
+        self.assertFalse(status_agrees_with_steps("NOT_APPLICABLE", verify, None))
+        self.assertTrue(status_agrees_with_steps("INCOMPLETE", verify, "NOTHING_FOUND"))
+        self.assertTrue(status_agrees_with_steps("COMPLETE", verify, None))
+        with mock.patch("deletion_audit.record.derive_status", return_value="COMPLETE"):
+            self.assertIn("STATUS_DERIVED", failed_rules(validate_row(record(finding), ctx())))
 
     def test_every_cited_id_in_index_and_not_after_audit_at(self) -> None:
         late = (s(1, "VERIFICATION", "account_service", "account_1", "VERIFY_RECORD_ABSENT", "ABSENT", "ev_late"),)

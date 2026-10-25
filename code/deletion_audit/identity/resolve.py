@@ -10,8 +10,8 @@ Rules (each with its basis):
   sha256 of the lower-cased email, 850/850 rows).
 * T49: matching is exact on the normalized value only, so a look-alike never matches.
 * T63: a request whose email resolves to no one is ``UNRESOLVED``: its set holds only the
-  request email and its hash, and the case gets a defined fail-closed outcome downstream, never
-  NOT_APPLICABLE.
+  request email and its hash, and a deletion request gets a defined fail-closed outcome
+  downstream (a request read as NOT_DELETION is NOT_APPLICABLE; ``engine`` module docstring).
 """
 
 from __future__ import annotations
@@ -150,8 +150,9 @@ def resolve(
 def resolve_with(req: DeletionRequest, people: PeopleIndex) -> IdentityResolution:
     """Resolve one request's email to a person (R1), current first, then historical.
 
-    An email held by two different people is never guessed: it is ``UNRESOLVED`` (0 such
-    identifiers in the data; ``build_people`` measured 0 shared values).
+    A current email wins outright, even if someone else held it earlier. Otherwise an email held
+    by two different people is never guessed: it is ``UNRESOLVED`` (0 shared values measured by
+    ``build_people`` in the data).
     """
     value = req.email.value
     uid = people.current_email.get(value)

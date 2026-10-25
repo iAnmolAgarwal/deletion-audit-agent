@@ -1,7 +1,8 @@
 """One call per case for the pipeline: loop -> answer validation -> intent -> compile twice -> report.
 
 The pipeline wiring (after G5 commits) calls :func:`audit_with_agent` for each case and writes
-``result.applied`` (the record whose steps are the output) and ``result.report`` (the ``"agent"``
+``result.applied`` (the record whose steps are the output, except that a FAILED loop is replaced
+by the engine-path row in ``pipeline.run``, flagged ``AGENT_CALL_FAILED``) and ``result.report`` (the ``"agent"``
 object of ``cases.jsonl``). The withheld compilation exists only to measure whether the answers
 changed the row (G3 section 9 item 2).
 

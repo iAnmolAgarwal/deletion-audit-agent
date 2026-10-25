@@ -104,6 +104,9 @@ class EngineConfig:
 #: change"); T88 (1) (two readings per image, in separate cache namespaces); T70 (two replicate runs).
 REPLY_NAMESPACES: tuple[str, str] = ("replies", "replies-replica-1")
 
-#: The record of the developer-approved output (T101 (1)); the regression gate and the freeze check
-#: read the approved file's path and sha256 from it at run time, relative to the repo root.
-APPROVED_OUTPUT_RECORD = "notes/approved_output.json"
+#: The record of the developer-approved outputs (T101 (1)), one per split (T117 B2); the regression
+#: gate reads each approved file's path and sha256 from it at run time, relative to the repo root.
+#: It and the files it names live under ``code/approved/``, inside the package tree that code.zip
+#: ships, so a fresh unzip with ``dataset/`` beside ``code/`` finds them (``runs/`` is never shipped).
+#: ``notes/approved_output.json`` (read by the freeze check) is kept byte-identical by a test.
+APPROVED_OUTPUT_RECORD = "code/approved/approved_output.json"

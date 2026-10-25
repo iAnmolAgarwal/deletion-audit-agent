@@ -34,6 +34,17 @@
   whose case set is not the approved file's (DEV, a fixture) is refused by the gate and so does not
   pass. **The root ``output.csv`` is written only after the gate passes** (T112 item 10, verifier
   finding 5): a stopped or refused run leaves it untouched, and ``producer.json`` says so.
+* **Candidate assembly by row (developer ruling T118 (2a), (2c)):** when the gate runs, the rows as
+  computed go to ``output_raw.csv`` and ``output.csv`` carries the gate's assembled rows: each
+  ``kept_approved`` row is the approved file's row, byte for byte. Its ``cases.jsonl`` record is the
+  engine-only recompile (fail-closed intent, no image readings) when that reproduces the approved row,
+  flagged ``GATE_KEPT_APPROVED``, so the run's metrics describe ``output.csv``; ``producer.json``
+  lists the kept cases and both hashes. The assembly runs after every row is computed, so no model
+  request changes. A refused gate assembles nothing (``output.csv`` = the computed rows; not passing).
+* **Baseline per split (developer ruling T117 B2):** ``cases="test"`` is gated against the approved
+  test file, the exact DEV case set against the DEV baseline, anything else against the record's
+  ``approved_output`` (so a fixture dataset needs its own record). The record lives in the package
+  (``config.APPROVED_OUTPUT_RECORD``), so an unzipped ``code/`` finds it.
 * **Vision review list (T112, item 4 (b)):** the images the developer must review before a paid
   full run (and that ``--vision-ack`` must cover) are the failed or disagreeing ones plus every
   image whose readings change a row (:func:`row_changing_images`: each case compiled on the world
@@ -63,6 +74,7 @@
 from __future__ import annotations
 
 import hashlib
+import itertools
 import json
 import re
 import subprocess
@@ -90,9 +102,23 @@ from .agent import (
 )
 from .agent.answers import patch_image_observations
 from .agent.crosscheck import intake_crosscheck
-from .agent.regression import Baseline, BaselineRefused, CaseEvidence, Row, image_facts, load_baseline, run_gate
+from .agent.regression import (
+    MAX_DISAGREEING,
+    Baseline,
+    BaselineRefused,
+    CaseEvidence,
+    Derivation,
+    RecordView,
+    Row,
+    SingleReadingCheck,
+    image_facts,
+    judge_single_readings,
+    load_baseline,
+    run_gate,
+)
 from .agent.regression import write_gate as write_regression
 from .agent.routing import text_id
+from .agent.vision import image_files, reading_observations
 from .artifacts import RunArtifacts, now_ist, write_json
 from .config import APPROVED_OUTPUT_RECORD, REPLY_NAMESPACES
 from .discovery.accounts import Flag
@@ -100,7 +126,7 @@ from .engine import AuditContext, FailClosedIntent, World, audit_case, build_con
 from .inputs.requests import load_requests_checked
 from .model import BudgetGuard, CallLog, ModelClient, ReplyCache, RetryPolicy, Transport
 from .record import CaseRecord, fail_closed_intent
-from .steps.serialize import steps_json, write_output
+from .steps.serialize import render_text_rows, steps_json, write_output, write_output_bytes
 
 Mode = Literal["A+", "A", "tools_off"]
 RUN_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*", re.ASCII)
@@ -432,6 +458,23 @@ def _row(rec: CaseRecord) -> Row:
     return Row(rec.status, steps_json(rec.steps))
 
 
+def record_derivation(rec: CaseRecord) -> Derivation:
+    """Per record of the case, its state value and the evidence IDs its steps (and FINDING cite)
+    name, plus the row's FAILED_CLOSED reason: what T118 rule (a) compares across readings."""
+    cited: dict[tuple[str, str], set[str]] = {}
+    for st in rec.steps:
+        if st.evidence_id:
+            cited.setdefault((st.system_id, st.resource_id), set()).add(st.evidence_id)
+    views: dict[tuple[str, str], RecordView] = {}
+    for r in rec.resources:
+        k = (r.key.system_id, r.key.resource_id)
+        ids = cited.get(k, set()) | ({r.cite} if r.cite else set())
+        views[k] = RecordView(k[0], k[1], r.state.value, tuple(sorted(ids)))
+    for k in set(cited) - set(views):
+        views[k] = RecordView(k[0], k[1], None, tuple(sorted(cited[k])))
+    return Derivation(rec.failed_closed, tuple(views[k] for k in sorted(views)))
+
+
 @dataclass
 class _GateInputs:
     """What the regression gate's recompiles need from one run."""
@@ -442,6 +485,30 @@ class _GateInputs:
     vision: VisionRun
     records: Mapping[str, CaseRecord]
     results: Mapping[str, AgentCaseResult]
+
+    def single_readings(self, cid: str, involved: Sequence[str], intent: Any, validated: Sequence[ValidatedAnswer],
+                        merged: CaseRecord) -> dict[str, SingleReadingCheck]:
+        """T118 rule (a) for the case's disagreeing images (``regression`` module docstring): the case
+        recompiled once per combination of their readings, each image's observations built from one
+        reading alone, the other images as the run read them, the run's intent and image answers."""
+        by_file = self.vision.by_file()
+        files = [f for f in involved if f in by_file and by_file[f].status == "OK" and by_file[f].agree is False]
+        if not files:
+            return {}
+        if len(files) > MAX_DISAGREEING:
+            why = f"{len(files)} disagreeing images in one case: more than {MAX_DISAGREEING}, not enumerated"
+            return {f: SingleReadingCheck(f, False, why) for f in files}
+        ctx = self.world.ctx
+        refs = {ref.file_id: ref for ref in image_files(ctx)}
+        derivations: dict[tuple[int, ...], Derivation] = {}
+        for combo in itertools.product((0, 1), repeat=len(files)):
+            pick = dict(zip(files, combo, strict=True))
+            obs = [o for r in self.vision.records
+                   for o in (reading_observations(refs[r.file_id], r, pick[r.file_id]) if r.file_id in pick
+                             else r.observations)]
+            w = build_world(replace(ctx, image_observations=patch_image_observations(tuple(obs), validated)))
+            derivations[combo] = record_derivation(audit_case(cid, w, FixedIntent(intent)))
+        return {c.file_id: c for c in judge_single_readings(files, derivations, record_derivation(merged))}
 
     def evidence(self, cid: str) -> CaseEvidence:
         """Recompile one changed case with the intent only, the images only and both (T100)."""
@@ -466,16 +533,39 @@ class _GateInputs:
         waiting = sorted(r.key.resource_id for r in plain_fc.resources
                          if any(f.code == "STATE_NEEDS_IMAGE" for f in r.flags))
         supplied = sorted({o.resource_id for o in image_obs if o.file_id in involved and o.resource_id})
+        validated = () if failed_loop else tuple(res.check.validated)
+        singles = self.single_readings(cid, sorted(involved), applied, validated, both)
+        facts = tuple(replace(f, single=singles.get(f.file_id))
+                      for f in image_facts(sorted(involved), self.vision.by_file(), resources))
         return CaseEvidence(
             case_id=cid, after=_row(after), intent_only=_row(intent_only), image_only=_row(image_only),
             both=_row(both), intent_changed=applied.source in ("MODEL", "MODEL_AFTER_TOOLS"),
             intent_label=applied.label, intent_source=applied.source,
             turn1_labels=tuple(res.report["turn1_replicates"]),
             intake_non_deletion=applied.crosscheck.intake_non_deletion,
-            images=image_facts(sorted(involved), self.vision.by_file(), resources),
+            images=facts,
             waiting_resources=tuple(waiting), image_resources=tuple(supplied),
             loop_status=res.outcome.status,
         )
+
+
+def _split_of(cases: Sequence[str] | Literal["test"], wanted: Sequence[str]) -> str | None:
+    """The baseline split of a run (module docstring, T117 B2): ``"test"`` for the test set, ``"dev"``
+    for exactly the DEV case set, else None (the record's ``approved_output``)."""
+    if cases == "test":
+        return "test"
+    return "dev" if set(wanted) == set(dev_ids()) else None
+
+
+def _kept_record(rec: CaseRecord, plain: World, approved: Row, cause: str) -> CaseRecord:
+    """The ``cases.jsonl`` record of a kept-approved case (module docstring): the engine-only
+    recompile when it reproduces the approved row, else the computed record; flagged either way."""
+    engine_only = audit_case(rec.case_id, plain, FixedIntent(fail_closed_intent(rec.intent.crosscheck)))
+    base, how = (engine_only, "engine-only recompile") if _row(engine_only) == approved else (rec, "computed record")
+    flag = Flag("GATE_KEPT_APPROVED", f"{cause} change whose condition failed: output keeps the approved row "
+                                      f"(T118); this record is the {how}")
+    return replace(base, flags=tuple(sorted(set(base.flags) | {flag}, key=lambda f: (f.code, f.detail))),
+                   open_questions=rec.open_questions, answers=rec.answers, rejected=rec.rejected)
 
 
 def _setup_for(model: ModelSetup | None, replay_only: bool) -> ModelSetup:
@@ -567,14 +657,20 @@ def run(
             arts.case(records[cid], res.report)
     out_path = run_dir / "output.csv"
     rows = [(r.case_id, r.status, r.steps) for r in records.values()]
-    sha = write_output(rows, out_path)
     gate: dict[str, Any] | None = None
     passed = True
+    raw_sha: str | None = None
+    kept_cases: list[str] = []
     model_on = setup.paid or any(c.outcome == "ok" and c.event in ("cache_hit", "send") for c in arts.calls)
-    if regression_gate or model_on or write_root:  # T112 items 10-11: mandatory when the model is on
+    if not (regression_gate or model_on or write_root):
+        sha = write_output(rows, out_path)
+        data = out_path.read_bytes()
+    else:  # T112 items 10-11: mandatory when the model is on
+        raw_sha = write_output(rows, run_dir / "output_raw.csv")
         baseline: Baseline | BaselineRefused
         try:
-            baseline = load_baseline(approved_record or REPO_ROOT / APPROVED_OUTPUT_RECORD, REPO_ROOT)
+            baseline = load_baseline(approved_record or REPO_ROOT / APPROVED_OUTPUT_RECORD, REPO_ROOT,
+                                     split=_split_of(cases, wanted))
         except BaselineRefused as exc:
             baseline = exc
         plain = world if not (ctx.image_observations or ctx.vision_read) else build_world(ctx0)
@@ -583,9 +679,18 @@ def run(
         write_regression(run_dir, result, run_id)
         gate, passed = result.summary(), result.passed
         gate["mandatory"] = bool(model_on or write_root)
+        if result.refusal is None:  # T118: the assembled rows; kept-approved rows are the approved bytes
+            data = render_text_rows((cid, r.status, r.steps_json) for cid, r in result.assembled.items())
+            for k in result.kept:
+                kept_cases.append(k["case_id"])
+                arts.records[:] = [_kept_record(rec, plain, result.assembled[rec.case_id], k["cause"])
+                                   if rec.case_id == k["case_id"] else rec for rec in arts.records]
+        else:
+            data = (run_dir / "output_raw.csv").read_bytes()
+        sha = write_output_bytes(data, out_path)
     root_written = False
     if write_root and passed:  # T112 item 10: only after the gate passes; a stopped run leaves it untouched
-        root_sha = write_output(rows, REPO_ROOT / "output.csv")
+        root_sha = write_output_bytes(data, REPO_ROOT / "output.csv")
         if root_sha != sha:
             raise RuntimeError("root output.csv differs from the run's output.csv")
         root_written = True
@@ -602,6 +707,8 @@ def run(
         "replay_only": not setup.paid,
         "rows_written": len(records),
         "output_sha256": sha,
+        "output_raw_sha256": raw_sha,
+        "kept_approved_cases": kept_cases,
         "model_ids": usage["model_ids"],
         "paid_model_calls": usage["model_calls"],
         "budget": setup.budget_record(),

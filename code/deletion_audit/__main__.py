@@ -232,6 +232,8 @@ def _main_run(argv: list[str], factory: TransportFactory | None) -> int:
     if s.gate is not None:
         print(f"  regression gate: passed {s.gate['passed']}, changed {s.gate['changed_rows']}, "
               f"by cause {s.gate['by_cause']}, refusal {s.gate['refusal']}")
+        print(f"  kept as approved (T118): {s.gate.get('kept_approved_cases') or 'none'}; "
+              f"stops: {s.gate.get('stop_cases') or 'none'}")
     if not s.passed:
         print("RUN NOT PASSING: the regression gate stopped it for the developer's review", file=sys.stderr)
         return EXIT_GATE_STOP

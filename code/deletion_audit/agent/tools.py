@@ -5,8 +5,11 @@
 
 Rules, each with its basis:
 
-* **Case-bound** (G3 section 5): the model never names a case; every tool reads the case the
-  harness bound, so a tool cannot reach another case's request.
+* **Case-bound** (G3 section 5): the model never names a case; ``audit_case``,
+  ``get_request_context`` and ``inspect_evidence`` read the case the harness bound. Two lookups are
+  not case-scoped: ``lookup_identity`` answers for any identifier, and ``list_activity`` matches its
+  string against every activity row. Both are read-only and cut off at ``audit_at``, and no tool
+  result can change a fact the engine settled.
 * **Cut off at ``audit_at``** (``notes/SYSTEM.md`` "always wins": nothing after ``audit_at`` is
   cited): a file captured after it is refused; activity, audit-log and identity rows after it
   are not returned.

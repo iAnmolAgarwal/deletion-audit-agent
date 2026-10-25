@@ -1,0 +1,43 @@
+{
+  "approved_output": {
+    "run_id": "g5-test-20261025T0530",
+    "path": "code/approved/test_output.csv",
+    "sha256": "cf2a90b070db785456b2cb26398add0eba95a69ae8a763eb838a367f135751fc",
+    "rows": 518,
+    "approved_by": "developer",
+    "ruling": "T101",
+    "approved_at": "2026-10-25T11:49:46+05:30 (the developer's T101 turn)",
+    "copied_from": "runs/g5-test-20261025T0530/output.csv (byte copy, sha256 checked; T117 B2 packaging fix)"
+  },
+  "rule": "The submitted output.csv must be byte-identical to the approved file. G7 may change test rows only by (1) a non-deletion request becoming NOT_APPLICABLE with [] where the model's answer and the intake cross-check agree in both replicate runs, or (2) a screenshot-dependent row changing where both vision readings agree and the extracted IDs cross-check. Any other change stops the run for the developer. A later change to the test output needs the developer's re-approval before freeze, or it is reverted. At freeze, print the output's sha256 and confirm it equals the approved file.",
+  "history": [
+    {
+      "sha256": "cf2a90b070db785456b2cb26398add0eba95a69ae8a763eb838a367f135751fc",
+      "run_id": "g5-test-20261025T0530",
+      "ruling": "T101"
+    }
+  ],
+  "approved_outputs": {
+    "dev": {
+      "run_id": "t118-eng-dev",
+      "path": "code/approved/dev_output.csv",
+      "sha256": "641dbc8d921186efbf92514b2c71fe25a3b133d412515dd952da19f8ac85b15c",
+      "rows": 22,
+      "approved_by": "developer",
+      "ruling": "T117 B2",
+      "approved_at": "2026-10-25 ~13:25 IST (the developer's T117 turn: DEV against 641dbc8d...)",
+      "copied_from": "a fresh engine-only DEV replay (empty cache, --set dev --mode A); its sha256 equals 641dbc8d..."
+    },
+    "test": {
+      "run_id": "g5-test-20261025T0530",
+      "path": "code/approved/test_output.csv",
+      "sha256": "cf2a90b070db785456b2cb26398add0eba95a69ae8a763eb838a367f135751fc",
+      "rows": 518,
+      "approved_by": "developer",
+      "ruling": "T101",
+      "approved_at": "2026-10-25T11:49:46+05:30 (the developer's T101 turn)",
+      "copied_from": "runs/g5-test-20261025T0530/output.csv (byte copy, sha256 checked; T117 B2 packaging fix)"
+    }
+  },
+  "note": "The gate reads code/approved/approved_output.json (shipped in code.zip); notes/approved_output.json is a byte-identical copy for the freeze check (code/tests/pipeline/test_approved_baselines.py)."
+}

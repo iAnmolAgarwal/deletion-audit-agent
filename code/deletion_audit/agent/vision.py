@@ -371,6 +371,18 @@ def assess_image(ref: FileRef, png: bytes | None, clients: Sequence[ModelClient]
                            rec.observations)
 
 
+def reading_observations(ref: FileRef, rec: ImageReadRecord, k: int) -> tuple[Observation, ...]:
+    """The observations reading ``k`` (0 or 1) alone gives, built exactly as the merged ones are
+    (same normalizer, same ID checks; developer ruling T118 (2a), used by the regression gate).
+
+    Only a read-OK image has two readings; any other request raises ValueError (an explicit
+    failure, never an empty "nothing shown")."""
+    if rec.status != "OK" or not 0 <= k < len(rec.attempts) or rec.attempts[k].reading is None:
+        raise ValueError(f"{rec.file_id}: no reading {k + 1} to build observations from")
+    single = merge_readings([rec.attempts[k].reading])  # type: ignore[list-item]
+    return _observations(ref, single, rec.ids)
+
+
 def check_namespaces(clients: Sequence[ModelClient]) -> None:
     """Refuse fewer than two clients, or two clients that share a reply-cache root (T88 (1))."""
     if len(clients) != 2:

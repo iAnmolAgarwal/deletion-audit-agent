@@ -3,7 +3,9 @@
 Checks (``hard`` blocks the row as written; ``flag`` is counted in the run artifacts):
 
 Row and step rules (G1 hard invariants H01-H16, ``notes/CONTRACT_DRAFT.md`` section 3):
-  ``STATUS_DERIVED`` the status equals the one derived from the steps; ``NA_EMPTY`` NOT_APPLICABLE
+  ``STATUS_DERIVED`` the status agrees with the steps, stated on the steps alone and not by calling
+  ``derive_status`` again (COMPLETE: at least one step and no FINDING; INCOMPLETE: a FINDING, or a
+  FAILED_CLOSED row; NOT_APPLICABLE: no step), so a bug in the derivation is caught; ``NA_EMPTY`` NOT_APPLICABLE
   <=> ``[]`` (a deletion row is never empty); ``ENUM`` operation in the table with its phase and
   state; ``STEP_NO`` 1..n; ``ORDER`` phase, operation, system, resource; ``DUPLICATE`` no repeated
   key and one operation per resource per phase; ``F_R_V`` INCOMPLETE finding <-> remediation <->
@@ -47,7 +49,7 @@ from dataclasses import dataclass, field, replace
 from typing import Literal
 
 from .. import timeutil
-from ..record import CaseRecord, derive_status
+from ..record import CaseRecord
 from ..state.reconstruct import ResourceKey
 from ..steps.model import Step
 from ..steps.order import (
@@ -106,18 +108,24 @@ def _check(
     out.append(CheckResult(rule, severity, ok, step_no, detail))
 
 
+def status_agrees_with_steps(status: str, steps: tuple[Step, ...], failed_closed: str | None) -> bool:
+    """The status/steps invariants on the steps alone (``../CLAUDE.md`` section 3; module docstring)."""
+    has_finding = any(s.phase == "FINDING" for s in steps)
+    if status == "NOT_APPLICABLE":
+        return not steps
+    if status == "COMPLETE":
+        return bool(steps) and not has_finding and failed_closed is None
+    return status == "INCOMPLETE" and (has_finding or failed_closed is not None)
+
+
 def validate_row(record: CaseRecord, ctx: ValidationContext) -> tuple[CheckResult, ...]:
     """Every check of the module docstring on one row. Never edits the row."""
     out: list[CheckResult] = []
     steps, status = record.steps, record.status
     audit_at = record.request.audit_at if record.request is not None else ""
     _check(out, "STATUS_ENUM", status in STATUSES, "status in the enum")
-    _check(
-        out,
-        "STATUS_DERIVED",
-        status == derive_status(record.intent, steps, record.failed_closed),
-        "status derived from the steps",
-    )
+    _check(out, "STATUS_DERIVED", status_agrees_with_steps(status, steps, record.failed_closed),
+           "status agrees with the steps")
     if record.failed_closed is None:
         _check(
             out,

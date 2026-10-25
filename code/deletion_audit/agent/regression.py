@@ -5,7 +5,11 @@ Basis, rule by rule:
 
 * **The baseline is the approved file** (T101 (1)). Its path and sha256 are read from
   ``notes/approved_output.json`` at run time, never from a constant, so approving a new file
-  changes only that record. The file's sha256 is checked before any row is read; a mismatch, a
+  changes only that record. **One baseline per split** (developer ruling T117 B2): ``split="test"``
+  reads ``approved_outputs.test`` (falling back to the legacy ``approved_output`` key, which the
+  freeze check reads), ``split="dev"`` reads ``approved_outputs.dev``; ``split=None`` reads
+  ``approved_output``. A split with no entry is refused, never silently swapped. The file's
+  sha256 is checked before any row is read; a mismatch, a
   missing file or an unreadable record refuses the gate (:class:`BaselineRefused`), and a refused
   gate stops the run.
 * **The cause is decided by recompiling, not by guessing** (T100, main's implementation note).
@@ -31,9 +35,24 @@ Basis, rule by rule:
      that waited on an image (``STATE_NEEDS_IMAGE`` in the image-free compile) got its state from
      an image (``notes/SYSTEM.md``: a failed read is never "nothing found").
 
-  Every other changed row is ``stop``: ``unexplained``, ``intent+image``, any other intent change,
-  an image change resting on disagreeing or failed readings or on an unconfirmed ID, and a row
-  whose cause holds but whose condition fails.
+  An image whose two readings disagree counts as agreeing for one case only under rule (a) below.
+* **Candidate assembly by row (developer ruling T118 (2a), (2c)).** A changed row whose cause is
+  ``intent``, ``image`` or ``intent+image`` and whose condition fails is ``kept_approved``: the
+  output carries the approved file's row for that case, byte for byte, and the gate artifacts
+  record it with its reason. It no longer fails the run. Only an ``unexplained`` change is
+  ``stop`` (T100), and the gate passes when no ``stop`` remains. Basis: T118 (2): "otherwise its
+  rows stay as approved"; "NOT_DELETION texts without an intake row stay as approved (T101)".
+  ``intent+image`` is never ``allowed`` (T101 (2) names only the two single-input changes).
+* **Rule (a), a disagreeing image (T118 (2a)):** it is accepted for a case only if each reading on
+  its own gives the same engine derivation for every record of the case: per record
+  ``(system_id, resource_id)``, its state value and the evidence IDs its steps cite, plus the row's
+  FAILED_CLOSED reason. The pipeline recompiles the case once per combination of readings of the
+  case's disagreeing images (each image's observations built from one reading alone), with the
+  run's intent. Fields the engine does not derive from (``status_label``, review only) cannot
+  matter, because only the derivation is compared. The merged reading the run used must give the
+  same derivation too, so the shipped row is one each reading supports (a conservative addition:
+  it can only keep more rows as approved). More than :data:`MAX_DISAGREEING` disagreeing images in
+  one case are not enumerated and are not accepted (an explicit failure, never "agree").
 * **Expectation, reported but not enforced** (T100): about the 10 non-deletion requests and the
   screenshot-dependent cases change, and nothing else. The Markdown puts the counts by cause next
   to it.
@@ -55,10 +74,12 @@ from pathlib import Path
 from typing import Any, Literal
 
 Cause = Literal["intent", "image", "intent+image", "unexplained"]
-Verdict = Literal["allowed", "stop"]
+Verdict = Literal["allowed", "kept_approved", "stop"]
 CAUSES: tuple[Cause, ...] = ("intent", "image", "intent+image", "unexplained")
 GATE_JSON = "regression_vs_engine.json"
 GATE_MD = "regression_vs_engine.md"
+#: The most disagreeing images in one case that rule (a) enumerates (2**4 = 16 recompiles).
+MAX_DISAGREEING = 4
 EXPECTATION = ("about the 10 non-deletion requests and the screenshot-dependent cases change, and nothing else "
                "(T100; reported, not enforced)")
 
@@ -109,11 +130,26 @@ def parse_rows(data: bytes) -> dict[str, Row]:
     return rows
 
 
-def load_baseline(record_path: Path, repo_root: Path) -> Baseline:
+def _approved_entry(record: Mapping[str, Any], split: str | None) -> Mapping[str, Any]:
+    """The record's entry for ``split`` (module docstring: one baseline per split, T117 B2)."""
+    per_split = record.get("approved_outputs") if split is not None else None
+    entry: Any
+    if isinstance(per_split, Mapping) and split in per_split:
+        entry = per_split[split]
+    elif split is None or split == "test":
+        entry = record["approved_output"]
+    else:
+        raise KeyError(f"no approved {split} output in the record")
+    if not isinstance(entry, Mapping):
+        raise TypeError("an approved-output entry is not an object")
+    return entry
+
+
+def load_baseline(record_path: Path, repo_root: Path, split: str | None = None) -> Baseline:
     """Read the approved-output record, check the file's sha256, and parse its rows (module docstring)."""
     try:
         record = json.loads(Path(record_path).read_text(encoding="utf-8"))
-        approved = record["approved_output"]
+        approved = _approved_entry(record, split)
         rel, sha = str(approved["path"]), str(approved["sha256"])
     except (OSError, ValueError, KeyError, TypeError) as exc:
         raise BaselineRefused(f"the approved-output record is unreadable ({type(exc).__name__})") from exc
@@ -145,13 +181,89 @@ class IdFacts:
 
 
 @dataclass(frozen=True)
+class RecordView:
+    """What the engine derived for one record of a case (rule (a)): its state and cited evidence IDs."""
+
+    system_id: str
+    resource_id: str
+    state: str | None
+    cited: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class Derivation:
+    """The engine's per-record derivation for one case, plus the row's FAILED_CLOSED reason (rule (a))."""
+
+    failed_closed: str | None
+    records: tuple[RecordView, ...]
+
+    def as_json(self) -> dict[str, Any]:
+        """IDs and states only (``artifacts.py`` rule)."""
+        return {"failed_closed": self.failed_closed,
+                "records": [{"system_id": r.system_id, "resource_id": r.resource_id, "state": r.state,
+                             "cited": list(r.cited)} for r in self.records]}
+
+
+@dataclass(frozen=True)
+class SingleReadingCheck:
+    """Rule (a) for one disagreeing image in one case: accepted, why, and each derivation compared."""
+
+    file_id: str
+    accepted: bool
+    reason: str
+    by_readings: tuple[tuple[tuple[tuple[str, int], ...], Derivation], ...] = ()  # ((file, reading 1|2)...), derivation
+    merged: Derivation | None = None
+
+    def as_json(self) -> dict[str, Any]:
+        """The artifact form: each reading combination with its derivation, and the merged one."""
+        return {"file_id": self.file_id, "accepted": self.accepted, "reason": self.reason,
+                "by_readings": [{"readings": {f: k for f, k in combo}, **d.as_json()} for combo, d in self.by_readings],
+                "merged": self.merged.as_json() if self.merged is not None else None}
+
+
+def judge_single_readings(files: Sequence[str], derivations: Mapping[tuple[int, ...], Derivation],
+                          merged: Derivation | None) -> tuple[SingleReadingCheck, ...]:
+    """Rule (a) (module docstring). ``derivations`` maps a reading choice per file of ``files``
+    (0 = reading 1, 1 = reading 2) to the case's derivation; a missing combination counts as a
+    difference. Image ``i`` is accepted when every pair of combinations that differ only in its
+    reading gives the same derivation and every combination equals the merged derivation."""
+    n = len(files)
+    combos = [c for c in sorted(derivations) if len(c) == n]
+    complete = n > 0 and len(combos) == 2 ** n
+    all_merged = complete and merged is not None and all(derivations[c] == merged for c in combos)
+    shown = tuple((tuple((f, k + 1) for f, k in zip(files, c, strict=True)), derivations[c]) for c in combos)
+    out = []
+    for i, fid in enumerate(files):
+        pairs = [(c, c[:i] + (1,) + c[i + 1:]) for c in combos if c[i] == 0]
+        same = complete and all(b in derivations and derivations[a] == derivations[b] for a, b in pairs)
+        if not complete:
+            reason = "not every reading combination was compiled"
+        elif not same:
+            reason = "the two readings give different states or cited IDs for a record of the case"
+        elif not all_merged:
+            reason = "the readings agree with each other but the merged reading the run used derives differently"
+        else:
+            reason = "each reading alone gives the same state and cited IDs for every record"
+        out.append(SingleReadingCheck(fid, same and all_merged, reason, shown, merged))
+    return tuple(out)
+
+
+@dataclass(frozen=True)
 class ImageFacts:
-    """One image involved in a case: whether both readings succeeded and agree, and its involved IDs."""
+    """One image involved in a case: whether both readings succeeded and agree, and its involved IDs.
+    ``single`` is rule (a)'s check for a disagreeing image (None when not computed)."""
 
     file_id: str
     read_ok: bool
     agree: bool | None
     ids: tuple[IdFacts, ...] = ()
+    single: SingleReadingCheck | None = None
+
+    @property
+    def usable(self) -> bool:
+        """Read OK, and its readings agree or rule (a) accepted it for this case."""
+        return self.read_ok and (self.agree is True or (self.agree is False and self.single is not None
+                                                         and self.single.accepted))
 
 
 @dataclass(frozen=True)
@@ -214,7 +326,8 @@ def _intent_condition(ev: CaseEvidence) -> tuple[bool, str]:
 
 def _image_condition(ev: CaseEvidence) -> tuple[bool, str]:
     """T101 (2b), plus the waiting-record check (module docstring)."""
-    bad_images = sorted(i.file_id for i in ev.images if not (i.read_ok and i.agree is True))
+    bad_images = sorted(i.file_id for i in ev.images if not i.usable)
+    by_rule_a = sorted(i.file_id for i in ev.images if i.read_ok and i.agree is False and i.usable)
     bad_ids = sorted({f"{i.file_id}:{x.resource_id or '(unusable id)'}:{x.basis}" for i in ev.images for x in i.ids
                       if not (x.well_formed and x.named_elsewhere and x.resource_id)})
     missing = sorted(set(ev.waiting_resources) - set(ev.image_resources))
@@ -224,22 +337,24 @@ def _image_condition(ev: CaseEvidence) -> tuple[bool, str]:
         return f"{text}: {not bad}" + (f" (not: {list(bad)})" if bad else "")
 
     parts = [f"images involved {sorted(i.file_id for i in ev.images)}",
-             part("read OK with agreeing readings", bad_images),
+             part("read OK with agreeing readings", bad_images)
+             + (f" (disagreeing but accepted by T118 rule (a): {by_rule_a})" if by_rule_a else ""),
              part("extracted IDs well-formed and named elsewhere", bad_ids),
              part("records waiting on an image got an image state", missing)]
     return ok, "; ".join(parts)
 
 
 def verdict(cause: Cause, ev: CaseEvidence) -> tuple[Verdict, str]:
-    """``allowed`` only for the two T101 changes whose conditions hold; every other row is ``stop``."""
+    """``allowed`` only for the two T101 changes whose conditions hold; an explained change whose
+    condition fails is ``kept_approved`` (T118 (2a), (2c)); only an unexplained change is ``stop`` (T100)."""
     if cause == "intent":
         ok, why = _intent_condition(ev)
-        return ("allowed" if ok else "stop"), why
+        return ("allowed" if ok else "kept_approved"), why
     if cause == "image":
         ok, why = _image_condition(ev)
-        return ("allowed" if ok else "stop"), why
+        return ("allowed" if ok else "kept_approved"), why
     if cause == "intent+image":
-        return "stop", "an intent+image change is never allowed (T101 (2))"
+        return "kept_approved", "an intent+image change is never allowed (T101 (2)); the approved row is kept (T118)"
     return "stop", "an unexplained change stops the run (T100)"
 
 
@@ -251,11 +366,17 @@ class GateResult:
     rows_compared: int
     changed: list[dict[str, Any]] = field(default_factory=list)
     refusal: str | None = None
+    assembled: dict[str, Row] = field(default_factory=dict)  # the output rows: kept-approved rows replaced
 
     @property
     def stops(self) -> list[dict[str, Any]]:
         """The changed rows marked ``stop``."""
         return [r for r in self.changed if r["verdict"] == "stop"]
+
+    @property
+    def kept(self) -> list[dict[str, Any]]:
+        """The changed rows whose approved row is kept (T118)."""
+        return [r for r in self.changed if r["verdict"] == "kept_approved"]
 
     @property
     def passed(self) -> bool:
@@ -273,6 +394,7 @@ class GateResult:
             "by_verdict": dict(sorted(Counter(r["verdict"] for r in self.changed).items())),
             "passed": self.passed,
             "refusal": self.refusal,
+            "kept_approved_cases": [r["case_id"] for r in self.kept],
             "expectation": EXPECTATION,
             "rows": self.changed,
         }
@@ -280,8 +402,9 @@ class GateResult:
     def summary(self) -> dict[str, Any]:
         """The producer-record summary."""
         body = self.as_json()
-        return {k: body[k] for k in ("baseline", "rows_compared", "changed_rows", "by_cause", "by_verdict", "passed",
-                                     "refusal")} | {"stop_cases": [r["case_id"] for r in self.stops]}
+        keys = ("baseline", "rows_compared", "changed_rows", "by_cause", "by_verdict", "passed", "refusal",
+                "kept_approved_cases")
+        return {k: body[k] for k in keys} | {"stop_cases": [r["case_id"] for r in self.stops]}
 
 
 def run_gate(baseline: Baseline | BaselineRefused, after: Mapping[str, Row],
@@ -289,7 +412,9 @@ def run_gate(baseline: Baseline | BaselineRefused, after: Mapping[str, Row],
     """Compare ``after`` with the baseline and judge every changed row (module docstring).
 
     ``evidence_for`` is called only for a changed row. A refused baseline, or a run whose case set
-    differs from the baseline's, gives a refused result with no row judged.
+    differs from the baseline's, gives a refused result with no row judged and nothing assembled.
+    Otherwise ``assembled`` is ``after`` with each ``kept_approved`` row replaced by the baseline's
+    row (T118: byte for byte).
     """
     if isinstance(baseline, BaselineRefused):
         return GateResult({"checked": False}, 0, refusal=str(baseline))
@@ -302,18 +427,24 @@ def run_gate(baseline: Baseline | BaselineRefused, after: Mapping[str, Row],
     result = GateResult(info, len(after))
     for cid in sorted(after, key=_case_order):
         before, now = baseline.rows[cid], after[cid]
+        result.assembled[cid] = now
         if before == now:
             continue
         ev = evidence_for(cid)
         cause, how = classify(ev)
         decided, condition = verdict(cause, ev)
+        if decided == "kept_approved":
+            result.assembled[cid] = before
         result.changed.append({
             "case_id": cid, "cause": cause, "decided_by": how, "verdict": decided, "condition": condition,
+            "kept_approved": decided == "kept_approved",
             "intent_label": ev.intent_label, "intent_source": ev.intent_source,
             "turn1_labels": list(ev.turn1_labels), "intake_non_deletion": ev.intake_non_deletion,
             "image_file_ids": sorted(i.file_id for i in ev.images),
+            "single_reading_checks": [i.single.as_json() for i in ev.images if i.single is not None],
             "before": {"status": before.status, "n_steps": before.n_steps},
             "after": {"status": now.status, "n_steps": now.n_steps},
+            "output": {"status": result.assembled[cid].status, "n_steps": result.assembled[cid].n_steps},
         })
     return result
 
@@ -334,7 +465,9 @@ def render_markdown(result: GateResult, run_id: str) -> str:
              f"- **Passed: {body['passed']}**" + (f"; refusal: {body['refusal']}" if body["refusal"] else ""), "",
              "| cause | changed rows |", "|---|---|"]
     lines += [f"| {c} | {n} |" for c, n in body["by_cause"].items()]
-    lines += ["", f"Expected: {EXPECTATION}. Verdicts: {body['by_verdict'] or '{}'}.", ""]
+    lines += ["", f"Expected: {EXPECTATION}. Verdicts: {body['by_verdict'] or '{}'}.",
+              f"Kept as approved (T118; the output carries the approved row): {body['kept_approved_cases'] or 'none'}.",
+              ""]
     if result.changed:
         lines += ["| case | cause | verdict | intent label | images | before | after | condition |",
                   "|---|---|---|---|---|---|---|---|"]
@@ -343,6 +476,18 @@ def render_markdown(result: GateResult, run_id: str) -> str:
             lines.append(f"| {r['case_id']} | {r['cause']} | {r['verdict']} | {r['intent_label']} | "
                          f"{', '.join(r['image_file_ids']) or '-'} | {before['status']} ({before['n_steps']}) "
                          f"| {after['status']} ({after['n_steps']}) | {r['condition']} |")
+        lines.append("")
+    checks = [(r["case_id"], c) for r in result.changed for c in r["single_reading_checks"]]
+    if checks:
+        lines += ["## Disagreeing images: rule (a) (T118 (2a))", "",
+                  "| case | image | accepted | reason | per reading: (resource, state, cited) |",
+                  "|---|---|---|---|---|"]
+        for cid, c in checks:
+            per = "; ".join(
+                f"{b['readings']}: fc={b['failed_closed']} "
+                + ", ".join(f"({x['resource_id']}, {x['state']}, {'+'.join(x['cited']) or '-'})" for x in b["records"])
+                for b in c["by_readings"])
+            lines.append(f"| {cid} | {c['file_id']} | {c['accepted']} | {c['reason']} | {per} |")
         lines.append("")
     return "\n".join(lines)
 

@@ -11,8 +11,8 @@
 from __future__ import annotations
 
 import csv
+from collections.abc import Callable, Iterator
 from pathlib import Path
-from typing import Callable, Iterator, TypeVar
 
 from ..evidence.interpret import make_identifier, normalize_time
 from ..evidence.model import Identifier, IdKind
@@ -34,7 +34,6 @@ AUDIT_LOG_HEADER = ("audit_id", "user_id", "event_time", "field_name", "old_valu
 IDENTIFIER_FIELDS: dict[str, IdKind] = {"email": "email", "phone": "phone",
                                         "email_hash": "email_hash"}
 
-Row = TypeVar("Row")
 
 
 class _Fields:
@@ -81,11 +80,11 @@ def _records(dataset_dir: Path, file_name: str, header: tuple[str, ...]) -> Iter
             if len(values) != len(header):
                 raise InputFormatError(file_name, reader.line_num,
                                        f"expected {len(header)} fields, found {len(values)}")
-            yield _Fields(file_name, reader.line_num, dict(zip(header, values)))
+            yield _Fields(file_name, reader.line_num, dict(zip(header, values, strict=True)))
 
 
-def _load(dataset_dir: Path, file_name: str, header: tuple[str, ...],
-          build: Callable[[_Fields], Row]) -> tuple[Row, ...]:
+def _load[Row](dataset_dir: Path, file_name: str, header: tuple[str, ...],
+               build: Callable[[_Fields], Row]) -> tuple[Row, ...]:
     """Load a CSV file into typed rows."""
     return tuple(build(record) for record in _records(dataset_dir, file_name, header))
 

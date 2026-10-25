@@ -5,8 +5,9 @@ Stages (``notes/ARCHITECTURE_OPTIONS.md`` section 1.0): parse evidence (GP) -> r
 identifier-free analytics (global) -> per case: state at ``audit_at``, category, decision,
 citation, steps -> pre-write validation.
 
-The engine settles every fact. A model (G7, not built yet) may only answer typed open questions;
-until then the pipeline gives every case the fail-closed intent of T71 Q2.
+The engine settles every fact. The model (``agent/``, wired in ``pipeline.run``) supplies the
+request intent and screenshot readings and may answer typed open questions; without a validated
+model intent a case takes the fail-closed deletion path of T71 Q2.
 
 Fail-closed rules, each with its basis:
 
@@ -20,8 +21,9 @@ Fail-closed rules, each with its basis:
   manifest names but the disk lacks gives the reason MISSING_EVIDENCE_FILE.
 * **T86 item 2**: a request row that could not be loaded gives a FAILED_CLOSED row for its case
   (when the case ID is readable) with no step; every such row is listed in the run artifacts.
-* **T63**: an unresolved identity is searched by the raw request email and its hash, and the row
-  is FAILED_CLOSED(IDENTITY_UNRESOLVED), never NOT_APPLICABLE.
+* **T63**: an unresolved identity is searched by the raw request email and its hash, and a
+  deletion request's row is FAILED_CLOSED(IDENTITY_UNRESOLVED). A request the model reads as
+  NOT_DELETION is NOT_APPLICABLE whatever the identity, since nothing is to be deleted.
 * **T71 Q11**: an image whose subject is not the person a catalog row names keeps the record in
   scope (the catalog link wins) and raises IMAGE_SUBJECT_CONFLICT.
 * **UNINTERPRETED_RECORD** (``../CLAUDE.md`` section 3, "a failed read is never nothing found";

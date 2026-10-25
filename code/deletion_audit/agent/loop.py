@@ -23,6 +23,9 @@ turns (G3 section 3 item 3). Routing rules, each tested:
   tool calls, ``audit_case`` included; then one request with ``tool_choice: {"type": "none"}`` and
   the schema-constrained answer. The same final turn is forced by the request and wall-clock
   caps. A call past the cap is refused with an error result and never runs.
+* **Hard bound**: whatever the caps above do, the loop sends at most ``max_requests`` +
+  :data:`LOOP_SLACK` requests after turn 1; past that the case ends ``FAILED`` with reason
+  ``LOOP_BOUND`` (an explicit iteration cap, not only the indirect stops).
 * **No repeats**: an identical call (name and canonical arguments) is refused.
 * **Drift** (rule 1): without an intent question the final intent must equal the commit; one
   repair turn, then the commit stands, flagged ``INTENT_DRIFT``.
@@ -55,6 +58,10 @@ from .tools import CaseTools, ToolResult, args_hash, tool_definitions
 from .vision import VisionRun
 
 LoopStatus = Literal["OK", "FINALIZED_AT_CAP", "FAILED"]
+
+#: Requests the loop may send past ``max_requests`` (the forced final turn and one drift repair)
+#: before the hard bound ends the case ``FAILED`` (module docstring, "Hard bound").
+LOOP_SLACK = 2
 
 
 class FixedIntent(IntentProvider):
@@ -344,7 +351,7 @@ class _Case:
     def _loop(self, t1: Turn1, reply: ModelReply, pending: list[dict[str, Any]], extra: list[dict[str, Any]],
               replicates: tuple[str | None, ...]) -> AgentOutcome:
         """Send results and questions until a final answer arrives, a cap forces one, or a call fails."""
-        while True:
+        for _ in range(self.caps.max_requests + LOOP_SLACK):
             self.st.messages.append(_assistant(reply))
             self.st.messages.append({"role": "user", "content": pending + extra})
             reason = self._force_reason()
@@ -370,6 +377,9 @@ class _Case:
                 status: LoopStatus = "FINALIZED_AT_CAP" if self.st.forced_by else "OK"
                 return self._outcome(t1, final, key, status, replicates, None)
             pending, extra = [], [redo]
+        self._flag("AGENT_CALL_FAILED", f"loop: no final answer within {self.caps.max_requests + LOOP_SLACK} "
+                                        "requests (hard bound)")
+        return self._outcome(t1, None, None, "FAILED", replicates, "LOOP_BOUND")
 
     def _after_final(self, final: FinalAnswer, key: str) -> dict[str, Any] | None:
         """A drift-repair message, or None when the answer stands.

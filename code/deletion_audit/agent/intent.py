@@ -10,8 +10,9 @@ Basis (each rule is a developer ruling or G3 design, not organiser text):
   with a phrase table. ``UNCERTAIN`` is a legal answer.
 * **basis_quote is checked in code** (G7a brief item 1): it must be a substring of the request
   text (exactly, or after Unicode NFC and whitespace collapsing). A failed check means the answer
-  is not a validated model answer, so its label is read as ``UNCERTAIN`` (flag
-  ``BASIS_QUOTE_INVALID``), which routes to a tool or to the fail-closed row (T71 Q2). An
+  is not a validated model answer: a final answer's label is read as ``UNCERTAIN`` (flag
+  ``BASIS_QUOTE_INVALID``), which routes to a tool or to the fail-closed row (T71 Q2), and an
+  ``audit_case`` commit with a bad quote is refused and not committed. An
   ``UNCERTAIN`` answer may carry an empty quote.
 * **Failures are explicit** (``../CLAUDE.md`` section 3): a failed call gives an
   :class:`~deletion_audit.record.IntentDecision` with ``source`` ``FAILED_CLOSED`` or

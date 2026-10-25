@@ -17,6 +17,7 @@ from typing import Any
 from unittest import mock
 
 from deletion_audit import __main__ as cli
+from deletion_audit.config import APPROVED_OUTPUT_RECORD
 from deletion_audit.model import FakeTransport
 from deletion_audit.pipeline import run_routing_check
 
@@ -71,15 +72,16 @@ class Base(unittest.TestCase):
         os.environ.pop(NAME, None)
 
     def approve_engine_rows(self, dataset_dir: Path) -> None:
-        """Write the temp repo's ``notes/approved_output.json`` for the engine-only replay rows of
+        """Write the temp repo's approved-output record (``config.APPROVED_OUTPUT_RECORD``) for the engine-only rows of
         ``dataset_dir``: the regression gate is mandatory on a model-on run (T112 item 11), so a paid
         run passes only when its rows equal these or change in an allowed way."""
         from deletion_audit.pipeline import ModelSetup, run
 
         base = run(dataset_dir, run_id="approved-base", cases="test", runs_dir=self.tmp / "baseline-rundirs",
                    model=ModelSetup.replay(self.tmp / "baseline-replycache"))
-        (self.tmp / "notes").mkdir(exist_ok=True)
-        (self.tmp / "notes" / "approved_output.json").write_text(json.dumps({"approved_output": {
+        rec = self.tmp / APPROVED_OUTPUT_RECORD
+        rec.parent.mkdir(parents=True, exist_ok=True)
+        rec.write_text(json.dumps({"approved_output": {
             "run_id": "approved-base", "path": str(base.output_path), "sha256": base.output_sha256}}), encoding="utf-8")
 
     def env_file(self, *lines: str) -> Path:
@@ -123,10 +125,12 @@ class TestPaidRun(Base):
         self.approve_engine_rows(self.root)
         code, out, _ = run_cli(self.base_args("p1") + ["--paid", "--dollar-cap", "0.5", "--call-cap", "2",
                                                        "--mode", "tools_off"], f)
-        # the mandatory gate (T112 item 11) stops Bo's NOT_APPLICABLE row: one turn-1 reading, not two
-        self.assertEqual((code, f.calls), (cli.EXIT_GATE_STOP, 1))
+        # the mandatory gate (T112 item 11) does not allow Bo's NOT_APPLICABLE row (one turn-1 reading, not
+        # two), so the approved row is kept (T118 (2c)) and the run passes
+        self.assertEqual((code, f.calls), (0, 1))
         producer = read_json(self.runs / "p1" / "producer.json")
-        self.assertEqual((producer["regression_gate"]["mandatory"], producer["run_passed"]), (True, False))
+        self.assertEqual((producer["regression_gate"]["mandatory"], producer["run_passed"]), (True, True))
+        self.assertEqual(len(producer["kept_approved_cases"]), 1)
         self.assertEqual(producer["budget"]["dollar_cap"], 0.5)
         self.assertEqual(producer["budget"]["call_cap"], 2)
         self.assertEqual(producer["budget"]["sends"], 2)
@@ -200,9 +204,9 @@ class TestExitCodes(Base):
         self.assertEqual(f.transports[0].calls, 0)
 
     def test_regression_gate_stop_exits_5(self) -> None:
-        notes = self.tmp / "notes"
-        notes.mkdir()
-        (notes / "approved_output.json").write_text(json.dumps(
+        rec = self.tmp / APPROVED_OUTPUT_RECORD
+        rec.parent.mkdir(parents=True)
+        rec.write_text(json.dumps(
             {"approved_output": {"path": "nowhere.csv", "sha256": "0" * 64}}), encoding="utf-8")
         code, _, err = run_cli(self.base_args("g1") + ["--regression-gate"])
         self.assertEqual(code, cli.EXIT_GATE_STOP)

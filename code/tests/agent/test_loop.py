@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import unittest
+from unittest import mock
 
 from deletion_audit.agent import LoopCaps, audit_with_agent, run_case
+from deletion_audit.agent import loop as loop_mod
 from deletion_audit.agent.questions import oq_id
 
 from ._support import (
@@ -72,6 +74,17 @@ class TestCaps(unittest.TestCase):
         out = run_case(C1, w, rig.client, mode="A+", clock=lambda: next(ticks))
         self.assertEqual(bodies_tool_choice(rig), ["auto", "none"])
         self.assertEqual(out.status, "FINALIZED_AT_CAP")
+
+    def test_hard_bound_ends_the_case_failed_even_if_no_cap_forces_a_final_turn(self) -> None:
+        """With every forcing cap disabled, the loop still stops after max_requests + LOOP_SLACK sends."""
+        w = world_of(dataset())
+        endless = [AUDIT] + [tool_reply(("list_activity", {"identifier_or_resource": f"acct_{i}"})) for i in range(30)]
+        rig = Rig(endless)
+        caps = LoopCaps(max_tool_calls=4, max_requests=3)
+        with mock.patch.object(loop_mod._Case, "_force_reason", return_value=None):
+            out = run_case(C1, w, rig.client, mode="A+", caps=caps)
+        self.assertEqual((out.status, out.failure), ("FAILED", "LOOP_BOUND"))
+        self.assertEqual(len(rig.sent()), 1 + caps.max_requests + loop_mod.LOOP_SLACK)
 
     def test_no_repeated_identical_tool_call(self) -> None:
         w = world_of(dataset())
