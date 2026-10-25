@@ -24,11 +24,29 @@
   acknowledgement is recorded in ``producer.json``. A replay-only run is never refused for it.
 * **Image answers (G7a proposal 6):** a validated ``IMAGE_FIELD_UNREADABLE`` answer is applied by
   compiling the case on a world built from ``patch_image_observations``.
-* **Model-on regression gate (T100, T101; :mod:`deletion_audit.agent.regression`):** with
-  ``regression_gate=True`` the output is compared row by row with the approved file named in
-  ``notes/approved_output.json``; every changed row gets a cause by recompiling. A stop row or a
-  refused baseline marks the run as not passing in ``producer.json`` (``run_passed`` false, with
-  the refusal) and the CLI exits non-zero.
+* **Model-on regression gate (T100, T101; :mod:`deletion_audit.agent.regression`):** the output is
+  compared row by row with the approved file named in ``notes/approved_output.json``; every changed
+  row gets a cause by recompiling. A stop row or a refused baseline marks the run as not passing in
+  ``producer.json`` (``run_passed`` false, with the refusal) and the CLI exits non-zero. **The gate
+  is mandatory** (developer ruling T112 item 11, G7 verifier MINOR 7) whenever the model is on, that
+  is, a paid run or a replay run that used at least one model reply, and whenever the root
+  ``output.csv`` is to be written; ``regression_gate=True`` only adds it to an engine-only run. A run
+  whose case set is not the approved file's (DEV, a fixture) is refused by the gate and so does not
+  pass. **The root ``output.csv`` is written only after the gate passes** (T112 item 10, verifier
+  finding 5): a stopped or refused run leaves it untouched, and ``producer.json`` says so.
+* **Vision review list (T112, item 4 (b)):** the images the developer must review before a paid
+  full run (and that ``--vision-ack`` must cover) are the failed or disagreeing ones plus every
+  image whose readings change a row (:func:`row_changing_images`: each case compiled on the world
+  without and with the readings, fail-closed intent, and the images involved in each changed row).
+  ``producer.vision.review.images`` lists, for each, its ``file_id`` and both reading keys, so the
+  freeze check can verify that an acknowledgement covers that exact image and both readings. An
+  acknowledgement never picks a reading.
+* **A failed agent call (developer ruling T109 (a)):** a case whose agent loop status is ``FAILED``
+  (a call failed at any turn) never becomes NOT_APPLICABLE, whatever turn 1 said. Its row is the
+  engine path without model intent (the fail-closed intent of T71 Q2, compiled on the run's world
+  with no model answer applied), flagged ``AGENT_CALL_FAILED``. This is decided here, in the
+  pipeline's intent decision, not only in the regression gate. Nothing is re-sent: the transport's
+  retry ladder stays the one place that gives up (``../CLAUDE.md`` section 5).
 * Every requested case gets exactly one row; a row is never left empty (``FAILED_CLOSED``).
 * **Holdout guard** (``../CLAUDE.md`` section 4): :func:`run` refuses, before it reads any input,
   an explicit case list that names a holdout case, and, after resolving ``"test"``, any resolved
@@ -77,7 +95,8 @@ from .agent.regression import write_gate as write_regression
 from .agent.routing import text_id
 from .artifacts import RunArtifacts, now_ist, write_json
 from .config import APPROVED_OUTPUT_RECORD, REPLY_NAMESPACES
-from .engine import AuditContext, World, audit_case, build_context, build_world, malformed_record
+from .discovery.accounts import Flag
+from .engine import AuditContext, FailClosedIntent, World, audit_case, build_context, build_world, malformed_record
 from .inputs.requests import load_requests_checked
 from .model import BudgetGuard, CallLog, ModelClient, ReplyCache, RetryPolicy, Transport
 from .record import CaseRecord, fail_closed_intent
@@ -281,15 +300,54 @@ def resolve_cases(ctx: AuditContext, cases: Sequence[str] | Literal["test"]) -> 
     return list(cases)
 
 
-def check_vision_ack(vision: VisionRun, ack_run_id: str | None, runs_dir: Path) -> dict[str, Any]:
+def row_changing_images(ctx0: AuditContext, vision: VisionRun) -> tuple[str, ...]:
+    """The images read OK whose readings change a row (module docstring, item 4 (b)).
+
+    Every request's case is compiled with the fail-closed intent on the world without the readings
+    and on the world with them; for each changed row, the images involved are the read images it
+    depended on and the images with an observation of any of its records. Inputs only (no gold)."""
+    ok = vision.read_ok()
+    if not ok:
+        return ()
+    plain = build_world(ctx0)
+    full = build_world(replace(ctx0, image_observations=vision.observations, vision_read=ok))
+    by_resource: dict[str, set[str]] = {}
+    for o in vision.observations:
+        if o.resource_id and o.file_id in ok:
+            by_resource.setdefault(o.resource_id, set()).add(o.file_id)
+    out: set[str] = set()
+    intent = FailClosedIntent()
+    for cid in sorted({r.case_id for r in ctx0.requests}):
+        before, after = audit_case(cid, plain, intent), audit_case(cid, full, intent)
+        if _row(before) == _row(after):
+            continue
+        involved = set(before.failed_dependencies) & ok
+        for x in (*before.resources, *after.resources):
+            involved |= by_resource.get(x.key.resource_id, set())
+        out |= involved
+    return tuple(sorted(out))
+
+
+def review_list(vision: VisionRun, changing: Sequence[str]) -> tuple[str, ...]:
+    """Failed or disagreeing images plus the row-changing ones, sorted (module docstring)."""
+    return tuple(sorted(set(vision.needs_review()) | set(changing)))
+
+
+def check_vision_ack(vision: VisionRun, ack_run_id: str | None, runs_dir: Path,
+                     needs_review: Sequence[str] | None = None) -> dict[str, Any]:
     """Whether ``ack_run_id`` acknowledges exactly this run's images that need review (module docstring).
 
     The named run's ``vision_readings.json`` must list the same images as needing review, and its
     report of each of them (status, reply keys, both readings, agreement, flags, IDs) must equal this
-    run's: the developer reviewed these very readings, not others.
+    run's: the developer reviewed these very readings, not others; the report includes the sha256 of
+    each reading's raw reply, so a re-read with a different reply never matches (T112 4(b)).
+    ``needs_review`` is the run's review list (:func:`review_list`; default: the failed or disagreeing
+    images only). When the acknowledgement matches, ``acknowledged`` lists each image with both
+    reading keys and both reading hashes (the freeze check's shape); an acknowledgement never picks
+    a reading.
     """
-    needs = list(vision.needs_review())
-    out: dict[str, Any] = {"needs_review": needs, "ack_run_id": ack_run_id}
+    needs = list(needs_review) if needs_review is not None else list(vision.needs_review())
+    out: dict[str, Any] = {"needs_review": needs, "ack_run_id": ack_run_id, "acknowledged": []}
     if not needs:
         return {**out, "ack_matches": None, "reason": "no image needs review"}
     if ack_run_id is None:
@@ -307,7 +365,9 @@ def check_vision_ack(vision: VisionRun, ack_run_id: str | None, runs_dir: Path) 
     mine = {i["file_id"]: i for i in vision_run_report(vision)}
     same = listed == needs and all(theirs.get(f) == mine.get(f) for f in needs)
     reason = "same images and readings" if same else "the acknowledged run's review list or readings differ"
-    return {**out, "ack_matches": same, "reason": reason}
+    acked = [{"file_id": f, "reply_keys": list(mine[f]["reply_keys"]),
+              "reading_sha256": list(mine[f]["reading_sha256"])} for f in needs] if same else []
+    return {**out, "ack_matches": same, "reason": reason, "acknowledged": acked}
 
 
 class _PatchedWorlds:
@@ -353,6 +413,21 @@ def _with_answers(res: AgentCaseResult) -> CaseRecord:
     )
 
 
+def _agent_failed_record(cid: str, world: World, res: AgentCaseResult) -> CaseRecord:
+    """T109 (a): the record of a case whose agent loop FAILED (module docstring): the engine path
+    without model intent, with the agent's questions, answers and rejections kept for the artifacts."""
+    base = audit_case(cid, world, FixedIntent(fail_closed_intent(res.intent.crosscheck)))
+    flag = Flag("AGENT_CALL_FAILED", f"agent loop FAILED ({res.outcome.failure}): engine path without model intent")
+    flags = tuple(sorted(set(base.flags) | {flag}, key=lambda f: (f.code, f.detail)))
+    return replace(
+        base,
+        flags=flags,
+        open_questions=tuple(q.oq_id for q in res.outcome.questions),
+        answers=tuple(v.oq_id for v in res.check.validated),
+        rejected=tuple(f"{r.oq_id}:{r.reason}" for r in res.check.rejected),
+    )
+
+
 def _row(rec: CaseRecord) -> Row:
     return Row(rec.status, steps_json(rec.steps))
 
@@ -375,8 +450,9 @@ class _GateInputs:
         if res is None:  # the agent did not run: neither input exists for this case
             row = _row(after)
             return CaseEvidence(cid, row, row, row, row, False, None, after.intent.source, (), False)
-        applied = res.intent
-        w_case = self.patched.built.get(cid, self.world)
+        failed_loop = res.outcome.status == "FAILED"
+        applied = after.intent if failed_loop else res.intent  # T109 (a): a failed loop has no model intent
+        w_case = self.world if failed_loop else self.patched.built.get(cid, self.world)
         fail = FixedIntent(fail_closed_intent(applied.crosscheck))
         intent_only = audit_case(cid, self.world_plain, FixedIntent(applied))
         image_only = audit_case(cid, w_case, fail)
@@ -398,6 +474,7 @@ class _GateInputs:
             intake_non_deletion=applied.crosscheck.intake_non_deletion,
             images=image_facts(sorted(involved), self.vision.by_file(), resources),
             waiting_resources=tuple(waiting), image_resources=tuple(supplied),
+            loop_status=res.outcome.status,
         )
 
 
@@ -461,9 +538,10 @@ def run(
         replica = setup.client(1, paid=False, log=arts, run_id=run_id)
         vision_clients = (setup.client(0, paid=False, log=arts, run_id=run_id), replica)
         vision = read_images(ctx0, vision_clients, learn_shapes(ctx0.index.observations(), ctx0.activity))
-        write_vision_artifacts(run_dir, vision)
+        needs = review_list(vision, row_changing_images(ctx0, vision))
+        write_vision_artifacts(run_dir, vision, needs_review=needs)
         write_json(run_dir / "vision.json", vision_run_report(vision))
-        review = check_vision_ack(vision, vision_ack, runs_root)
+        review = check_vision_ack(vision, vision_ack, runs_root, needs_review=needs)
         if setup.paid and review["needs_review"] and not review["ack_matches"]:
             write_json(run_dir / "refused.json", {"run_id": run_id, "refused": "vision review required",
                                                   "vision_review": review, "created_at": now_ist()})
@@ -483,18 +561,17 @@ def run(
             patched.case = cid
             res = audit_with_agent(cid, world, primary, mode=mode, caps=caps, vision=vision,
                                    replicate_clients=(replica,), world_for_answers=patched)
-            results[cid], records[cid] = res, _with_answers(res)
+            failed_loop = res.outcome.status == "FAILED"
+            results[cid] = res
+            records[cid] = _agent_failed_record(cid, world, res) if failed_loop else _with_answers(res)
             arts.case(records[cid], res.report)
     out_path = run_dir / "output.csv"
     rows = [(r.case_id, r.status, r.steps) for r in records.values()]
     sha = write_output(rows, out_path)
-    if write_root:
-        root_sha = write_output(rows, REPO_ROOT / "output.csv")
-        if root_sha != sha:
-            raise RuntimeError("root output.csv differs from the run's output.csv")
     gate: dict[str, Any] | None = None
     passed = True
-    if regression_gate:
+    model_on = setup.paid or any(c.outcome == "ok" and c.event in ("cache_hit", "send") for c in arts.calls)
+    if regression_gate or model_on or write_root:  # T112 items 10-11: mandatory when the model is on
         baseline: Baseline | BaselineRefused
         try:
             baseline = load_baseline(approved_record or REPO_ROOT / APPROVED_OUTPUT_RECORD, REPO_ROOT)
@@ -505,6 +582,13 @@ def run(
         result = run_gate(baseline, {cid: _row(r) for cid, r in records.items()}, inputs.evidence)
         write_regression(run_dir, result, run_id)
         gate, passed = result.summary(), result.passed
+        gate["mandatory"] = bool(model_on or write_root)
+    root_written = False
+    if write_root and passed:  # T112 item 10: only after the gate passes; a stopped run leaves it untouched
+        root_sha = write_output(rows, REPO_ROOT / "output.csv")
+        if root_sha != sha:
+            raise RuntimeError("root output.csv differs from the run's output.csv")
+        root_written = True
     usage = arts.usage(setup.roots)
     producer = {
         "tool": "code/deletion_audit (pipeline.run)",
@@ -530,6 +614,8 @@ def run(
                    "observations": len(vision.observations), "review": review},
         "intent_sources": dict(sorted(Counter(r.intent.source for r in records.values()).items())),
         "regression_gate": gate if gate is not None else {"run": False},
+        "model_on": model_on,
+        "root_output": {"requested": write_root, "written": root_written},
         "run_passed": passed,
         "request_issues": [
             {"file": i.file, "line": i.line, "case_id": i.case_id, "reason": i.reason} for i in ctx.request_issues
@@ -687,12 +773,13 @@ def run_vision(dataset_dir: Path, *, run_id: str, model: ModelSetup, runs_dir: P
     with _RunLock(model):
         clients = [model.client(i, paid=True, log=arts, run_id=run_id) for i in (0, 1)]
         vision = read_images(ctx, clients, learn_shapes(ctx.index.observations(), ctx.activity))
-    write_vision_artifacts(run_dir, vision)
+    needs = review_list(vision, row_changing_images(ctx, vision))
+    write_vision_artifacts(run_dir, vision, needs_review=needs)
     write_json(run_dir / "vision.json", vision_run_report(vision))
     usage = arts.usage(model.roots)
     write_json(run_dir / "usage.json", usage)
     record = _run_record("vision-readings", run_id, command, model, images=len(vision.records),
-                         read_ok=sorted(vision.read_ok()), needs_review=list(vision.needs_review()),
+                         read_ok=sorted(vision.read_ok()), needs_review=list(needs),
                          model_calls=usage["model_calls"], model_ids=usage["model_ids"])
     write_json(run_dir / "run.json", record)
     return record

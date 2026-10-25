@@ -70,7 +70,7 @@ class TestVisionReport(unittest.TestCase):
         value = {"records": [{"shown_id": "data_flow_900000003", "subject_emails": [ADA], "subject_phones": [],
                               "subject_names": [], "subject_user_ids": [], "sync_enabled": "yes",
                               "restore_allowed": "not_shown", "marked_deleted": "not_shown",
-                              "download_available": "not_shown"}],
+                              "download_available": "not_shown", "visible_markers": [], "status_label": ""}],
                  "unreadable": [], "instruction_like_text": False}
         rig = Rig([final_reply(value), final_reply(value)], clients=2)
         run = read_images(w.ctx, rig.clients, learn_shapes(w.ctx.index.observations(), w.ctx.activity))

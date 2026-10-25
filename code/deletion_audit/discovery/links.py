@@ -11,6 +11,19 @@ Rules, each with its basis:
   linked only through that key, compared against the person's complete identifier set. Only a
   record with no own key, that names a resource, borrows the lookup keys of its trace. So a decoy
   hit whose own key is a look-alike never links, even when its trace looked up the person.
+* **Per record, not per line** (developer ruling T105 on red-team fixture R04): the own-key rule
+  is applied to a record (``resource_id``) across *all* its observations, whatever the file or
+  trace. When any observation of the record carries an own linkable key, those own keys decide
+  whose record it is: a trace lookup on another of its lines may link it only to a person its own
+  keys resolve to. So a kv log's "started" line, which holds only the lookup key, can no longer
+  claim a record whose "completed" line names someone else, or a look-alike that belongs to no
+  one (R04: a namesake's live account and two look-alike records). A lookup that agrees with the
+  own key still links (R05: the pre-audit lookup line of an account whose own key is the
+  requester's, seen only in a post-audit file, keeps the in-window link). ``LinkIndex.own_persons``
+  keeps, per record, every person its own keys resolve to; the engine fails a row closed when
+  they name someone other than the requester (``OWN_KEY_CONFLICT``), and the validator refuses
+  any step on such a record. Observations on a blocked PDF page (T68) are left out of these
+  per-record facts, since their identifiers cannot be tied to one record.
 * **PDF pages (T68):** identifiers on a page that names several resources, or whose identifiers
   resolve to several people, never link.
 * **Catalog rows** link their resource to the person they name (``catalog.py``).
@@ -23,8 +36,8 @@ Rules, each with its basis:
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass, field
 from typing import Literal
 
 from .. import timeutil
@@ -102,8 +115,15 @@ def _pdf_page_blocked(index: EvidenceIndex, people: PeopleIndex) -> frozenset[tu
     return frozenset(blocked)
 
 
-def link_observation(obs: Observation, people: PeopleIndex, blocked: bool = False) -> tuple[ObservationLink, ...]:
-    """Every person one observation links to, with the basis (module docstring)."""
+def link_observation(
+    obs: Observation, people: PeopleIndex, blocked: bool = False, *, record_owners: frozenset[str] | None = None
+) -> tuple[ObservationLink, ...]:
+    """Every person one observation links to, with the basis (module docstring).
+
+    ``record_owners`` is None when no observation of the same record carries an own linkable key;
+    otherwise it is every person those own keys resolve to (any file, any trace), and a trace
+    lookup links only a person in it (T105, per record).
+    """
     if blocked:
         return ()
     out: dict[str, ObservationLink] = {}
@@ -115,12 +135,32 @@ def link_observation(obs: Observation, people: PeopleIndex, blocked: bool = Fals
     if not own and obs.resource_id:
         for ident in sorted(obs.lookup_identifiers, key=_ident_key):
             for p in sorted(people.persons_for(ident)):
+                if record_owners is not None and p not in record_owners:
+                    continue  # the record's own key names someone else, or no one (T105)
                 out.setdefault(p, ObservationLink(p, "trace_lookup", ident))
     return tuple(out[p] for p in sorted(out))
 
 
 def _ident_key(i: Identifier) -> tuple[str, str, str]:
     return (i.kind, i.value, i.field)
+
+
+def record_own_keys(
+    observations: Iterable[Observation], people: PeopleIndex, blocked: frozenset[tuple[str, str]] = frozenset()
+) -> tuple[frozenset[str], Mapping[str, frozenset[str]]]:
+    """Per-record own-key facts (T105): the records that carry an own linkable key in any
+    observation, and for each record every person those own keys resolve to (possibly none, as for
+    a look-alike). Observations on a blocked PDF page are skipped (module docstring)."""
+    keyed: set[str] = set()
+    persons: dict[str, set[str]] = defaultdict(set)
+    for o in observations:
+        if not o.resource_id or (o.file_id, o.locator.ref) in blocked:
+            continue
+        for i in o.record_identifiers:
+            if is_own_key(i):
+                keyed.add(o.resource_id)
+                persons[o.resource_id] |= people.persons_for(i)
+    return frozenset(keyed), {k: frozenset(persons[k]) for k in sorted(keyed)}
 
 
 @dataclass(frozen=True)
@@ -131,6 +171,8 @@ class LinkIndex:
     resource_persons: Mapping[str, frozenset[str]]  # every person any record or catalog row ties a resource to
     catalog_by_person: Mapping[str, tuple[CatalogLink, ...]]
     blocked_pages: frozenset[tuple[str, str]]
+    own_keyed: frozenset[str] = frozenset()  # records with an own linkable key in some observation (T105)
+    own_persons: Mapping[str, frozenset[str]] = field(default_factory=dict)  # record -> persons its own keys name
 
 
 def build_link_index(
@@ -138,10 +180,14 @@ def build_link_index(
 ) -> LinkIndex:
     """Link every observation (and any extra image observations) and every catalog row."""
     blocked = _pdf_page_blocked(index, people)
+    every = list(index.observations()) + list(extra)
+    keyed, own_persons = record_own_keys(every, people, blocked)
     by_person: dict[str, list[tuple[Observation, ObservationLink]]] = defaultdict(list)
     res_persons: dict[str, set[str]] = defaultdict(set)
-    for o in list(index.observations()) + list(extra):
-        for ol in link_observation(o, people, (o.file_id, o.locator.ref) in blocked):
+    for o in every:
+        page_blocked = (o.file_id, o.locator.ref) in blocked
+        owners = own_persons.get(o.resource_id) if o.resource_id in keyed else None
+        for ol in link_observation(o, people, page_blocked, record_owners=owners):
             by_person[ol.person].append((o, ol))
             if o.resource_id:
                 res_persons[o.resource_id].add(ol.person)
@@ -155,6 +201,8 @@ def build_link_index(
         resource_persons={k: frozenset(v) for k, v in res_persons.items()},
         catalog_by_person={k: tuple(v) for k, v in cat.items()},
         blocked_pages=blocked,
+        own_keyed=keyed,
+        own_persons=own_persons,
     )
 
 

@@ -42,6 +42,7 @@ VALIDATOR_PARTS: Mapping[str, str] = {
     "T77_FINDING_CITES": "row_rules",
     "REMEDIATION_EMPTY": "row_rules",
     "COMPLETE_VERIFICATION_ONLY": "row_rules",
+    "OWN_KEY_OTHER_PERSON": "ownership",
 }
 
 
@@ -156,9 +157,10 @@ def usage_from_calls(calls: Sequence[CallLogEntry], roots: Sequence[Path],
 
 
 def validator_counts(records: Sequence[CaseRecord]) -> dict[str, Any]:
-    """Validator counts by part: hard containment, ABSENT branches, flagged absence, row rules."""
+    """Validator counts by part: hard containment, ABSENT branches, flagged absence, row rules, and
+    ownership (T105's hard check that no step names another known person's record)."""
     parts: dict[str, Counter[str]] = {
-        p: Counter() for p in ("hard", "absent_branches", "flagged", "row_rules", "other")
+        p: Counter() for p in ("hard", "absent_branches", "flagged", "row_rules", "ownership", "other")
     }
     failing: dict[str, list[str]] = {}
     for r in records:

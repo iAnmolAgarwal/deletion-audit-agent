@@ -39,6 +39,18 @@ Fail-closed rules, each with its basis:
   records are in ``image_observations``) is neither a pending image nor a skip. A PNG whose
   reading failed, or that was never read, stays a :class:`FileFailure` and an unparsed dependency
   exactly as T8 says.
+* **Fix round 2 (T104, T105, T108, T112):** an unread dependency names its own kind
+  (MISSING_EVIDENCE_FILE, EVIDENCE_PARSE_ERROR, UNKNOWN_EVIDENCE_FAMILY, else UNPARSED_DEPENDENCY)
+  with a FAILED_DEPENDENCY flag per file (R11); a record whose own keys name a known person other
+  than the requester fails the row closed as OWN_KEY_CONFLICT (R04; ``discovery/links.py``); a state
+  that no rule covers is NO_CATEGORY_RULE, never a silent NO_STEP (T104 (a); T69 is unchanged,
+  since a hold that names no resource is not a record); a retained record whose state is not
+  PRESENT keeps VERIFY_RECORD_PRESENT, flagged PRESENT_CLAIM_OVER_STATE (T104 (b); DEV gold does
+  the same on 9 audit records); a record that would wait on an image (STATE_NEEDS_IMAGE) when the
+  images were read and no reading mentions it is IMAGE_OMITS_CATALOG_RECORD (T108, T112), and one
+  a reading shows with no visible state is IMAGE_STATE_NOT_SHOWN (T112 item 9: an omission
+  elsewhere never stands in for the screenshot the record waited on). Measured
+  on real data, replay-only: DEV and test output hashes unchanged (``notes/approved_output.json``).
 * **POST_AUDIT_ONLY_FINDING** (developer ruling T101 on red-team fixture R06): a FINDING whose
   record is held only by files captured after ``audit_at`` fails its row closed with its own
   reason and a ``POST_AUDIT_ONLY_FINDING`` flag naming the resource. Such a finding can cite no
@@ -250,15 +262,21 @@ def _failures(ctx: AuditContext, file_captured: Mapping[str, str]) -> tuple[File
     return tuple(out)
 
 
-def _unresolved_links(ident: IdentityResolution, ctx: AuditContext, window: Window) -> tuple[Link, ...]:
-    """T63: links of an unresolved request by its raw email and hash only (exact, own key first)."""
+def _unresolved_links(
+    ident: IdentityResolution, ctx: AuditContext, window: Window, own_keyed: frozenset[str] = frozenset()
+) -> tuple[Link, ...]:
+    """T63: links of an unresolved request by its raw email and hash only (exact, own key first).
+
+    T105, per record: a record that carries an own linkable key in any observation never links an
+    unresolved request by a trace lookup (its own key did not match the raw email, so it names
+    someone else or no one)."""
     ids: IdentifierSet = ident.identifiers
     out = []
     for o in list(ctx.index.observations()) + list(ctx.image_observations):
         own = [i for i in o.record_identifiers if is_own_key(i)]
         hit = next((i for i in o.record_identifiers if ids.matches(i)), None)
         basis: LinkBasis = "record_identifier"
-        if hit is None and not own and o.resource_id:
+        if hit is None and not own and o.resource_id and o.resource_id not in own_keyed:
             hit = next((i for i in o.lookup_identifiers if ids.matches(i)), None)
             basis = "trace_lookup"
         if hit is None:
@@ -324,7 +342,9 @@ def build_world(ctx: AuditContext) -> World:
         window = Window(r.requested_at, r.audit_at)
         ident = resolutions[r.case_id]
         case_links[r.case_id] = (
-            link_observations(ident, lindex, window, aliases) if ident.person else _unresolved_links(ident, ctx, window)
+            link_observations(ident, lindex, window, aliases)
+            if ident.person
+            else _unresolved_links(ident, ctx, window, lindex.own_keyed)
         )
     owners = dict(lindex.resource_persons)
     assignments = assign_primary_accounts(
@@ -344,7 +364,7 @@ def build_world(ctx: AuditContext) -> World:
     file_captured = {ref.file_id: ref.captured_at for ref in ctx.manifest}
     manifest_pos = {ref.file_id: i for i, ref in enumerate(ctx.manifest)}
     account_files = frozenset(o.file_id for o in ctx.index.observations() if o.system_id == "account_service")
-    validation = build_validation_context(ctx, catalog, aliases, file_captured)
+    validation = build_validation_context(ctx, catalog, aliases, file_captured, own_persons=lindex.own_persons)
     return World(
         ctx,
         people,
@@ -373,8 +393,11 @@ def build_validation_context(
     catalog: Sequence[CatalogLink],
     aliases: Sequence[AliasEvidence],
     file_captured: Mapping[str, str],
+    *,
+    own_persons: Mapping[str, frozenset[str]] | None = None,
 ) -> ValidationContext:
-    """The citable IDs with their times, and what each file contains, declares and lists."""
+    """The citable IDs with their times, what each file contains, declares and lists, and the
+    persons each record's own keys name (T105's validator check)."""
     citable = dict(file_captured)
     citable.update({a.activity_id: a.event_time for a in ctx.activity})
     citable.update({a.audit_id: a.event_time for a in ctx.audit_log})
@@ -403,6 +426,7 @@ def build_validation_context(
         file_aliases={k: frozenset(v) for k, v in file_aliases.items()},
         resource_aliases={k: tuple(sorted(v)) for k, v in res_aliases.items()},
         activity_resource={a.activity_id: a.resource_id for a in ctx.activity if a.resource_id},
+        resource_own_persons=dict(own_persons or {}),
     )
 
 
@@ -459,6 +483,9 @@ def audit_case(case_id: str, w: World, intent_for: IntentProvider) -> CaseRecord
     # --- unparsed dependencies (T8)
     structural = {f.file_id for f in w.failures if not f.png and timeutil.le(f.captured_at, audit_at)}
     pending_png = sorted(f.file_id for f in w.failures if f.png and timeutil.le(f.captured_at, audit_at))
+    read_png = sorted(
+        fid for fid in ctx.vision_read if fid in w.file_captured and timeutil.le(w.file_captured[fid], audit_at)
+    )
     case = choose_citation(
         links,
         audit_at,
@@ -471,6 +498,11 @@ def audit_case(case_id: str, w: World, intent_for: IntentProvider) -> CaseRecord
     deps: set[str] = set(structural)
     uninterpreted: list[str] = []
     post_audit_only: list[str] = []
+    no_rule: list[str] = []
+    image_omits: list[str] = []
+    image_no_state: list[str] = []
+    own_conflict: list[str] = []
+    mine = {ident.person} if ident.person else set()
     for rid in sorted(found):
         basis, hint = found[rid]
         system = _resource_system(rid, w, hint)
@@ -534,13 +566,63 @@ def audit_case(case_id: str, w: World, intent_for: IntentProvider) -> CaseRecord
         seen = sum(1 for o in obs if at_or_before(observation_time(o), audit_at)) + sum(
             1 for r in usable if r.kind == "alias"
         )
-        if decision.outcome == "NO_STEP" and seen:
+        if decision.outcome == "NO_STEP" and state.value is not None:
+            no_rule.append(rid)  # T104 (a): a state with no rule covering its category is never dropped silently
+            rflags.append(
+                Flag(
+                    "NO_CATEGORY_RULE",
+                    f"{rid}: state {state.value} but no rule covers category {cat.category} (system {system}); no step",
+                )
+            )
+        elif decision.outcome == "NO_STEP" and seen:
             uninterpreted.append(rid)
             rflags.append(
                 Flag(
                     "UNINTERPRETED_RECORD",
                     f"{rid}: {seen} reading(s) at or before audit_at give no step "
                     f"(state {state.value}, category {cat.category}, system {system})",
+                )
+            )
+        shown_in_image = any(o.locator.kind == "image" for o in obs)
+        if not usable and basis == "link_row" and read_png and not depends and shown_in_image:
+            # T112 item 9: the record would wait on an image, a reading shows it, but nothing visible on
+            # screen gives it a state; an omission elsewhere is no substitute for the screenshot it waited on
+            image_no_state.append(rid)
+            rflags.append(
+                Flag(
+                    "IMAGE_STATE_NOT_SHOWN",
+                    f"{rid}: waited on an image; the image(s) read show it with no visible state "
+                    f"(state {state.value}, {state.basis})",
+                )
+            )
+        if not usable and basis == "link_row" and read_png and not depends and not shown_in_image:
+            # T108, widened by T112 (G7 verifier finding 6): the record would wait on an image
+            # (STATE_NEEDS_IMAGE), the images were read, and no reading mentions it
+            image_omits.append(rid)
+            rflags.append(
+                Flag(
+                    "IMAGE_OMITS_CATALOG_RECORD",
+                    f"{rid}: waited on an image (no state at or before audit_at from other evidence); "
+                    f"{len(read_png)} image(s) read by the vision step do not show it",
+                )
+            )
+        if decision.outcome == "COMPLIANT" and decision.verification_op == "VERIFY_RECORD_PRESENT" and (
+            state.value != "PRESENT"
+        ):
+            rflags.append(  # T104 (b): the output step is kept (DEV gold does the same); the artifacts say so
+                Flag(
+                    "PRESENT_CLAIM_OVER_STATE",
+                    f"{rid}: retained ({cat.category}) gets VERIFY_RECORD_PRESENT while the derived state is "
+                    f"{state.value} ({state.basis})",
+                )
+            )
+        others = w.links.own_persons.get(rid, frozenset()) - mine
+        if others:
+            own_conflict.append(rid)  # T105: the record's own key belongs to another known person
+            rflags.append(
+                Flag(
+                    "OWN_KEY_CONFLICT",
+                    f"{rid}: its own keys name {len(others)} known person(s) other than the requester",
                 )
             )
         if system_from_prefix(rid) and system_from_prefix(rid) != system:
@@ -561,15 +643,27 @@ def audit_case(case_id: str, w: World, intent_for: IntentProvider) -> CaseRecord
         resources.append(ResourceFinding(key, basis, state, cat, decision, None, cite, tuple(rflags)))
         flags.extend(rflags)
     resources.sort(key=lambda r: (r.key.system_id, r.key.resource_id))
+    by_file = {f.file_id: f for f in w.failures}
+    dep_kinds = {fid: _failure_kind(by_file[fid]) for fid in sorted(deps) if fid in by_file}
+    for fid, kind in dep_kinds.items():
+        flags.append(Flag("FAILED_DEPENDENCY", f"{fid}: {kind} (parse status {by_file[fid].status})"))
     failed: FailedClosedReason | None = None
     if ident.person is None:
         failed = "IDENTITY_UNRESOLVED"
-    elif deps & {f.file_id for f in w.failures if f.missing}:
-        failed = "MISSING_EVIDENCE_FILE"  # T86 item 1: FAILED_CLOSED even with findings
+    elif own_conflict:
+        failed = "OWN_KEY_CONFLICT"  # T105: own keys name someone other than the requester
     elif deps:
-        failed = "UNPARSED_DEPENDENCY"  # T8/T86 item 1: an unread dependency fails the row closed
+        # T8/T86 item 1: an unread dependency fails the row closed, even with findings; the reason is
+        # the gravest kind among the row's dependencies, and each file has its own flag (T105, R11)
+        failed = next(k for k in _DEPENDENCY_REASONS if k in dep_kinds.values()) if dep_kinds else "UNPARSED_DEPENDENCY"
     elif post_audit_only:
         failed = "POST_AUDIT_ONLY_FINDING"  # T101 (R06): decided here, not left to the validator
+    elif no_rule:
+        failed = "NO_CATEGORY_RULE"  # T104 (a): a silent drop is how a COMPLETE row could hide a record
+    elif image_omits:
+        failed = "IMAGE_OMITS_CATALOG_RECORD"  # T108: the freeze check names it
+    elif image_no_state:
+        failed = "IMAGE_STATE_NOT_SHOWN"  # T112 item 9: a screenshot that shows nothing proves nothing
     elif uninterpreted:
         failed = "UNINTERPRETED_RECORD"  # module docstring: evidence the engine cannot read is no proof
     elif not any(r.decision.outcome in ("FINDING", "COMPLIANT") for r in resources):
@@ -605,6 +699,27 @@ def audit_case(case_id: str, w: World, intent_for: IntentProvider) -> CaseRecord
         failed_closed=failed,
     )
     return gate(record, w.validation)
+
+
+_DEPENDENCY_REASONS: tuple[FailedClosedReason, ...] = (
+    "MISSING_EVIDENCE_FILE",
+    "EVIDENCE_PARSE_ERROR",
+    "UNKNOWN_EVIDENCE_FAMILY",
+    "UNPARSED_DEPENDENCY",
+)
+
+
+def _failure_kind(f: FileFailure) -> FailedClosedReason:
+    """Why a dependency is unread (T105 on R11): a file the manifest names but the disk lacks, a file
+    on disk that failed to parse (``ERROR``, e.g. SQL that cannot run), a file no family sniffer
+    matched, or anything else not OK (``EMPTY``, ``AMBIGUOUS_FAMILY``, an image waiting for a model)."""
+    if f.missing:
+        return "MISSING_EVIDENCE_FILE"
+    if f.status == "ERROR":
+        return "EVIDENCE_PARSE_ERROR"
+    if f.status == "UNKNOWN_FAMILY":
+        return "UNKNOWN_EVIDENCE_FAMILY"
+    return "UNPARSED_DEPENDENCY"
 
 
 def _held_only_after(rid: str, obs: Sequence[Observation], w: World, audit_at: str) -> bool:

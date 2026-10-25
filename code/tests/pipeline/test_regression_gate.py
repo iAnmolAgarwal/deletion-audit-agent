@@ -29,7 +29,7 @@ from deletion_audit.pipeline import ModelSetup, RunSummary, run, run_vision
 
 from ..agent._support import C1, C2, DELETE_TEXT, KEEP_TEXT, PNG, answer, dataset, final_reply, tmpdir
 from ..engine_fixtures import case
-from ._wiring import approve, paid_setup, read_json, reading, seed_turn1, shown
+from ._wiring import approve, cases_jsonl, paid_setup, read_json, reading, seed_turn1, shown
 
 BASE = Row("INCOMPLETE", '[{"step_no":1}]')
 NA = Row("NOT_APPLICABLE", "[]")
@@ -40,9 +40,10 @@ GOOD_IMAGE = ImageFacts("ev_img", True, True, (IdFacts("data_flow_9", "data_flow
 
 def ev(after: Row, intent_only: Row, image_only: Row, both: Row, *, intent: bool = False,
        images: tuple[ImageFacts, ...] = (), labels: tuple[str | None, ...] = ("NOT_DELETION", "NOT_DELETION"),
-       intake: bool = True, waiting: tuple[str, ...] = (), supplied: tuple[str, ...] = ()) -> CaseEvidence:
+       intake: bool = True, waiting: tuple[str, ...] = (), supplied: tuple[str, ...] = (),
+       loop: str | None = "OK") -> CaseEvidence:
     return CaseEvidence("c", after, intent_only, image_only, both, intent, "NOT_DELETION" if intent else None,
-                        "MODEL" if intent else "FAILED_CLOSED", labels, intake, images, waiting, supplied)
+                        "MODEL" if intent else "FAILED_CLOSED", labels, intake, images, waiting, supplied, loop)
 
 
 class TestClassify(unittest.TestCase):
@@ -76,6 +77,15 @@ class TestClassify(unittest.TestCase):
 
 
 class TestVerdict(unittest.TestCase):
+    def test_intent_change_stops_when_the_agent_loop_failed(self) -> None:
+        """T109 (b): a FAILED loop (or an unknown loop status) never allows an intent change, even with
+        two agreeing NOT_DELETION turn-1 readings and an agreeing intake cross-check."""
+        for loop in ("FAILED", None):
+            got, why = verdict("intent", ev(NA, NA, BASE, NA, intent=True, loop=loop))
+            self.assertEqual(got, "stop", loop)
+            self.assertIn(f"agent loop status {loop} is not FAILED: False", why)
+        self.assertEqual(verdict("intent", ev(NA, NA, BASE, NA, intent=True, loop="FINALIZED_AT_CAP"))[0], "allowed")
+
     def test_intent_to_na_with_agreeing_replicates_and_crosscheck_is_allowed(self) -> None:
         self.assertEqual(verdict("intent", ev(NA, NA, BASE, NA, intent=True))[0], "allowed")
 
@@ -232,7 +242,10 @@ class TestEndToEnd(unittest.TestCase):
         self.assertFalse(producer["run_passed"])
         self.assertIn("1 changed row(s) marked stop", producer["refusal"])
 
-    def test_intent_change_stops_when_the_crosscheck_disagrees(self) -> None:
+    def test_crosscheck_disagreement_with_a_failed_extra_turn_keeps_the_engine_row(self) -> None:
+        """A+ poses INTENT_CROSSCHECK; its extra turn is a replay miss, so the loop FAILED. Before T109 the
+        committed NOT_DELETION stood and the row became NOT_APPLICABLE (the gate then stopped it); now
+        the row is the engine path without model intent, flagged AGENT_CALL_FAILED, so nothing changed."""
         d = dataset()
         d.activity = [a for a in d.activity if a["activity_id"] != "a_2"]  # Bo has no non-deletion intake row
         (self.tmp / "ds").mkdir(exist_ok=True)
@@ -240,12 +253,15 @@ class TestEndToEnd(unittest.TestCase):
         run(root, run_id="base", cases="test", runs_dir=self.runs, model=ModelSetup.replay(self.tmp / "emptycache"))
         record = approve(self.runs / "base" / "output.csv")
         seed_turn1(self.replies, KEEP_TEXT, [self.nd(), self.nd()])
-        # A+ poses INTENT_CROSSCHECK; its extra turn is a replay miss, so the committed label stands (G7a loop)
         s, gate = self.gated(root, record)
-        rows = [(r["case_id"], r["cause"], r["verdict"], r["intake_non_deletion"]) for r in gate["rows"]]
-        self.assertEqual(rows, [(C2, "intent", "stop", False)])
-        self.assertIn("intake_non_deletion: False", gate["rows"][0]["condition"])
-        self.assertFalse(s.passed)
+        self.assertEqual(gate["rows"], [])
+        self.assertTrue(s.passed)
+        self.assertEqual((self.runs / "gated" / "output.csv").read_bytes(),
+                         (self.runs / "base" / "output.csv").read_bytes())
+        bo = cases_jsonl(self.runs / "gated")[C2]
+        self.assertEqual(bo["agent"]["status"], "FAILED")
+        self.assertNotEqual(bo["status"], "NOT_APPLICABLE")
+        self.assertIn("AGENT_CALL_FAILED", {f["code"] for f in bo["flags"]})
 
     def vision(self, root: Path, r1: dict[str, Any], r2: dict[str, Any]) -> None:
         run_vision(root, run_id="vis", model=paid_setup(self.replies, [final_reply(r1), final_reply(r2)]),

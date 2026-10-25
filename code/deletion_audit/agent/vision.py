@@ -27,6 +27,12 @@ Rules, each with its basis:
 * **Observation fields** use the engine's own attribute names (``state/observe.py``), so the engine
   reads an image record exactly as it reads a parsed record. ``record_time`` is left empty: the
   state shown is the state at capture, so the engine falls back to the file's ``captured_at``.
+* **Only what is visibly on screen sets a state** (developer ruling T112 item 9, G7 verifier
+  finding 1): a reading records each record's redaction-style markers (``visible_markers``, such as
+  ``[REDACTED]``) and its status badge (``status_label``) verbatim. The markers pass to the engine as
+  ``visible_marker``; the badge is kept for review only (``status_label``) and maps to no state.
+  ``state/observe.py`` reads an image observation by its own rule: a record with no transcribed
+  subject, no visible state field and no marker gets no state, never a text default.
 * **Artifacts name IDs, states and flags only** (``artifacts.py`` rule): identifiers read from an
   image are written as a sha256 prefix of their normalized value plus a masked form.
 """
@@ -47,11 +53,21 @@ from ..engine import PNG_SIGNATURE, AuditContext
 from ..evidence.interpret import make_identifier, normalize_identifier
 from ..evidence.model import FileRef, Identifier, Locator, Observation
 from ..model import ModelCallFailed, ModelClient, ModelRequest, reply_text
+from ..model.request import canonical_json
 from .idshapes import IdCheck, IdShapes, check_id
 from .injection import detect_instruction_like
 from .params import EFFORT_VISION, MAX_TOKENS_VISION, MODEL
 from .prompting import load_prompt
-from .schemas import STATE_FIELDS, SUBJECT_FIELDS, VISION_SCHEMA, SchemaError, VisionReading, VisionRecord, parse_vision
+from .schemas import (
+    STATE_FIELDS,
+    SUBJECT_FIELDS,
+    VERBATIM_FIELDS,
+    VISION_SCHEMA,
+    SchemaError,
+    VisionReading,
+    VisionRecord,
+    parse_vision,
+)
 
 #: The value of each state field that keeps a finding (merge rule; module docstring).
 FINDING_VALUE: Mapping[str, str] = MappingProxyType(
@@ -91,6 +107,7 @@ class ReadAttempt:
     reading: VisionReading | None
     failure: str | None = None
     error_class: str | None = None
+    raw_sha256: str | None = None  # sha256 of canonical_json(reply.raw): tells a re-read from the original (T112 4(b))
 
 
 def read_once(png: bytes, client: ModelClient) -> ReadAttempt:
@@ -98,7 +115,8 @@ def read_once(png: bytes, client: ModelClient) -> ReadAttempt:
     req = vision_request(png)
     try:
         reply = client.call(req)
-        return ReadAttempt(req.key(), parse_vision(json.loads(reply_text(reply.raw) or "null")))
+        digest = hashlib.sha256(canonical_json(reply.raw).encode("utf-8")).hexdigest()
+        return ReadAttempt(req.key(), parse_vision(json.loads(reply_text(reply.raw) or "null")), raw_sha256=digest)
     except ModelCallFailed as exc:
         return ReadAttempt(req.key(), None, exc.reason, exc.error_class)
     except (SchemaError, ValueError) as exc:
@@ -148,6 +166,8 @@ def merge_records(shown_id: str, records: Sequence[VisionRecord]) -> VisionRecor
         restore_allowed=state("restore_allowed"),
         marked_deleted=state("marked_deleted"),
         download_available=state("download_available"),
+        visible_markers=tuple(sorted({m for r in records for m in r.visible_markers if m.strip()})),
+        status_label=" | ".join(sorted({r.status_label for r in records if r.status_label.strip()})),
     )
 
 
@@ -161,7 +181,7 @@ def compare_readings(a: VisionReading, b: VisionReading) -> tuple[str, ...]:
         ra, rb = merge_records(sid, ia[sid]), merge_records(sid, ib[sid])
         if len(ia[sid]) != len(ib[sid]):
             out.append(f"records[{sid}].count")
-        for name in (*SUBJECT_FIELDS, *STATE_FIELDS):
+        for name in (*SUBJECT_FIELDS, *STATE_FIELDS, *VERBATIM_FIELDS):
             if getattr(ra, name) != getattr(rb, name):
                 out.append(f"records[{sid}].{name}")
     if a.instruction_like_text != b.instruction_like_text:
@@ -204,6 +224,10 @@ def record_attrs(rec: VisionRecord) -> dict[str, str]:
         attrs["download_available"] = tri[rec.download_available]
     if rec.marked_deleted in tri:
         attrs["account_status"] = "DELETED" if rec.marked_deleted == "yes" else "ACTIVE"
+    if rec.visible_markers:
+        attrs["visible_marker"] = " | ".join(rec.visible_markers)
+    if rec.status_label:
+        attrs["status_label"] = rec.status_label  # review only: state/observe.py never reads it
     return attrs
 
 
@@ -392,6 +416,8 @@ def reading_report(reading: VisionReading | None) -> dict[str, Any] | None:
                 "shown_id": r.shown_id,
                 **{n: sorted(_sha12(_norm(n, v)) for v in getattr(r, n)) for n in SUBJECT_FIELDS},
                 **{n: getattr(r, n) for n in STATE_FIELDS},
+                "visible_markers": list(r.visible_markers),
+                "status_label": r.status_label,
             }
             for r in sorted(reading.records, key=lambda x: x.shown_id)
         ],
@@ -406,6 +432,7 @@ def image_report(rec: ImageReadRecord) -> dict[str, Any]:
         "file_id": rec.file_id,
         "status": rec.status,
         "reply_keys": [a.key for a in rec.attempts],
+        "reading_sha256": [a.raw_sha256 for a in rec.attempts],
         "readings": [reading_report(a.reading) for a in rec.attempts],
         "agree": rec.agree,
         "disagreements": list(rec.disagreements),
@@ -444,7 +471,7 @@ def _field_values(reading: VisionReading, path: str) -> str:
     return str(value)
 
 
-def review_markdown(run: VisionRun) -> str:
+def review_markdown(run: VisionRun, needs_review: Sequence[str] | None = None) -> str:
     """A short Markdown comparison of the two readings of every image, for the developer (T88 (1))."""
     lines = ["# Vision readings: two independent readings per image (T88)", "",
              "Identifiers are masked; the sha256 prefix shows whether two values are the same.", "",
@@ -463,17 +490,22 @@ def review_markdown(run: VisionRun) -> str:
             first = _field_values(a, path) if a is not None else "-"
             second = _field_values(b, path) if b is not None else "-"
             lines.append(f"| `{path}` | {first} | {second} | {used} |")
-    review = ", ".join(run.needs_review()) or "none"
+    review = ", ".join(needs_review if needs_review is not None else run.needs_review()) or "none"
     lines += ["", f"Needs the developer's review before a paid full run: {review}.", ""]
     return "\n".join(lines)
 
 
-def write_vision_artifacts(run_dir: Path, run: VisionRun) -> tuple[Path, Path]:
-    """Write ``vision_readings.json`` and ``vision_readings.md`` under ``run_dir``; return both paths."""
+def write_vision_artifacts(run_dir: Path, run: VisionRun,
+                           needs_review: Sequence[str] | None = None) -> tuple[Path, Path]:
+    """Write ``vision_readings.json`` and ``vision_readings.md`` under ``run_dir``; return both paths.
+
+    ``needs_review`` is the run's review list (the pipeline adds every image whose readings change a
+    row, T112 item 4 (b)); default: the failed or disagreeing images only."""
     run_dir.mkdir(parents=True, exist_ok=True)
     js = run_dir / "vision_readings.json"
     md = run_dir / "vision_readings.md"
-    body = {"images": [image_report(r) for r in run.records], "needs_review": list(run.needs_review())}
+    needs = list(needs_review) if needs_review is not None else list(run.needs_review())
+    body = {"images": [image_report(r) for r in run.records], "needs_review": needs}
     js.write_text(json.dumps(body, indent=1, sort_keys=True) + "\n", encoding="utf-8")
-    md.write_text(review_markdown(run), encoding="utf-8")
+    md.write_text(review_markdown(run, needs), encoding="utf-8")
     return js, md

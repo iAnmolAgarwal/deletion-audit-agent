@@ -24,13 +24,17 @@ Model options: ``--cache-dir`` (default ``cache/``), and for a paid command ``--
   environment (the transport reads it from there). The value is never printed, logged or written
   anywhere; an error message never quotes the file.
 * **``--write-root``** also writes the root ``output.csv`` and needs the developer's approval
-  (``../CLAUDE.md`` section 2).
+  (``../CLAUDE.md`` section 2). It turns the regression gate on, and the root file is written only
+  after the gate passes; a stopped run leaves it untouched (T112 item 10).
 * **``--set dev``** takes the 22 DEV IDs from ``code/evaluation/split.py``. A run that names a
   holdout case is refused by ``pipeline.run`` itself (exit 2). The CLI never passes the unlock.
 * **``--vision-ack``** names the vision run whose readings the developer reviewed; a paid full run
   with images that need review is refused without it (exit 4).
-* **``--regression-gate``** compares the output with the approved file in
-  ``notes/approved_output.json`` (T100, T101); a stop row or a refused baseline exits 5.
+* **The regression gate** compares the output with the approved file in
+  ``notes/approved_output.json`` (T100, T101); a stop row or a refused baseline exits 5. It is
+  mandatory whenever the model is on (``--paid``, or a replay that used a model reply) and with
+  ``--write-root``, with no opt-out (T112 item 11); ``--regression-gate`` only adds it to an
+  engine-only replay run.
 """
 
 from __future__ import annotations
@@ -184,7 +188,8 @@ def _main_run(argv: list[str], factory: TransportFactory | None) -> int:
     ap.add_argument("--dataset", default=str(REPO_ROOT / "dataset"))
     ap.add_argument("--mode", default="A+", choices=["A+", "A", "tools_off"])
     ap.add_argument("--vision-ack", help="the vision run ID whose readings the developer reviewed")
-    ap.add_argument("--regression-gate", action="store_true", help="diff the output against the approved file")
+    ap.add_argument("--regression-gate", action="store_true",
+                    help="also gate an engine-only replay run (always on when the model is on, or with --write-root)")
     ap.add_argument("--write-root", action="store_true", help="also write the root output.csv (needs approval)")
     _add_model_args(ap)
     a = ap.parse_args(argv)

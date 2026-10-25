@@ -7,7 +7,12 @@
   file or a malformed request row (T86), an unresolved identity (T63), a linked record whose
   evidence gives no step (UNINTERPRETED_RECORD, ``engine`` module docstring), a finding whose
   record only post-audit files hold (POST_AUDIT_ONLY_FINDING, developer ruling T101), nothing
-  found, or a row the validator refuses.
+  found, or a row the validator refuses. Fix round 2 adds: a parse error or an unknown family as
+  their own dependency reasons (EVIDENCE_PARSE_ERROR, UNKNOWN_EVIDENCE_FAMILY; T105 on R11), a
+  record whose own key names another known person (OWN_KEY_CONFLICT; T105 on R04), a state no
+  rule covers (NO_CATEGORY_RULE; T104 (a)), and a catalog-only record a read screenshot does not
+  show (IMAGE_OMITS_CATALOG_RECORD; T108, widened by T112), or shows with no visible state
+  (IMAGE_STATE_NOT_SHOWN; T112 item 9).
 * ``IntentDecision`` lives here until the model gate (G7) exists; G5's intent stage returns the
   fail-closed decision of T71 Q2: the engine's deletion-path row, flagged, never NOT_APPLICABLE.
 """
@@ -34,6 +39,12 @@ FailedClosedReason = Literal[
     "UNINTERPRETED_RECORD",
     "POST_AUDIT_ONLY_FINDING",
     "MISSING_EVIDENCE_FILE",
+    "EVIDENCE_PARSE_ERROR",
+    "UNKNOWN_EVIDENCE_FAMILY",
+    "OWN_KEY_CONFLICT",
+    "NO_CATEGORY_RULE",
+    "IMAGE_OMITS_CATALOG_RECORD",
+    "IMAGE_STATE_NOT_SHOWN",
     "IDENTITY_UNRESOLVED",
     "NOTHING_FOUND",
     "MALFORMED_REQUEST",

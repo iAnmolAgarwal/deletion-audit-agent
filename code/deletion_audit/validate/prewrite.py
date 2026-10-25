@@ -24,19 +24,26 @@ Citation content (T66 as amended by T71 Q3/Q4 and T77):
   citation meeting none is flagged and counted, never changed.
   ``OTHER_ABSENCE`` cited REDACTED / ANONYMIZED / DATA_FLOW_DISABLED / RESTORE_BLOCKED
   verifications: flag-and-count when the file does not contain the resource (T71 Q4).
+Ownership (developer ruling T105, main's safety net on red-team fixture R04):
+  ``OWN_KEY_OTHER_PERSON`` (hard) no step names a record whose own key belongs to a known person
+  other than the requester (``ValidationContext.resource_own_persons``, built from every
+  observation of the record, whatever the file or trace).
 ``FAILED_CLOSED`` (flag): the row is the enumerated fail-closed class (T71 Q5).
 
 :func:`gate` applies the result: a row with a hard failure keeps every step (a finding is never
-dropped), any citation that fails the evidence rules is blanked (a forbidden ID is never written),
-and the row becomes FAILED_CLOSED(VALIDATOR_REFUSED), status INCOMPLETE (a row already FAILED_CLOSED
-keeps its own reason).
+dropped), any citation that fails the evidence rules is blanked (a forbidden ID is never written;
+T105 on R06 adds ``HARD_CONTAINS``, so a file that does not hold the record is never written as its
+evidence), and the row becomes FAILED_CLOSED(VALIDATOR_REFUSED), status INCOMPLETE (a row already
+FAILED_CLOSED keeps its own reason). The gated row is validated again; its checks are the first
+pass plus only the failures the second pass finds anew, so a failure seen by both passes is counted
+once (T105 on R06).
 """
 
 from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Literal
 
 from .. import timeutil
@@ -79,6 +86,7 @@ class ValidationContext:
     file_aliases: Mapping[str, frozenset[str]]  # alias tokens a file names (T71 Q3)
     resource_aliases: Mapping[str, tuple[tuple[str, str], ...]]  # resource -> ((alias, catalog row time), ...)
     activity_resource: Mapping[str, str]  # activity_id -> resource_id
+    resource_own_persons: Mapping[str, frozenset[str]] = field(default_factory=dict)  # record -> own-key persons
 
     def contains(self, cited: str, resource_id: str, audit_at: str) -> bool:
         """The cited file (or activity row) holds the resource, directly or by a timely alias."""
@@ -145,6 +153,16 @@ def validate_row(record: CaseRecord, ctx: ValidationContext) -> tuple[CheckResul
         )
     for s in steps:
         _evidence_rules(out, s, status, audit_at, ctx)
+    requester = {record.identity.person} if record.identity.person else set()
+    for s in steps:
+        others = ctx.resource_own_persons.get(s.resource_id, frozenset()) - requester
+        _check(
+            out,
+            "OWN_KEY_OTHER_PERSON",
+            not others,
+            "the step's record has no own key of another known person",
+            s.step_no,
+        )
     if record.failed_closed is not None:
         _check(out, "FAILED_CLOSED", False, f"row is FAILED_CLOSED({record.failed_closed})", severity="flag")
     return tuple(out)
@@ -219,10 +237,16 @@ def gate(record: CaseRecord, ctx: ValidationContext) -> CaseRecord:
     bad = hard_failures(checks)
     if not bad:
         return replace(record, checks=checks)
-    blank = {c.step_no for c in bad if c.rule in ("EVIDENCE_EXISTS", "EVIDENCE_TIME") and c.step_no is not None}
+    blank = {
+        c.step_no
+        for c in bad
+        if c.rule in ("EVIDENCE_EXISTS", "EVIDENCE_TIME", "HARD_CONTAINS") and c.step_no is not None
+    }
     # the row becomes INCOMPLETE, whose verifications carry "" (T77 rule 1)
     steps = tuple(
         replace(s, evidence_id="") if s.step_no in blank or s.phase == "VERIFICATION" else s for s in record.steps
     )
     failed = replace(record, steps=steps, failed_closed=record.failed_closed or "VALIDATOR_REFUSED")
-    return replace(failed, checks=checks + validate_row(failed, ctx))
+    seen = {(c.rule, c.step_no) for c in checks if not c.ok}
+    again = tuple(c for c in validate_row(failed, ctx) if not c.ok and (c.rule, c.step_no) not in seen)
+    return replace(failed, checks=checks + again)

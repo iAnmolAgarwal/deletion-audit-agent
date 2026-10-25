@@ -5,8 +5,8 @@ from __future__ import annotations
 import unittest
 
 from deletion_audit.discovery.catalog import alias_evidence, catalog_links
-from deletion_audit.discovery.links import Window, build_link_index, link_observation, link_observations
-from deletion_audit.evidence.model import EvidenceIndex, FileParse, Observation
+from deletion_audit.discovery.links import LinkIndex, Window, build_link_index, link_observation, link_observations
+from deletion_audit.evidence.model import EvidenceIndex, FileParse, Identifier, Observation
 from deletion_audit.identity import build_people, email_hash, resolve_with
 from deletion_audit.identity.resolve import PeopleIndex
 from deletion_audit.inputs.model import IdentityRow
@@ -190,6 +190,94 @@ class Catalog(unittest.TestCase):
         page = obs(None, kind="pdf_page", ref="p1", family="pdf_text", file_id="ev_doc", text="Statement REF-0007-XY")
         found = alias_evidence(cat, index_of(page))
         self.assertEqual([(a.resource_id, a.file_id) for a in found], [("export_7", "ev_doc")])
+
+
+class OwnKeyPerRecord(unittest.TestCase):
+    """T105 (R04): the own-key rule per record, across all its observations, whatever the file or trace."""
+
+    def started(self, rid: str, file_id: str = "ev_1") -> Observation:
+        return obs(rid, file_id=file_id, ref="L1", lookup=[ident("email", ADA, "lookup_key")])
+
+    def completed(self, rid: str, *own: Identifier, file_id: str = "ev_1") -> Observation:
+        return obs(rid, file_id=file_id, ref="L2", record=list(own))
+
+    def linked(self, li: LinkIndex, person: str) -> dict[str, set[str]]:
+        out: dict[str, set[str]] = {}
+        for o, ol in li.by_person.get(person, ()):
+            out.setdefault(o.resource_id or "", set()).add(ol.basis)
+        return out
+
+    def test_namesakes_own_key_on_the_completed_line_beats_the_started_lines_lookup(self) -> None:
+        """Before: the started line linked account_3 to Ada by trace lookup."""
+        p = people()
+        li = build_link_index(index_of(self.started("account_3"),
+                                       self.completed("account_3",
+                                                      ident("user_id", "user_9002", "customer_reference"))),
+                              p, ())
+        self.assertNotIn("account_3", self.linked(li, "user_9001"))
+        self.assertEqual(self.linked(li, "user_9002"), {"account_3": {"record_identifier"}})
+        self.assertEqual(li.own_persons["account_3"], frozenset({"user_9002"}))
+        self.assertEqual(li.resource_persons["account_3"], frozenset({"user_9002"}))
+
+    def test_lookalike_own_key_belongs_to_no_one_and_still_blocks_the_lookup(self) -> None:
+        p = people()
+        li = build_link_index(index_of(self.started("search_2"),
+                                       self.completed("search_2",
+                                                      ident("email", "ada.jr@example.test", "correlation_key"))),
+                              p, ())
+        self.assertNotIn("search_2", self.linked(li, "user_9001"))
+        self.assertEqual(li.own_persons["search_2"], frozenset())
+        self.assertIn("search_2", li.own_keyed)
+
+    def test_own_key_in_another_file_blocks_the_lookup(self) -> None:
+        p = people()
+        li = build_link_index(index_of(self.started("account_3"),
+                                       self.completed("account_3", ident("email", BO), file_id="ev_2")), p, ())
+        self.assertNotIn("account_3", self.linked(li, "user_9001"))
+
+    def test_lookup_agreeing_with_the_own_key_still_links(self) -> None:
+        """R05 shape: the lookup line's person is the one the own key names, so the lookup link stays."""
+        p = people()
+        li = build_link_index(index_of(self.started("account_1"),
+                                       self.completed("account_1", ident("email", ADA), file_id="ev_2")), p, ())
+        self.assertEqual(self.linked(li, "user_9001"), {"account_1": {"trace_lookup", "record_identifier"}})
+
+    def test_record_with_no_own_key_anywhere_still_links_by_lookup(self) -> None:
+        p = people()
+        li = build_link_index(index_of(self.started("search_9"), obs("search_9", ref="L2")), p, ())
+        self.assertEqual(self.linked(li, "user_9001"), {"search_9": {"trace_lookup"}})
+        self.assertNotIn("search_9", li.own_keyed)
+
+    def test_link_observation_keyword_form(self) -> None:
+        p = people()
+        line = self.started("account_3")
+        self.assertEqual(link_observation(line, p, record_owners=frozenset({"user_9002"})), ())
+        self.assertEqual([x.basis for x in link_observation(line, p, record_owners=frozenset({"user_9001"}))],
+                         ["trace_lookup"])
+        self.assertEqual([x.basis for x in link_observation(line, p)], ["trace_lookup"])  # no own key anywhere
+
+    def test_no_lookup_link_ever_contradicts_a_records_own_keys(self) -> None:
+        """Seeded property test (Hypothesis is not installed): over random records spread across files
+        and lines, a person gets a trace_lookup link to a record only when the record has no own key or
+        its own keys name that person."""
+        import random
+
+        p = people()
+        keys = [ident("email", ADA), ident("email", BO), ident("email", "ada.jr@example.test", "correlation_key"),
+                ident("user_id", "user_9002", "customer_reference"), ident("email_hash", email_hash(ADA), "email_hash")]
+        for seed in range(200):
+            rng = random.Random(seed)
+            observations = []
+            for n in range(rng.randrange(2, 8)):
+                rid = f"account_{rng.randrange(3)}"
+                own = [rng.choice(keys)] if rng.random() < 0.4 else []
+                look = [ident("email", rng.choice((ADA, BO)), "lookup_key")] if rng.random() < 0.6 else []
+                observations.append(obs(rid, file_id=f"ev_{rng.randrange(2)}", ref=f"L{n}", record=own, lookup=look))
+            li = build_link_index(index_of(*observations), p, ())
+            for person, pairs in li.by_person.items():
+                for o, ol in pairs:
+                    if ol.basis == "trace_lookup" and o.resource_id in li.own_keyed:
+                        self.assertIn(person, li.own_persons[o.resource_id], seed)
 
 
 if __name__ == "__main__":

@@ -24,7 +24,7 @@ import unittest
 from pathlib import Path
 from typing import Any
 
-from deletion_audit.pipeline import RunSummary, run
+from deletion_audit.pipeline import ModelSetup, RunSummary, run
 from evaluation.coherence import Violation, check_file, load_evidence_index
 from evaluation.outputs import read_output
 
@@ -53,7 +53,9 @@ class Ran:
     def __init__(self, name: str) -> None:
         self.root = FIXTURES / name
         self._tmp = temp_dir()
-        self.summary: RunSummary = run(self.root, run_id="fx", cases="test", runs_dir=Path(self._tmp.name))
+        # an empty reply cache of its own: the test never replays the repo's cache (hermetic, replay-only)
+        self.summary: RunSummary = run(self.root, run_id="fx", cases="test", runs_dir=Path(self._tmp.name),
+                                       model=ModelSetup.replay(Path(self._tmp.name) / "replycache"))
         self.dir = Path(self._tmp.name) / "fx"
         self.output = (self.dir / "output.csv").read_bytes()
         self.cases = {c["case_id"]: c for c in map(json.loads, (self.dir / "cases.jsonl").read_text().splitlines())}

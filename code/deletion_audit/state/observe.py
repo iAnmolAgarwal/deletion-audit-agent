@@ -8,6 +8,23 @@ about the resource (a ``*_started`` line, a preview failure).
 State vocabulary (``notes/ARCHITECTURE_OPTIONS.md`` section 5): PRESENT, ABSENT, IDENTIFIABLE,
 ANONYMIZED, REDACTED, EXPOSED_PII (a tombstone still holding a direct identifier), FLOW_ENABLED,
 FLOW_DISABLED, RESTORABLE, RESTORE_BLOCKED.
+
+**Image observations** (locator kind ``image``, built by ``agent/vision.py``) have their own rule,
+:func:`image_state` (developer ruling T112 item 9, G7 verifier finding 1): only what is visibly on
+screen sets a state. A visible state field (sync, restore, download, deleted) is read as the text
+rules read it; a transcribed subject gives the system's "still holds the person" state (IDENTIFIABLE,
+EXPOSED_PII or PRESENT); REDACTED or ANONYMIZED comes only from a visible marker of the kind the text
+rules use (``[REDACTED]``, the support rule's literal, and its analytics counterpart ``[ANONYMIZED]``).
+With nothing transcribed and no marker the image gives no state: the support (REDACTED), analytics
+(ANONYMIZED) and tombstone (REDACTED) defaults below were written for text records and never apply
+to an image, because an untranscribed subject is not evidence of redaction. The visible status
+label is never read here (review only).
+
+**Backup rule F for images** (developer ruling T114 item 13): a backup whose state comes from an
+image reading is RESTORE_BLOCKED only on a visible cue (``restore_allowed`` shown ``no``, or a
+verbatim restore-block marker: a marker whose text says blocked or denied); with no visible cue it
+is RESTORABLE, an active restore path (REPORT_RESTORE_RISK, BLOCK_RESTORE, VERIFY_RESTORE_BLOCKED:
+DEV gold's backup pattern, two DEV cases). Backups whose state comes from text keep the text rules.
 """
 
 from __future__ import annotations
@@ -94,6 +111,8 @@ def observation_state(obs: Observation, system: str | None, person: IdentifierSe
 
     ``person`` is the case's identifier set: free-text PII counts only for them (T86 item 3).
     """
+    if obs.locator.kind == "image":
+        return image_state(obs, system)
     event = obs.event or ""
     if event.endswith("_started") or event in NO_STATE_EVENTS:
         return None
@@ -174,3 +193,58 @@ def observation_state(obs: Observation, system: str | None, person: IdentifierSe
     if system == "legal_service":
         return "PRESENT"
     return None
+
+
+#: Marker literal per system that lets an image show a cleaned record (module docstring).
+IMAGE_MARKERS: Mapping[str, tuple[str, str]] = {
+    "support_platform": ("[REDACTED]", "REDACTED"),
+    "identity_service": ("[REDACTED]", "REDACTED"),
+    "analytics_platform": ("[ANONYMIZED]", "ANONYMIZED"),
+}
+#: The state a transcribed subject gives, by system (the text rules' "still holds the person" state).
+IMAGE_SUBJECT_STATE: Mapping[str, str] = {
+    "analytics_platform": "IDENTIFIABLE",
+    "support_platform": "IDENTIFIABLE",
+    "identity_service": "EXPOSED_PII",
+    "account_service": "PRESENT",
+    "search_service": "PRESENT",
+    "export_service": "PRESENT",
+    "object_storage": "PRESENT",
+    "object_store": "PRESENT",
+    "marketing_platform": "PRESENT",
+    "security_service": "PRESENT",
+    "legal_service": "PRESENT",
+}
+_SUBJECT_KEYS = ("email", "phone", "name", "user_id", "requester_email", "requester_name", "requester_phone")
+
+
+def image_state(obs: Observation, system: str | None) -> str | None:
+    """The state an image observation shows: only what is visibly on screen (module docstring)."""
+    a = leaves(obs)
+    sysid = system or ""
+    if sysid == "integration_service" and "enabled" in a:
+        return "FLOW_ENABLED" if _true(a["enabled"]) else "FLOW_DISABLED"
+    if sysid == "backup_service":
+        if "restore_allowed" in a:
+            return "RESTORABLE" if _true(a["restore_allowed"]) else "RESTORE_BLOCKED"
+        return "RESTORE_BLOCKED" if restore_block_cue(a.get("visible_marker")) else "RESTORABLE"  # T114 rule F
+    if sysid == "export_service" and "download_available" in a:
+        return "PRESENT" if _true(a["download_available"]) else "ABSENT"
+    if sysid == "account_service" and "account_status" in a:
+        return "ABSENT" if a["account_status"].upper() == "DELETED" else "PRESENT"
+    if bool(obs.record_identifiers) or any(_set(a.get(k)) for k in _SUBJECT_KEYS):
+        return IMAGE_SUBJECT_STATE.get(sysid)
+    marker = IMAGE_MARKERS.get(sysid)
+    if marker is not None and marker[0] in (a.get("visible_marker") or ""):
+        return marker[1]
+    return None
+
+
+#: Words that make a verbatim marker a restore-block cue on a backup image (T114 item 13).
+RESTORE_BLOCK_WORDS: tuple[str, ...] = ("block", "denied")
+
+
+def restore_block_cue(marker: str | None) -> bool:
+    """A visible restore-block marker: its verbatim text says blocked or denied (case-insensitive)."""
+    text = (marker or "").lower()
+    return any(w in text for w in RESTORE_BLOCK_WORDS)

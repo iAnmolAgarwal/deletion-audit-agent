@@ -76,8 +76,9 @@ class RealInvariants(unittest.TestCase):
 SCRIPT = """
 import sys; sys.path.insert(0, {code!r})
 from pathlib import Path
-from deletion_audit.pipeline import run
-s = run(Path({ds!r}), run_id="det", cases="test", runs_dir=Path(sys.argv[1]))
+from deletion_audit.pipeline import ModelSetup, run
+s = run(Path({ds!r}), run_id="det", cases="test", runs_dir=Path(sys.argv[1]),
+        model=ModelSetup.replay(Path(sys.argv[1]) / "replycache"))  # hermetic: never the repo's reply cache
 print(s.output_sha256)
 """
 

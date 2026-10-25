@@ -171,6 +171,7 @@ class CaseEvidence:
     images: tuple[ImageFacts, ...] = ()
     waiting_resources: tuple[str, ...] = ()  # records flagged STATE_NEEDS_IMAGE in the image-free compile
     image_resources: tuple[str, ...] = ()  # records an involved image gave an observation for
+    loop_status: str | None = None  # the agent loop's status (OK, FINALIZED_AT_CAP, FAILED); None: not known
 
 
 def classify(ev: CaseEvidence) -> tuple[Cause, str]:
@@ -197,15 +198,18 @@ def classify(ev: CaseEvidence) -> tuple[Cause, str]:
 
 
 def _intent_condition(ev: CaseEvidence) -> tuple[bool, str]:
-    """T101 (2a)."""
+    """T101 (2a), plus T109 (b): the case's agent loop did not fail (a loop status that is FAILED, or
+    not known, never allows an intent change, whatever turn 1 said)."""
     parts = []
+    loop_ok = ev.loop_status is not None and ev.loop_status != "FAILED"
+    parts.append(f"agent loop status {ev.loop_status} is not FAILED: {loop_ok}")
     na = ev.after.status == "NOT_APPLICABLE" and ev.after.steps_json == "[]"
     parts.append(f"new row NOT_APPLICABLE with []: {na}")
     readings = ev.turn1_labels
     reps = len(readings) >= 2 and all(label == "NOT_DELETION" for label in readings)
     parts.append(f"turn-1 readings {list(readings)} all NOT_DELETION (at least 2): {reps}")
     parts.append(f"intake cross-check intake_non_deletion: {ev.intake_non_deletion}")
-    return na and reps and ev.intake_non_deletion, "; ".join(parts)
+    return loop_ok and na and reps and ev.intake_non_deletion, "; ".join(parts)
 
 
 def _image_condition(ev: CaseEvidence) -> tuple[bool, str]:

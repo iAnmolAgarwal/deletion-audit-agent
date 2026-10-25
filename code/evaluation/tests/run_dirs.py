@@ -39,6 +39,7 @@ def agent(**over: Any) -> dict[str, Any]:
         "steps_differ_when_applied": False,
         "status": "OK",
         "flags": [],
+        "replies": [],
     }
     base = copy.deepcopy(base)
     base.update(over)
@@ -73,11 +74,48 @@ def case(case_id: str, ag: Any = None, *, row_state: str = "VALID", failed_close
     return line
 
 
-def image(file_id: str, r1: Mapping[str, Any], r2: Mapping[str, Any], agree: bool, dis: Sequence[str],
-          rids: Sequence[tuple[str, str, bool, bool]] = ()) -> dict[str, Any]:
-    return {"file_id": file_id, "readings": [dict(r1), dict(r2)], "agree": agree, "disagreements": list(dis),
-            "flags": [], "resource_ids": [{"system_id": s, "resource_id": r, "well_formed": w, "named_elsewhere": n}
-                                          for s, r, w, n in rids]}
+STATES = ("sync_enabled", "restore_allowed", "marked_deleted", "download_available")
+SUBJECTS = ("subject_emails", "subject_phones", "subject_names", "subject_user_ids")
+
+
+def rrec(shown_id: str, *, emails: Sequence[str] = (), **states: str) -> dict[str, Any]:
+    """One record of a reading report (``vision.reading_report`` shape): hashed subjects, four states."""
+    out: dict[str, Any] = {"shown_id": shown_id, **{s: [] for s in SUBJECTS}, **{s: "not_shown" for s in STATES},
+                           "visible_markers": [], "status_label": ""}
+    out["subject_emails"] = sorted(emails)
+    out.update(states)
+    return out
+
+
+def rreading(*records: Mapping[str, Any], unreadable_count: int = 0, ilt: bool = False) -> dict[str, Any]:
+    """A reading report."""
+    return {"records": [dict(r) for r in records], "unreadable_count": unreadable_count, "instruction_like_text": ilt}
+
+
+def image(file_id: str, r1: Any, r2: Any, agree: bool | None, dis: Sequence[str],
+          rids: Sequence[tuple[str | None, str, bool, bool]] = (), *, status: str = "OK",
+          flags: Sequence[str] | None = None) -> dict[str, Any]:
+    """One vision.json item in the writer's shape (``vision.image_report``). A rid tuple is
+    (system_id, label, mapped, named_elsewhere); an unmapped label gets basis ``unrecognized``."""
+    readings = [] if r1 is ABSENT else [r1, r2]
+    return {"file_id": file_id, "status": status, "reply_keys": ["k" + str(i) for i in range(len(readings))],
+            "readings": readings, "agree": agree, "disagreements": list(dis),
+            "flags": list(flags) if flags is not None else (["VISION_READINGS_DISAGREE"] if dis else []),
+            "resource_ids": [{"system_id": s, "resource_id": r, "well_formed": w, "named_elsewhere": n,
+                              "shown_id": r, "basis": "shape" if w else "unrecognized",
+                              "named_by": ["evidence"] if n else []} for s, r, w, n in rids]}
+
+
+def agree_image(file_id: str = "evidence_04", label: str = "acct_1001") -> dict[str, Any]:
+    """A clean image: both readings show one mapped record marked deleted."""
+    r = rreading(rrec(label, marked_deleted="yes"))
+    return image(file_id, r, r, True, [], [("account_service", label, True, True)])
+
+
+def review_body(vision: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """vision_readings.json for ``vision``: the same items, and the failed or disagreeing file IDs."""
+    review = sorted(i["file_id"] for i in vision if i.get("status") != "OK" or i.get("agree") is False)
+    return {"images": [dict(i) for i in vision], "needs_review": review}
 
 
 def write_csv(path: Path, rows: Mapping[str, tuple[str, list[dict[str, Any]]]]) -> str:
@@ -94,7 +132,8 @@ def write_csv(path: Path, rows: Mapping[str, tuple[str, list[dict[str, Any]]]]) 
 def write_run(root: Path, run_id: str, rows: Mapping[str, tuple[str, list[dict[str, Any]]]],
               cases: Sequence[Mapping[str, Any]], *, vision: Any = (), skips: Sequence[str] = (),
               usage: Mapping[str, Any] | None = None, mode: str = "A+", producer: Any = None,
-              bad_hash: bool = False, fc_count: int | None = None) -> Path:
+              bad_hash: bool = False, fc_count: int | None = None, readings: Any = None,
+              calls: Sequence[Mapping[str, Any]] = ()) -> Path:
     """A run directory in the G5 artifact layout plus the agent fields under test."""
     d = root / run_id
     sha = write_csv(d / "output.csv", rows)
@@ -103,6 +142,11 @@ def write_run(root: Path, run_id: str, rows: Mapping[str, tuple[str, list[dict[s
             f.write(json.dumps(c) + "\n")
     if vision is not ABSENT:
         (d / "vision.json").write_text(json.dumps(list(vision)), encoding="utf-8")
+    body = review_body(list(vision)) if readings is None and vision is not ABSENT else readings
+    if body is not None and body is not ABSENT:
+        (d / "vision_readings.json").write_text(json.dumps(body), encoding="utf-8")
+    if calls:
+        (d / "calls.jsonl").write_text("".join(json.dumps(c) + "\n" for c in calls), encoding="utf-8")
     prod = {"evidence_failures": [], "evidence_skipped": list(skips), "evidence_skip_count": len(skips),
             "output_sha256": "0" * 64 if bad_hash else sha, "mode": mode}
     if producer is not None:

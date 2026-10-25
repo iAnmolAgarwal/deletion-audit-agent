@@ -116,8 +116,9 @@ class EndToEnd(unittest.TestCase):
         d.add_file("ev_bad", "records/bad.json", "2026-05-01T00:00:00Z", '{"snapshots": [ {"captured_at": 1}]}')
         tmp, ctx, recs = run_on(d, [C2])
         with tmp:
-            self.assertNotEqual(ctx.index.files["ev_bad"].status, "OK")
-            self.assertEqual((recs[C2].failed_closed, recs[C2].status), ("UNPARSED_DEPENDENCY", "INCOMPLETE"))
+            self.assertEqual(ctx.index.files["ev_bad"].status, "ERROR")
+            # T105 (R11): a file on disk that fails to parse has its own reason (before: UNPARSED_DEPENDENCY)
+            self.assertEqual((recs[C2].failed_closed, recs[C2].status), ("EVIDENCE_PARSE_ERROR", "INCOMPLETE"))
             self.assertIn("ev_bad", recs[C2].failed_dependencies)
             self.assertTrue(all(s.evidence_id == "" for s in recs[C2].steps))
 

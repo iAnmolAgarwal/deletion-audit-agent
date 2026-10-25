@@ -27,7 +27,7 @@ from evaluation import gold as gold_mod
 from evaluation import holdout_run as hr
 from evaluation import paths, split
 
-from .run_dirs import case, image, step, write_run
+from .run_dirs import agree_image, case, step, write_run
 
 HOLD: tuple[str, ...] = ("case_951", "case_952", "case_953")
 DEV: tuple[str, ...] = ("case_851", "case_852")
@@ -36,7 +36,7 @@ CAVEAT = "Synthetic caveat: this split was made after the answers were read; hol
 TAG = "freeze-20261025"
 FREEZE_RUN = "final-run-1"
 RUN_ID = "holdout-20261025T1500"
-AGREE = image("evidence_04", {"state": "DELETED"}, {"state": "DELETED"}, True, [])
+AGREE = agree_image()
 GIT_SETUP = ("-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false",
              "-c", "tag.gpgsign=false", "-c", "core.hooksPath=/dev/null")
 

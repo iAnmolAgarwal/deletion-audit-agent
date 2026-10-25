@@ -1,10 +1,11 @@
-"""freeze_check: refuses on each of its four counts separately, passes only when all are 0."""
+"""freeze_check: refuses on each blocking count separately, passes only when all are 0; T110 repeat stop."""
 from __future__ import annotations
 
 import contextlib
 import hashlib
 import io
 import json
+import shutil
 import tempfile
 import unittest
 from collections.abc import Iterator
@@ -16,11 +17,28 @@ from evaluation import freeze_check as fc_mod
 from evaluation import paths
 from evaluation.freeze_check import COUNTS, freeze_check
 
-from .run_dirs import ABSENT, agent, case, image, intent, step, write_run
+from .run_dirs import ABSENT, agent, agree_image, case, image, intent, rreading, rrec, step, write_run
 
 IDS = ["case_901", "case_902", "case_903"]
-AGREE = image("evidence_04", {"state": "DELETED"}, {"state": "DELETED"}, True, [])
-DISAGREE = image("evidence_09", {"state": "ACTIVE"}, {"state": "DELETED"}, False, ["state"])
+AGREE = agree_image()
+DISAGREE = image("evidence_09", rreading(rrec("acct_1002", sync_enabled="yes")),
+                 rreading(rrec("acct_1002", sync_enabled="no")), False, ["records[acct_1002].sync_enabled"],
+                 [("account_service", "acct_1002", True, True)])
+FAILED_IMG = image("evidence_12", rreading(rrec("acct_1003")), None, None, [], status="FAILED",
+                   flags=["VISION_READ_FAILED"])
+LABELS = image("evidence_14", rreading(rrec("CS-4821")), rreading(rrec("CS-4821")), True, [],
+               [(None, "CS-4821", False, False)], flags=["VISION_ID_UNRECOGNIZED"])
+
+
+def failed_agent(*keys: str) -> dict[str, Any]:
+    """An agent block whose conversation failed (T109 (c)): status FAILED, its request keys listed."""
+    return agent(status="FAILED", flags=["AGENT_CALL_FAILED"], replies=list(keys))
+
+
+def call(key: str, outcome: str, error_class: str | None = None, input_tokens: int | None = None) -> dict[str, Any]:
+    """One calls.jsonl event (the call log's field names)."""
+    return {"run_id": "x", "key": key, "event": "send", "attempt": 1, "outcome": outcome, "from_cache": False,
+            "error_class": error_class, "usage": {} if input_tokens is None else {"input_tokens": input_tokens}}
 
 
 def rows() -> dict[str, tuple[str, list[dict[str, Any]]]]:
@@ -94,6 +112,143 @@ class TestFreezeCheck(unittest.TestCase):
         res = self.check(vision=[AGREE, DISAGREE])
         self.assertEqual(self.failing(res), ["vision_unresolved_disagreements"])
         self.assertEqual(res["ids"]["vision_unresolved_disagreements"], ["evidence_09"])
+
+    def test_refuses_on_failed_vision_reading_with_its_reason(self) -> None:
+        res = self.check(vision=[AGREE, FAILED_IMG])
+        self.assertEqual(self.failing(res), ["vision_failed_readings"])
+        self.assertEqual(res["ids"]["vision_failed_readings"], ["evidence_12"])
+        self.assertIn("vision_failed_readings = 1 (e.g. evidence_12 [VISION_READ_FAILED])", res["refusals"])
+        self.assertEqual(res["counts"]["vision_unresolved_disagreements"], 0)  # a failure is not a disagreement
+
+    def test_disagreement_is_named_by_its_path(self) -> None:
+        res = self.check(vision=[DISAGREE])
+        self.assertIn("vision_unresolved_disagreements = 1 (e.g. evidence_09 [records[acct_1002].sync_enabled])",
+                      res["refusals"])
+
+    def test_unmapped_label_is_listed_and_does_not_block(self) -> None:
+        res = self.check(vision=[AGREE, LABELS])
+        self.assertTrue(res["passed"], res["refusals"])
+        self.assertEqual(res["vision_unmapped_labels"]["count"], 1)
+        self.assertEqual(res["vision_unmapped_labels"]["labels"], ["evidence_14:CS-4821"])
+        self.assertFalse(res["vision_unmapped_labels"]["blocks"])
+
+    # ---- T109 (c), T110: FAILED agent outcomes block; repeat failures stop for the developer ----
+    def test_failed_agent_case_blocks_and_is_listed_with_its_error_class(self) -> None:
+        cases = [case(c) for c in IDS]
+        cases[1] = case("case_902", failed_agent("k1", "k2"))
+        res = self.check(cases, calls=[call("k1", "ok", input_tokens=900), call("k2", "give_up", "APITimeoutError")])
+        self.assertFalse(res["passed"])
+        self.assertEqual(res["result"], "REFUSED")
+        self.assertEqual(res["counts"]["agent_failed_cases"], 1)
+        self.assertEqual(res["ids"]["agent_failed_cases"], ["case_902"])
+        self.assertIn("agent_failed_cases = 1 (e.g. case_902 [APITimeoutError])", res["refusals"])
+        self.assertTrue(any("re-run the same command" in r for r in res["refusals"]))
+        self.assertEqual(res["agent_failed"][0]["request_size"]["max_logged_input_tokens"], 900)
+
+    def test_record_flag_detail_gives_the_error_class(self) -> None:
+        cases = [case(c) for c in IDS]
+        cases[0] = case("case_901", failed_agent())
+        cases[0]["flags"] = [{"code": "AGENT_CALL_FAILED", "detail": "loop: TRANSPORT_GAVE_UP (RateLimitError)"}]
+        res = self.check(cases)
+        self.assertEqual(res["agent_failed"][0]["error_class"], "RateLimitError")
+        self.assertIsNone(res["agent_failed"][0]["request_size"]["max_logged_input_tokens"])
+
+    def test_failed_case_without_a_recorded_class_says_so(self) -> None:
+        cases = [case(c) for c in IDS]
+        cases[2] = case("case_903", failed_agent("k9"))
+        res = self.check(cases)
+        self.assertIn("agent_failed_cases = 1 (e.g. case_903 [not recorded])", res["refusals"])
+
+    def fail_runs(self, classes: list[str | None]) -> list[str]:
+        """One run per entry: case_902 FAILED with that error class (None: the case passes)."""
+        ids = []
+        for i, cls in enumerate(classes):
+            cases = [case(c) for c in IDS]
+            calls = []
+            if cls is not None:
+                cases[1] = case("case_902", failed_agent(f"t1-{i}", f"loop-{i}"))
+                calls = [call(f"t1-{i}", "ok", input_tokens=1200 + i), call(f"loop-{i}", "give_up", cls)]
+            write_run(self.runs, f"r{i}", rows(), cases, vision=[AGREE], calls=calls)
+            ids.append(f"r{i}")
+        d = self.runs / ids[-1]
+        self.approve(hashlib.sha256((d / "output.csv").read_bytes()).hexdigest())
+        return ids
+
+    def test_same_failure_on_two_reruns_in_a_row_stops_for_the_developer(self) -> None:
+        ids = self.fail_runs(["APITimeoutError"] * 3)
+        res = freeze_check(ids[-1], runs_root=self.runs, approved_record=self.approved, prior_run_ids=ids[:-1])
+        self.assertEqual(res["result"], "STOP-FOR-DEVELOPER")
+        self.assertFalse(res["passed"])
+        self.assertEqual(res["stop_for_developer"], [{
+            "case_id": "case_902", "error_class": "APITimeoutError", "runs": ["r0", "r1", "r2"],
+            "request_size": {"max_logged_input_tokens": 1202, "request_keys": 2,
+                             "basis": "cases.jsonl agent.replies x calls.jsonl usage.input_tokens"}}])
+        out = io.StringIO()
+        with self.patched(), contextlib.redirect_stdout(out):
+            status = fc_mod.main(["--run-id", "r2", "--prior-run-id", "r0", "--prior-run-id", "r1"])
+        self.assertEqual(status, fc_mod.EXIT_STOP)
+        text = out.getvalue()
+        self.assertIn("STOP-FOR-DEVELOPER", text)
+        self.assertIn("case case_902: error class APITimeoutError; request size 1202 input tokens", text)
+
+    def test_only_the_two_runs_just_before_count(self) -> None:
+        """Four runs, oldest first: the window is the last two priors, never the first two."""
+        timeout = "APITimeoutError"
+        for classes, stops in (([timeout, timeout, "RateLimitError", timeout], False),
+                               (["RateLimitError", timeout, timeout, timeout], True)):
+            ids = self.fail_runs(list(classes))
+            res = freeze_check(ids[-1], runs_root=self.runs, approved_record=self.approved, prior_run_ids=ids[:-1])
+            self.assertEqual(bool(res["stop_for_developer"]), stops, classes)
+            for d in self.runs.iterdir():
+                shutil.rmtree(d)
+
+    def test_no_stop_on_a_different_class_a_pass_between_or_too_few_runs(self) -> None:
+        cases: list[list[str | None]] = [["APITimeoutError", "RateLimitError", "APITimeoutError"],
+                                         ["APITimeoutError", None, "APITimeoutError"],
+                                         ["APITimeoutError", "APITimeoutError"]]
+        for classes in cases:
+            ids = self.fail_runs(classes)
+            res = freeze_check(ids[-1], runs_root=self.runs, approved_record=self.approved, prior_run_ids=ids[:-1])
+            self.assertEqual(res["stop_for_developer"], [], classes)
+            self.assertEqual(res["result"], "REFUSED", classes)  # still blocked: the FAILED case remains
+            self.assertEqual(res["ids"]["agent_failed_cases"], ["case_902"], classes)
+            for d in self.runs.iterdir():
+                shutil.rmtree(d)
+
+    def test_unreadable_prior_run_is_an_error_not_a_pass(self) -> None:
+        ids = self.fail_runs(["APITimeoutError"])
+        res = freeze_check(ids[-1], runs_root=self.runs, approved_record=self.approved, prior_run_ids=["missing-run"])
+        self.assertTrue(any("prior run missing-run" in e for e in res["errors"]))
+        self.assertFalse(res["passed"])
+
+    # ---- T112 4(a): an acknowledgement covering the image and both reading keys resolves it ----
+    def ack_check(self, acknowledged: Any) -> dict[str, Any]:
+        d = write_run(self.runs, "r1", rows(), [case(c) for c in IDS], vision=[AGREE, DISAGREE])
+        prod = json.loads((d / "producer.json").read_text(encoding="utf-8"))
+        prod["vision"] = {"review": {"ack_run_id": "vision-1", "acknowledged": acknowledged}}
+        (d / "producer.json").write_text(json.dumps(prod), encoding="utf-8")
+        self.approve(hashlib.sha256((d / "output.csv").read_bytes()).hexdigest())
+        return freeze_check("r1", runs_root=self.runs, approved_record=self.approved)
+
+    def test_acknowledged_disagreement_is_resolved(self) -> None:
+        res = self.ack_check([{"file_id": "evidence_09", "reply_keys": DISAGREE["reply_keys"]}])
+        self.assertTrue(res["passed"], res["refusals"])
+        self.assertEqual(res["counts"]["vision_unresolved_disagreements"], 0)
+        self.assertEqual(res["vision_acknowledged_disagreements"], ["evidence_09"])
+
+    def test_acknowledgement_for_another_reading_key_does_not_resolve(self) -> None:
+        res = self.ack_check([{"file_id": "evidence_09", "reply_keys": [DISAGREE["reply_keys"][0], "re-read"]}])
+        self.assertEqual(self.failing(res), ["vision_unresolved_disagreements"])
+        self.assertEqual(res["vision_acknowledged_disagreements"], [])
+
+    def test_acknowledgement_for_another_image_does_not_resolve(self) -> None:
+        res = self.ack_check([{"file_id": "evidence_04", "reply_keys": AGREE["reply_keys"]}])
+        self.assertEqual(self.failing(res), ["vision_unresolved_disagreements"])
+
+    def test_malformed_acknowledgement_leaves_the_count_not_computed(self) -> None:
+        res = self.ack_check([{"file_id": "evidence_09"}])
+        self.assertIsNone(res["counts"]["vision_unresolved_disagreements"])
+        self.assertFalse(res["passed"])
 
     def test_refuses_unchecked_run(self) -> None:
         res = self.check(bad_hash=True)

@@ -168,11 +168,70 @@ class RowRules(unittest.TestCase):
         self.assertIn("NA_EMPTY", failed_rules(validate_row(record(()), ctx())))  # a deletion row is never []
 
     def test_hard_failure_never_drops_a_finding(self) -> None:
+        """A finding is never dropped; since T105 (R06) its citation of a file that does not hold the
+        record is blanked (before: ``ev_sql`` was written although it holds only account_1)."""
         out = gate(record(finding_row("ev_sql")), ctx())
         self.assertEqual(out.failed_closed, "VALIDATOR_REFUSED")
         self.assertEqual([x.phase for x in out.steps], ["FINDING", "REMEDIATION", "VERIFICATION"])
-        self.assertEqual(out.steps[0].evidence_id, "ev_sql")
+        self.assertEqual(out.steps[0].evidence_id, "")
         self.assertEqual(out.status, "INCOMPLETE")
+
+
+class GateFixRound2(unittest.TestCase):
+    """T105 on R06 (citation blanking, one count) and on R04 (the ownership safety net)."""
+
+    def test_failed_hard_contains_citation_is_blanked_in_a_failed_closed_row(self) -> None:
+        """R06 shape: the row is already FAILED_CLOSED for its own reason; its finding cites a file that
+        does not contain the record. The citation is blanked, the step and the reason are kept."""
+        r = record(finding_row("ev_sql"), failed="POST_AUDIT_ONLY_FINDING")
+        out = gate(r, ctx())
+        self.assertEqual(out.failed_closed, "POST_AUDIT_ONLY_FINDING")
+        self.assertEqual([(x.phase, x.resource_id) for x in out.steps], [(x.phase, x.resource_id) for x in r.steps])
+        self.assertEqual({x.evidence_id for x in out.steps}, {""})
+        self.assertNotIn("ev_sql", {x.evidence_id for x in out.steps})
+
+    def test_a_failure_seen_by_both_passes_is_counted_once(self) -> None:
+        """Before: the gate kept both passes' results, so HARD_CONTAINS (and FAILED_CLOSED) counted twice."""
+        out = gate(record(finding_row("ev_sql"), failed="POST_AUDIT_ONLY_FINDING"), ctx())
+        failing = [(c.rule, c.step_no) for c in out.checks if not c.ok]
+        self.assertEqual(len(failing), len(set(failing)))
+        self.assertEqual(failing.count(("HARD_CONTAINS", 1)), 1)
+        self.assertEqual(failing.count(("FAILED_CLOSED", None)), 1)
+        self.assertIn(("T77_FINDING_CITES", 1), failing)  # the blanked finding, found by the second pass
+
+    def test_every_check_counted_once_on_random_gated_rows(self) -> None:
+        """Seeded property test (Hypothesis is not installed): whatever the citations, a gated row's
+        checks never repeat a (rule, step_no, ok) failure, and the gate never drops a step."""
+        import random
+
+        cites = ("ev_sql", "ev_late", "ev_pdf", "nowhere", "", "activity_5")
+        reasons: tuple[FailedClosedReason | None, ...] = (None, "POST_AUDIT_ONLY_FINDING", "UNPARSED_DEPENDENCY")
+        for seed in range(200):
+            rng = random.Random(seed)
+            steps = tuple(replace(x, evidence_id=rng.choice(cites)) for x in finding_row("ev_pdf"))
+            out = gate(record(steps, failed=rng.choice(reasons)), ctx())
+            failing = [(c.rule, c.step_no) for c in out.checks if not c.ok]
+            self.assertEqual(len(failing), len(set(failing)), seed)
+            self.assertEqual(len(out.steps), len(steps), seed)
+            if out.failed_closed is not None:
+                self.assertEqual(out.status, "INCOMPLETE", seed)
+
+    def test_step_on_another_persons_record_is_a_hard_failure(self) -> None:
+        """T105 safety net: the requester is user_9; a record whose own key names user_8 never gets a step."""
+        own = {"export_1": frozenset({"user_8"})}
+        got = validate_row(record(finding_row("ev_pdf")), ctx(resource_own_persons=own))
+        self.assertIn("OWN_KEY_OTHER_PERSON", {c.rule for c in hard_failures(got)})
+        both = {"export_1": frozenset({"user_8", "user_9"})}
+        got = validate_row(record(finding_row("ev_pdf")), ctx(resource_own_persons=both))
+        self.assertIn("OWN_KEY_OTHER_PERSON", {c.rule for c in hard_failures(got)})
+        out = gate(record(finding_row("ev_pdf")), ctx(resource_own_persons=own))
+        self.assertEqual((out.failed_closed, out.status, len(out.steps)), ("VALIDATOR_REFUSED", "INCOMPLETE", 3))
+
+    def test_step_on_the_requesters_own_record_passes(self) -> None:
+        mine = {"export_1": frozenset({"user_9"})}
+        got = validate_row(record(finding_row("ev_pdf")), ctx(resource_own_persons=mine))
+        self.assertEqual(failed_rules(got), set())
+        self.assertIn("OWN_KEY_OTHER_PERSON", {c.rule for c in got})  # it was checked
 
     def test_post_audit_citation_is_blanked_and_row_fails_closed(self) -> None:
         r = record((s(1, "VERIFICATION", "account_service", "account_1", "VERIFY_RECORD_ABSENT", "ABSENT", "ev_late"),))
@@ -253,6 +312,12 @@ class RowRules(unittest.TestCase):
             "UNPARSED_DEPENDENCY",
             "UNINTERPRETED_RECORD",
             "MISSING_EVIDENCE_FILE",
+            "EVIDENCE_PARSE_ERROR",
+            "UNKNOWN_EVIDENCE_FAMILY",
+            "OWN_KEY_CONFLICT",
+            "NO_CATEGORY_RULE",
+            "IMAGE_OMITS_CATALOG_RECORD",
+            "IMAGE_STATE_NOT_SHOWN",
             "IDENTITY_UNRESOLVED",
             "NOTHING_FOUND",
             "MALFORMED_REQUEST",

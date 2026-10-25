@@ -70,6 +70,18 @@ class Base(unittest.TestCase):
         self.addCleanup(env.stop)
         os.environ.pop(NAME, None)
 
+    def approve_engine_rows(self, dataset_dir: Path) -> None:
+        """Write the temp repo's ``notes/approved_output.json`` for the engine-only replay rows of
+        ``dataset_dir``: the regression gate is mandatory on a model-on run (T112 item 11), so a paid
+        run passes only when its rows equal these or change in an allowed way."""
+        from deletion_audit.pipeline import ModelSetup, run
+
+        base = run(dataset_dir, run_id="approved-base", cases="test", runs_dir=self.tmp / "baseline-rundirs",
+                   model=ModelSetup.replay(self.tmp / "baseline-replycache"))
+        (self.tmp / "notes").mkdir(exist_ok=True)
+        (self.tmp / "notes" / "approved_output.json").write_text(json.dumps({"approved_output": {
+            "run_id": "approved-base", "path": str(base.output_path), "sha256": base.output_sha256}}), encoding="utf-8")
+
     def env_file(self, *lines: str) -> Path:
         p = self.tmp / "fake_key.envfile"
         p.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -108,10 +120,13 @@ class TestPaidRun(Base):
         nd = final_reply(answer("NOT_DELETION", "Send me a copy of my data"))
         dr = final_reply(answer("DELETION_REQUEST", "delete my account", kind="full_deletion"))
         f = Factory([dr, nd])
+        self.approve_engine_rows(self.root)
         code, out, _ = run_cli(self.base_args("p1") + ["--paid", "--dollar-cap", "0.5", "--call-cap", "2",
                                                        "--mode", "tools_off"], f)
-        self.assertEqual((code, f.calls), (0, 1))
+        # the mandatory gate (T112 item 11) stops Bo's NOT_APPLICABLE row: one turn-1 reading, not two
+        self.assertEqual((code, f.calls), (cli.EXIT_GATE_STOP, 1))
         producer = read_json(self.runs / "p1" / "producer.json")
+        self.assertEqual((producer["regression_gate"]["mandatory"], producer["run_passed"]), (True, False))
         self.assertEqual(producer["budget"]["dollar_cap"], 0.5)
         self.assertEqual(producer["budget"]["call_cap"], 2)
         self.assertEqual(producer["budget"]["sends"], 2)
@@ -121,6 +136,7 @@ class TestPaidRun(Base):
     def test_call_cap_holds_across_the_command(self) -> None:
         dr = final_reply(answer("DELETION_REQUEST", "delete my account", kind="full_deletion"))
         f = Factory([dr, dr, dr])
+        self.approve_engine_rows(self.root)
         code, _, _ = run_cli(self.base_args("p2") + ["--paid", "--dollar-cap", "1", "--call-cap", "1",
                                                      "--mode", "tools_off"], f)
         self.assertEqual(code, 0)
@@ -134,6 +150,7 @@ class TestEnvFile(Base):
         dr = final_reply(answer("DELETION_REQUEST", "delete my account", kind="full_deletion"))
         f = Factory([dr, dr])
         envf = self.env_file("# a comment", "OTHER_SETTING=keep-out", f"export {NAME}=\"{FAKE_KEY}\"")
+        self.approve_engine_rows(self.root)
         code, out, err = run_cli(self.base_args("k1") + ["--paid", "--dollar-cap", "1", "--call-cap", "5",
                                                          "--mode", "tools_off", "--env-file", str(envf)], f)
         self.assertEqual(code, 0, err)
@@ -248,6 +265,7 @@ class TestRoutingAndVisionCommands(Base):
         run_routing_check(run_id="rc5", sources=["test"], model=paid_setup(self.replies, script), runs_dir=self.runs,
                           repo_root=repo)
         f = Factory([])
+        self.approve_engine_rows(repo / "dataset")
         code, _, _ = run_cli(["--run-id", "full", "--set", "test", "--dataset", str(repo / "dataset"), "--mode",
                               "tools_off", "--cache-dir", str(self.replies), "--runs-dir", str(self.runs)], f)
         self.assertEqual((code, f.calls), (0, 0))
@@ -287,7 +305,8 @@ class TestRoutingAndVisionCommands(Base):
                                 "--runs-dir", str(self.runs), "--paid", "--dollar-cap", "1", "--call-cap", "2"], f)
         self.assertEqual((code, f.transports[0].calls), (0, 2))
         rec = read_json(self.runs / "vc1" / "run.json")
-        self.assertEqual((rec["read_ok"], rec["needs_review"], rec["model_calls"]), (["ev_img"], [], 2))
+        # the reading changes Ada's row (an enabled flow), so the image is on the review list (T112 item 4 (b))
+        self.assertEqual((rec["read_ok"], rec["needs_review"], rec["model_calls"]), (["ev_img"], ["ev_img"], 2))
         for name in ("vision_readings.json", "vision_readings.md", "vision.json", "calls.jsonl", "usage.json"):
             self.assertTrue((self.runs / "vc1" / name).is_file(), name)
         f2 = Factory([])

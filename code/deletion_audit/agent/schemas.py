@@ -35,6 +35,10 @@ Tri = Literal["yes", "no", "not_shown", "unreadable"]
 TRI_VALUES: tuple[str, ...] = get_args(Tri)
 STATE_FIELDS: tuple[str, ...] = ("sync_enabled", "restore_allowed", "marked_deleted", "download_available")
 SUBJECT_FIELDS: tuple[str, ...] = ("subject_emails", "subject_phones", "subject_names", "subject_user_ids")
+#: Verbatim on-screen text a reading records per record (T112 item 9): redaction-style markers such as
+#: ``[REDACTED]`` (the only source of a REDACTED or ANONYMIZED state from an image) and the record's
+#: visible status label (a badge; stored for review only, it maps to no state).
+VERBATIM_FIELDS: tuple[str, ...] = ("visible_markers", "status_label")
 
 
 class SchemaError(ValueError):
@@ -108,8 +112,10 @@ VISION_SCHEMA: dict[str, Any] = {
                     "shown_id": {"type": "string"},
                     **{f: _strings() for f in SUBJECT_FIELDS},
                     **{f: _TRI for f in STATE_FIELDS},
+                    "visible_markers": _strings(),
+                    "status_label": {"type": "string"},
                 },
-                "required": ["shown_id", *SUBJECT_FIELDS, *STATE_FIELDS],
+                "required": ["shown_id", *SUBJECT_FIELDS, *STATE_FIELDS, *VERBATIM_FIELDS],
                 "additionalProperties": False,
             },
         },
@@ -209,6 +215,8 @@ class VisionRecord:
     restore_allowed: str
     marked_deleted: str
     download_available: str
+    visible_markers: tuple[str, ...] = ()  # verbatim markers such as "[REDACTED]" (T112 item 9)
+    status_label: str = ""  # verbatim status badge; review only, never a state (T112 item 9)
 
 
 @dataclass(frozen=True)
@@ -235,6 +243,8 @@ def parse_vision(value: Any) -> VisionReading:
                 restore_allowed=r["restore_allowed"],
                 marked_deleted=r["marked_deleted"],
                 download_available=r["download_available"],
+                visible_markers=tuple(r["visible_markers"]),
+                status_label=r["status_label"],
             )
             for r in value["records"]
         ),

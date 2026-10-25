@@ -77,7 +77,7 @@ def shown(shown_id: str, **state: str) -> dict[str, Any]:
     """One record of a reading: Ada as the subject, the given state fields, the rest ``not_shown``."""
     base = {"shown_id": shown_id, "subject_emails": [ADA], "subject_phones": [], "subject_names": [],
             "subject_user_ids": [], "sync_enabled": "not_shown", "restore_allowed": "not_shown",
-            "marked_deleted": "not_shown", "download_available": "not_shown"}
+            "marked_deleted": "not_shown", "download_available": "not_shown", "visible_markers": [], "status_label": ""}
     base.update(state)
     return base
 

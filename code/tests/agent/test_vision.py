@@ -27,7 +27,7 @@ def rec(shown_id: str, *, emails: tuple[str, ...] = (), sync: str = "not_shown",
     """One record of a vision reply."""
     return {"shown_id": shown_id, "subject_emails": list(emails), "subject_phones": [], "subject_names": [],
             "subject_user_ids": [], "sync_enabled": sync, "restore_allowed": restore, "marked_deleted": deleted,
-            "download_available": download}
+            "download_available": download, "visible_markers": [], "status_label": ""}
 
 
 def reading(*records: dict[str, Any], unreadable: tuple[str, ...] = (), instruction: bool = False) -> dict[str, Any]:
