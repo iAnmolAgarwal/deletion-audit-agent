@@ -45,6 +45,7 @@ Rebuilt at the developer's direction (turn 2026-10-25T00:08:45+05:30). Updated a
     3. G7 wiring (brief `g7wiring_brief.md`);
     4. the G7 verifier;
     5. stage 1 plus vision ($5, 170 sends);
+    - (T100: the wiring builds the model-on regression gate; main runs it on the mode-A run after stage 2. A row changed with no cause stops the run.)
     6. **stop** and show stage 1's results, the vision readings, the A+ re-projection and the R06 count.
 - **R06 count (T99 D), done at 11:40:**
   - **DEV gold:** all 29 FINDINGs cite a file captured at or before `audit_at` that holds the resource. 0 of 52 cited steps cite a post-audit file. Only 4 steps have the R06 shape, all VERIFICATION steps with `""` in INCOMPLETE rows.

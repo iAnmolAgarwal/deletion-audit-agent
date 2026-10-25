@@ -4724,3 +4724,26 @@ parent_agent=none
 worktree=main
 branch=main
 repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T11:45:10+05:30] T100: model-on regression gate added to the G7 wiring brief
+
+User Prompt (verbatim, secrets redacted):
+One addition to the G7 wiring brief: a model-on regression gate. After the mode-A run, diff its output.csv against the replay-only engine output (runs/g5-test-20261025T0530, sha256 cf2a90b0...). Every changed row must trace back to an intent answer or an image reading, with the case, the cause and the before/after status listed in the run artifacts. Any changed row without such a cause stops the run for my review. Expected: about the 10 non-deletion requests and the screenshot-dependent cases, nothing else.
+
+Time is not a factor.
+
+Agent Response Summary:
+Developer decision: a model-on regression gate becomes part of the G7 wiring (orch-builder-core, high, not yet launched; it starts after the G5 commit). I added a section to the wiring brief: diff against the hash-checked engine baseline, find each changed row's cause by recompiling with intent only and with images only, write the changed rows with case, cause and before/after status to the run artifacts, and stop on any unexplained row. It is recorded as T100.
+
+Actions:
+* scratchpad g7wiring_brief.md: new section "The model-on regression gate" (0 lines starting with "## ["), baseline sha256 cf2a90b070db785456b2cb26398add0eba95a69ae8a763eb838a367f135751fc read from runs/g5-test-20261025T0530/producer.json; tests listed for the causes intent, image, intent+image, unexplained (must stop) and the wrong-hash baseline.
+* notes/DECISIONS.md T100; TASKS.md. The G5 fix-round verifier is still running.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
