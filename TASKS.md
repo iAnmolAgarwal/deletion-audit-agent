@@ -36,7 +36,8 @@ Rebuilt at the developer's direction (turn 2026-10-25T00:08:45+05:30). Updated a
 - **Interview prep:** removed from the plan (T37). The developer will say how to prepare once the deliverables are ready.
 
 ## Agent queue (cap: 3 at once, T79; never two of the same type)
-- **Running:** G7a (`orch-builder-core`, high, T88), since about 05:57.
+- **Running:** G7a (`orch-builder-core`, high, T88), since about 05:57. G8 red team (`orch-redteam`, high, T94), since 06:21; brief at scratchpad `g8_redteam_brief.md`; fixtures in `code/tests/fixtures/redteam/`, committed before any engine run. GP ruff cleanup (`orch-builder`, medium, T94), since 06:21; brief at scratchpad `gp_ruff_brief.md`.
+- **G5 fix round:** starts when G7a **and** the ruff cleanup are both done (T94 sequencing note).
 - **Order (T90/T92):** G7a finishes → the G5 fix round → its verifier → G5 commit → G7a's wiring → the G7 verifier → routing check stage 1 → stage 2.
 - **Next, when G7a finishes (T90):** the G5 fix round (`orch-builder-core`, high, directed_by 2026-10-25T06:08:27+05:30); the brief is ready at scratchpad `g5fix_brief.md`. Then a fresh verifier on that diff (T90). **T93:** a PASS, or only findings below BLOCKER (which go on the G9 list), commits G5 without waiting; a BLOCKER stops for the developer.
 - **Done:** the G5 verifier (FIX, 05:56); G7b (06:09); the GM error-text fix (06:13).

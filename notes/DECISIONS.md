@@ -240,5 +240,11 @@ The full prep-era log (D1–D19) is in the kit at `../research/DECISIONS.md`. Th
 |---|---|---|
 | T93 | **The G5 fix round's verifier: commit without waiting, unless there is a BLOCKER.** If that verifier (T90) returns PASS, or only findings below BLOCKER, main commits G5 without stopping for the developer's reply. The non-BLOCKER findings go on the G9 list, as under T80. A BLOCKER still stops for the developer's reply. This applies to that one verdict. Every other verifier, judge or code-review verdict still stops for the developer's reply (../CLAUDE.md §1). | Developer, to save a round trip. |
 
+## Developer turn 2026-10-25T06:18:59+05:30
+
+| # | Decision | Reason given / basis |
+|---|---|---|
+| T94 | **The two free slots, alongside G7a,** directed_by 2026-10-25T06:18:59+05:30. **(1) G8 red team:** `orch-redteam` (high) builds adversarial fixtures in `code/tests/fixtures/redteam/`, under G5b's discipline: fictional data; expected rows derived by hand from the rules, citing the rule for each step; committed before any engine run on them; the engine's code never read. Coverage: negation and other non-deletion requests; other languages; prompt injection in the request text and in evidence; a look-alike decoy sharing a trace; evidence captured after `audit_at`; a replica that disagrees with the primary; a restore or sync path still active; a tombstone holding PII. At least 3 double as custom eval cases. It gates the G9 freeze run. **(2) GP's leftover ruff findings:** `orch-builder` (medium), `code/deletion_audit/evidence/**` only, with no change in behaviour; the parse summary, the raw-check report and the G5 DEV output hash stay unchanged. **(3)** The G5 fix round still waits for G7a (both `orch-builder-core`). *Main's sequencing note:* the G5 fix round also waits for the ruff cleanup, so the cleanup's DEV-hash comparison is not confounded by G5 edits. Case IDs for G8 start at `case_93001`. | Developer. |
+
 ## Organiser claims adopted
 (None yet. G1's `notes/CONTRACT_DRAFT.md` will propose them; each adoption is added here with its DEV evidence.)

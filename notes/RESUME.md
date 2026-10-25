@@ -2,7 +2,7 @@
 
 The durable state is in these files. Read them first after a compaction:
 - `TASKS.md`: gate status, the agent queue, the G9 list and the freeze checks.
-- `notes/DECISIONS.md`: T1–T93, every developer ruling.
+- `notes/DECISIONS.md`: T1–T94, every developer ruling.
 - `notes/INTERFACES.md`:
   - §7 is G5's engine, amended by T68–T77; §7.1 holds its **as-built signatures**, accepted under T87.
   - §8 is GM's model client.
@@ -31,11 +31,14 @@ Scratchpad below means `/private/tmp/claude-501/-Users-anmolagarwal-hackerrank-o
 - `code/evaluation/NUMBERS.md`: the scorer-hash note (T92).
 - Both G7b and the GM change wait for the G7 verifier.
 
-**Running:** G7a (`orch-builder-core`, high, directed_by 2026-10-25T05:49:46+05:30, brief at scratchpad `g7a_brief.md`).
+**Running (3, the cap):**
+- G7a: `orch-builder-core`, high, directed_by 2026-10-25T05:49:46+05:30, brief at scratchpad `g7a_brief.md`.
+- G8 red team: `orch-redteam`, high, directed_by 2026-10-25T06:18:59+05:30, brief at scratchpad `g8_redteam_brief.md`. On completion, check the fixtures, then commit `code/tests/fixtures/redteam/` before any engine run.
+- GP ruff cleanup: `orch-builder`, medium, same directed_by, brief at scratchpad `gp_ruff_brief.md`. On completion, check that the three baselines are unchanged.
 
 **Order (T90/T92), each step after the one before:**
 1. G7a finishes. Main checks its report, including its proposed wiring changes.
-2. The G5 fix round: `orch-builder-core`, high, directed_by 2026-10-25T06:08:27+05:30. The brief is at scratchpad `g5fix_brief.md`, and the repros at `g5fix_repros/`. It keeps T69 and adds the new fail-closed rule for records that cannot be interpreted.
+2. The G5 fix round, once G7a **and** the ruff cleanup are done: `orch-builder-core`, high, directed_by 2026-10-25T06:08:27+05:30. The brief is at scratchpad `g5fix_brief.md`, and the repros at `g5fix_repros/`. It keeps T69 and adds the new fail-closed rule for records that cannot be interpreted.
 3. A fresh verifier on that diff. **T93:** if it returns PASS or only findings below BLOCKER, commit G5 without waiting and put those findings on the G9 list. A BLOCKER stops for the developer's reply.
 4. G7a's wiring into `pipeline.py` and `artifacts.py`. `committed_key`/`final_key` must compare intent labels (T92).
 5. The G7 verifier: `orch-verifier`, high, directed_by 2026-10-25T06:15:34+05:30. Scope: G7a, G7b, the GM change and G7b's four details.

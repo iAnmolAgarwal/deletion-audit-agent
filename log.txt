@@ -4192,3 +4192,34 @@ parent_agent=none
 worktree=main
 branch=main
 repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T06:21:52+05:30] T94: G8 red team and GP ruff cleanup launched alongside G7a
+
+User Prompt (verbatim, secrets redacted):
+Use the two free slots now, alongside G7a (directed_by = this turn):
+
+1. G8 red team, orch-redteam (high): adversarial fixtures in their own folder (code/tests/fixtures/redteam/), with the same discipline as G5b: fictional data, and expected rows derived by hand from the rules, citing the rule for each step. Commit them before any engine runs on them, and never read the engine's code. Cover: negation and other non-deletion requests; requests in other languages; prompt injection in request text and in evidence; a look-alike decoy sharing a trace; evidence captured after audit_at; a replica that disagrees with the primary; a restore or sync path still active; a tombstone holding PII. At least 3 of them double as custom eval cases. It gates the G9 freeze run.
+
+2. GP's leftover ruff findings, orch-builder (medium): code/deletion_audit/evidence/** only, with no change in behaviour. The parse summary, the raw-check report and the G5 DEV output hash must stay unchanged.
+
+The G5 fix round still waits for G7a, since both are orch-builder-core.
+
+Time is not a factor.
+
+Agent Response Summary:
+Orchestration decisions (developer): orch-redteam (high) builds the G8 adversarial fixtures, gating the G9 freeze run, and orch-builder (medium) clears GP's leftover ruff findings in evidence/ with behaviour unchanged. Both are directed_by 2026-10-25T06:18:59+05:30 and run alongside G7a, filling the cap of 3. I added one sequencing guard: the G5 fix round waits for the ruff cleanup too, so the cleanup's DEV-hash check is not confounded by G5 edits. The G5 fix brief now keeps that round off the uncommitted red-team fixtures. The previous turn's commit was 261ba3c (T93).
+
+Actions:
+* Briefs at scratchpad g8_redteam_brief.md and gp_ruff_brief.md (0 lines starting with "## ["). The red team follows G5b's discipline, with case IDs from case_93001 (existing fixtures use 90101–91205), new and harder variants of F01–F11, at least 3 custom eval cases, and GP's parser run only. The ruff cleanup's baselines: ruff 8 errors and mypy clean today; parse_summary.py before and after; raw_check.py with git diff of notes/parser_raw_check.md empty; DEV output_sha256 641dbc8d… (g5-dev22-20261025T0530).
+* g5fix_brief.md: never read or run anything on code/tests/fixtures/redteam/; fixture tests name F02–F10, F11a and F11b explicitly.
+* Agents orch-redteam and orch-builder launched in the background.
+* notes/DECISIONS.md T94; TASKS.md; notes/RESUME.md.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
