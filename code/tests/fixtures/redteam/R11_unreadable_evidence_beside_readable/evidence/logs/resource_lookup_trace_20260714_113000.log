@@ -1,0 +1,14 @@
+2026-07-14T10:00:00Z level=INFO service=readback_collector event=export_started target_count=6 mode=point_in_time
+2026-07-14T10:03:00Z level=DEBUG service=account_service trace_id=rb-100300-001 event=profile_lookup_started resource_id=account_9310101 lookup_key=aurelio.penhallow@example.com
+2026-07-14T10:03:00Z level=INFO service=account_service trace_id=rb-100300-001 event=profile_lookup_completed resource_id=account_9310101 rows=0 http_status=404
+2026-07-14T10:03:30Z level=DEBUG service=security_service trace_id=rb-100330-002 event=audit_record_read_started resource_id=audit_record_9310102 lookup_key=user_931010
+2026-07-14T10:03:30Z level=INFO service=security_service trace_id=rb-100330-002 event=audit_record_read_completed resource_id=audit_record_9310102 rows=1 subject_reference=user_931010 event_code=ACCOUNT_DELETION_RECORDED retention_until=2033-12-31T23:59:59Z
+2026-07-14T10:07:00Z level=DEBUG service=account_service trace_id=rb-100700-003 event=profile_lookup_started resource_id=account_9310201 lookup_key=bettany.crewe@example.org
+2026-07-14T10:07:00Z level=INFO service=account_service trace_id=rb-100700-003 event=profile_lookup_completed resource_id=account_9310201 rows=0 http_status=404
+2026-07-14T10:07:30Z level=DEBUG service=security_service trace_id=rb-100730-004 event=audit_record_read_started resource_id=audit_record_9310202 lookup_key=user_931020
+2026-07-14T10:07:30Z level=INFO service=security_service trace_id=rb-100730-004 event=audit_record_read_completed resource_id=audit_record_9310202 rows=1 subject_reference=user_931020 event_code=ACCOUNT_DELETION_RECORDED retention_until=2033-12-31T23:59:59Z
+2026-07-14T10:11:00Z level=DEBUG service=account_service trace_id=rb-101100-005 event=profile_lookup_started resource_id=account_9310301 lookup_key=cyprian.lusk@example.net
+2026-07-14T10:11:00Z level=INFO service=account_service trace_id=rb-101100-005 event=profile_lookup_completed resource_id=account_9310301 rows=0 http_status=404
+2026-07-14T10:11:30Z level=DEBUG service=security_service trace_id=rb-101130-006 event=audit_record_read_started resource_id=audit_record_9310302 lookup_key=user_931030
+2026-07-14T10:11:30Z level=INFO service=security_service trace_id=rb-101130-006 event=audit_record_read_completed resource_id=audit_record_9310302 rows=1 subject_reference=user_931030 event_code=ACCOUNT_DELETION_RECORDED retention_until=2033-12-31T23:59:59Z
+2026-07-14T11:30:00Z level=INFO service=readback_collector event=export_completed queries=6 dropped=0

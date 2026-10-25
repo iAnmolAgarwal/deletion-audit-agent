@@ -1,0 +1,5 @@
+activity_id,event_time,event_type,source_system,target_system,resource_id,reported_result,details
+activity_930901,2026-07-14T10:30:00Z,CHECK_DATA_FLOW,deletion_worker,integration_service,data_flow_9308203,SUCCESS,Connector status check confirmed that data flow data_flow_9308203 remains enabled.
+activity_930902,2026-07-14T11:20:00Z,BLOCK_RESTORE,deletion_worker,backup_service,backup_9308102,SUCCESS,Policy action completed for backup_9308102.
+activity_930903,2026-07-14T11:25:00Z,DISABLE_DATA_FLOW,deletion_worker,integration_service,data_flow_9308103,SUCCESS,Policy action completed for data_flow_9308103.
+activity_930904,2026-07-16T06:00:00Z,SYNC_RECORD,integration_service,account_service,data_flow_9308203,SUCCESS,Active connector repopulated downstream resource account_9308299.

@@ -1,0 +1,16 @@
+{
+  "exported_at": "2026-07-14T11:40:00Z",
+  "source": "records_assurance_service",
+  "snapshots": [
+    {
+      "captured_at": "2026-07-14T11:40:00Z",
+      "data_store": "search_service",
+      "collection": "customer_search_documents",
+      "records": [
+        {
+          "resource_id": "search_9310303",
+          "index_name": "customer_directory_v3",
+          "document": {
+            "display_name": "Cyprian Lusk",
+            "email": "cyprian.lusk@example.net",
+            "customer_reference": "user_931030"

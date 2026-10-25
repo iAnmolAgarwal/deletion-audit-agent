@@ -1,0 +1,8 @@
+2026-07-14T10:00:00Z level=INFO service=readback_collector event=export_started target_count=3 mode=point_in_time
+2026-07-14T10:20:00Z level=DEBUG service=account_service trace_id=rb-102000-001 event=profile_lookup_started resource_id=account_9309101 lookup_key=imelda.rookwood@example.org
+2026-07-14T10:20:00Z level=INFO service=account_service trace_id=rb-102000-001 event=profile_lookup_completed resource_id=account_9309101 rows=0 http_status=404
+2026-07-14T10:24:00Z level=DEBUG service=account_service trace_id=rb-102400-002 event=profile_lookup_started resource_id=account_9309201 lookup_key=casimir.wrenfield@example.net
+2026-07-14T10:24:00Z level=INFO service=account_service trace_id=rb-102400-002 event=profile_lookup_completed resource_id=account_9309201 rows=0 http_status=404
+2026-07-14T10:28:00Z level=DEBUG service=account_service trace_id=rb-102800-003 event=profile_lookup_started resource_id=account_9309301 lookup_key=leopold.garnock@example.com
+2026-07-14T10:28:00Z level=INFO service=account_service trace_id=rb-102800-003 event=profile_lookup_completed resource_id=account_9309301 rows=0 http_status=404
+2026-07-14T11:30:00Z level=INFO service=readback_collector event=export_completed queries=3 dropped=0

@@ -1,0 +1,30 @@
+{
+  "exported_at": "2026-07-14T11:40:00Z",
+  "region": "global",
+  "service_exports": {
+    "backup_service": {
+      "restore_entries": [
+        {
+          "archive_key": "archive/customer-data/backup_9301502.tar.zst",
+          "customer_email": "maelys.tournemire@example.org",
+          "customer_reference": null,
+          "observed_at": "2026-07-14T11:20:00Z",
+          "resource_id": "backup_9301502",
+          "restore_allowed": true
+        }
+      ]
+    },
+    "security_service": {
+      "audit_records": [
+        {
+          "event_code": "SUBJECT_REQUEST_AUDITED",
+          "observed_at": "2026-07-14T11:05:00Z",
+          "resource_id": "audit_record_9301503",
+          "retention_until": "2033-12-31T23:59:59Z",
+          "subject_reference": "user_930150"
+        }
+      ]
+    }
+  },
+  "source": "records_assurance_gateway"
+}

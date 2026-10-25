@@ -1,0 +1,3 @@
+audit_id,user_id,event_time,field_name,old_value,new_value
+audit_930201,user_930110,2026-03-01T10:00:00Z,email,ines.v@example.net,ines.valcarcel@example.com
+audit_930202,user_930110,2026-03-01T10:00:00Z,email_hash,da599af5c773883526f5868f0dd393899fd1382edc6cdc63e75cea0061772634,65d22ec31cf122ebe8b7f8c73979435784992a619c586ca9c2e372830cbfc2c7

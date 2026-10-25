@@ -1,0 +1,35 @@
+{
+  "fixture": "R12_malformed_request_rows_v2",
+  "rulings": ["T86 (1)", "T87 (5)", "T51 (2)", "T71 Q5"],
+  "csv_records_in_file_order": [
+    {"case_id": "case_93111", "fields": 8},
+    {"case_id": "case_93112", "fields": 7, "email": "eamon.tregarth@example.org"},
+    {"case_id": "case_93112", "fields": 7, "email": "fenella.tregarth@example.org"},
+    {"case_id": "case_93113", "fields": 7, "note": "quoted request_text with an embedded newline (valid)"},
+    {"case_id": "case_93114", "fields": 7, "note": "reported_status=DONE"}
+  ],
+  "output": {"row_count": 4, "case_ids": ["case_93111", "case_93112", "case_93113", "case_93114"], "rows_for_case_93112": 1},
+  "valid_rows": {"case_93113": "equals its row in expected_partial.csv"},
+  "cases": {
+    "case_93111": {
+      "row_state": "FAILED_CLOSED",
+      "deletion_status": "INCOMPLETE",
+      "deletion_status_never": ["COMPLETE", "NOT_APPLICABLE"],
+      "failed_closed_reason": {"must_name_column": "(row)", "must_state": "the row has 8 fields where 7 are required", "must_not_contain_cell_value": true}
+    },
+    "case_93112": {
+      "status": "UNSETTLED (no ruling on duplicate case_id)",
+      "deletion_status_never": ["COMPLETE", "NOT_APPLICABLE"],
+      "leaning": "one FAILED_CLOSED row whose reason names the duplicate case_id"
+    },
+    "case_93114": {
+      "status": "UNSETTLED (out-of-enum reported_status)",
+      "deletion_status_never": ["NOT_APPLICABLE"],
+      "never_findings": true,
+      "acceptable": [
+        "FAILED_CLOSED naming the reported_status column",
+        "COMPLETE: VERIFY_RECORD_ABSENT account_service account_9311401 evidence_931201; VERIFY_RECORD_PRESENT security_service audit_record_9311402 evidence_931201"
+      ]
+    }
+  }
+}

@@ -1,0 +1,7 @@
+case_id,email,requested_at,reported_status,reported_at,audit_at,request_text
+case_93111,delphine.ashcombe@example.com,2026-07-12T08:00:00Z,COMPLETE,2026-07-13T02:00:00Z,2026-07-14T12:00:00Z,Please delete my account, and all of my personal data.
+case_93112,eamon.tregarth@example.org,2026-07-12T08:00:00Z,COMPLETE,2026-07-13T02:00:00Z,2026-07-14T12:00:00Z,Please delete my account and personal data.
+case_93112,fenella.tregarth@example.org,2026-07-12T08:00:00Z,COMPLETE,2026-07-13T02:00:00Z,2026-07-14T12:00:00Z,Please delete my account and personal data.
+case_93113,godric.hallam@example.net,2026-07-12T08:00:00Z,COMPLETE,2026-07-13T02:00:00Z,2026-07-14T12:00:00Z,"Please delete my account.
+Also remove any copies kept in backups or search."
+case_93114,hesper.vinnicombe@example.com,2026-07-12T08:00:00Z,DONE,2026-07-13T02:00:00Z,2026-07-14T12:00:00Z,Please delete my account and personal data.

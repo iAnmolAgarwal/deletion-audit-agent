@@ -1,0 +1,4 @@
+audit_id,user_id,event_time,field_name,old_value,new_value
+audit_931001,user_930910,2026-03-01T10:00:00Z,phone,+44 7700 900963,+44 7700 900962
+audit_931002,user_930930,2026-03-01T10:00:00Z,email,leo.garnock@example.org,leopold.garnock@example.com
+audit_931003,user_930930,2026-03-01T10:00:00Z,email_hash,a11989eaf47ac1932f8164a82f6bdb3a019735304ca42d100617e8de422858f6,09844199d47125e28fa83dd0f03fdbd2cc295e4fd9838c77b88a2418386b9245

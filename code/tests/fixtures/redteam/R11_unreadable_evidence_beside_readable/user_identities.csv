@@ -1,0 +1,4 @@
+user_id,name,email,phone,email_hash,updated_at
+user_931010,Aurelio Penhallow,aurelio.penhallow@example.com,+44 7700 900967,a482be46085cac62302db9418cdb22f5e614fab303c3291b62cd0a5675ff3b9f,2026-03-01T10:00:00Z
+user_931020,Bettany Crewe,bettany.crewe@example.org,+44 7700 900968,df599a7e7bd7e9810973fb1a520d49d77e23cd56f7471cec0ce261e54122c73e,2026-03-01T10:00:00Z
+user_931030,Cyprian Lusk,cyprian.lusk@example.net,+44 7700 900969,89c5063d0cbf0f316c45b69cd352c1ab72019d45dca5b1549a6e75da72b6334e,2026-03-01T10:00:00Z

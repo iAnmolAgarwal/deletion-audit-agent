@@ -1,0 +1,15 @@
+{
+  "exported_at": "2026-07-15T09:00:00Z",
+  "origin": "backup_compliance_service",
+  "record_count": 1,
+  "records": [
+    {
+      "recorded_at": "2026-07-15T08:30:00Z",
+      "system": "backup_service",
+      "resource_id": "backup_9302102",
+      "record_type": "BACKUP_ARCHIVE",
+      "result": "NOT_FOUND",
+      "subject_reference": "rosalind.kettleby@example.com"
+    }
+  ]
+}

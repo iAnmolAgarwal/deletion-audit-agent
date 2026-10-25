@@ -1,0 +1,2 @@
+activity_id,event_time,event_type,source_system,target_system,resource_id,reported_result,details
+activity_930501,2026-07-14T12:30:00Z,DELETE_RECORD,deletion_worker,search_service,search_9304102,SUCCESS,Policy action completed for search_9304102.

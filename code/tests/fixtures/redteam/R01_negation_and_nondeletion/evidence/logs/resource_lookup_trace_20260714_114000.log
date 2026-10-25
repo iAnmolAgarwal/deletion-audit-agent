@@ -1,0 +1,32 @@
+2026-07-14T10:00:00Z level=INFO service=readback_collector event=export_started target_count=7 mode=point_in_time
+2026-07-14T10:01:10Z level=DEBUG service=account_service trace_id=rb-100110-001 event=profile_lookup_started resource_id=account_9300101 lookup_key=corvin.ashgrove@example.com
+2026-07-14T10:01:10Z level=INFO service=account_service trace_id=rb-100110-001 event=profile_lookup_completed resource_id=account_9300101 rows=0 http_status=404
+2026-07-14T10:01:40Z level=DEBUG service=search_service trace_id=rb-100140-002 event=index_query_started resource_id=search_9300102 lookup_key=corvin.ashgrove@example.com
+2026-07-14T10:01:40Z level=INFO service=search_service trace_id=rb-100140-002 event=index_query_completed resource_id=search_9300102 result=hit total_hits=1 index=customer_directory_v3 email=corvin.ashgrove@example.com customer_reference=null
+2026-07-14T10:02:05Z level=DEBUG service=security_service trace_id=rb-100205-003 event=audit_record_read_started resource_id=audit_record_9300103 lookup_key=user_930010
+2026-07-14T10:02:05Z level=INFO service=security_service trace_id=rb-100205-003 event=audit_record_read_completed resource_id=audit_record_9300103 rows=1 subject_reference=user_930010 event_code=ACCOUNT_DELETION_RECORDED retention_until=2033-12-31T23:59:59Z
+2026-07-14T10:05:10Z level=DEBUG service=account_service trace_id=rb-100510-004 event=profile_lookup_started resource_id=account_9300201 lookup_key=dagny.wexford@example.org
+2026-07-14T10:05:10Z level=INFO service=account_service trace_id=rb-100510-004 event=profile_lookup_completed resource_id=account_9300201 rows=1 http_status=200 customer_reference=null email=dagny.wexford@example.org phone=null
+2026-07-14T10:05:40Z level=DEBUG service=security_service trace_id=rb-100540-005 event=audit_record_read_started resource_id=audit_record_9300202 lookup_key=user_930020
+2026-07-14T10:05:40Z level=INFO service=security_service trace_id=rb-100540-005 event=audit_record_read_completed resource_id=audit_record_9300202 rows=1 subject_reference=user_930020 event_code=ACCOUNT_DELETION_RECORDED retention_until=2033-12-31T23:59:59Z
+2026-07-14T10:09:10Z level=DEBUG service=account_service trace_id=rb-100910-006 event=profile_lookup_started resource_id=account_9300301 lookup_key=ferris.quillon@example.net
+2026-07-14T10:09:10Z level=INFO service=account_service trace_id=rb-100910-006 event=profile_lookup_completed resource_id=account_9300301 rows=1 http_status=200 customer_reference=null email=ferris.quillon@example.net phone=null
+2026-07-14T10:09:40Z level=DEBUG service=analytics_platform trace_id=rb-100940-007 event=analytics_profile_read_started resource_id=analytics_9300302 lookup_key=ferris.quillon@example.net
+2026-07-14T10:09:40Z level=INFO service=analytics_platform trace_id=rb-100940-007 event=analytics_profile_read_completed resource_id=analytics_9300302 customer_reference=null email=ferris.quillon@example.net phone=null email_hash=null audience_cohort=returning_customer
+2026-07-14T10:13:10Z level=DEBUG service=account_service trace_id=rb-101310-008 event=profile_lookup_started resource_id=account_9300401 lookup_key=ysolde.brannock@example.com
+2026-07-14T10:13:10Z level=INFO service=account_service trace_id=rb-101310-008 event=profile_lookup_completed resource_id=account_9300401 rows=1 http_status=200 customer_reference=null email=ysolde.brannock@example.com phone=null
+2026-07-14T10:13:40Z level=DEBUG service=search_service trace_id=rb-101340-009 event=index_query_started resource_id=search_9300402 lookup_key=ysolde.brannock@example.com
+2026-07-14T10:13:40Z level=INFO service=search_service trace_id=rb-101340-009 event=index_query_completed resource_id=search_9300402 result=hit total_hits=1 index=customer_directory_v3 email=ysolde.brannock@example.com customer_reference=null
+2026-07-14T10:17:10Z level=DEBUG service=account_service trace_id=rb-101710-010 event=profile_lookup_started resource_id=account_9300501 lookup_key=tamsin.gorewell@example.org
+2026-07-14T10:17:10Z level=INFO service=account_service trace_id=rb-101710-010 event=profile_lookup_completed resource_id=account_9300501 rows=1 http_status=200 customer_reference=null email=tamsin.gorewell@example.org phone=null
+2026-07-14T10:17:40Z level=DEBUG service=account_service trace_id=rb-101740-011 event=profile_lookup_started resource_id=account_9300511 lookup_key=briony.gorewell@example.org
+2026-07-14T10:17:40Z level=INFO service=account_service trace_id=rb-101740-011 event=profile_lookup_completed resource_id=account_9300511 rows=1 http_status=200 customer_reference=null email=briony.gorewell@example.org phone=null
+2026-07-14T10:21:10Z level=DEBUG service=account_service trace_id=rb-102110-012 event=profile_lookup_started resource_id=account_9300601 lookup_key=bertil.hanscombe@example.net
+2026-07-14T10:21:10Z level=INFO service=account_service trace_id=rb-102110-012 event=profile_lookup_completed resource_id=account_9300601 rows=0 http_status=404
+2026-07-14T10:21:40Z level=DEBUG service=security_service trace_id=rb-102140-013 event=audit_record_read_started resource_id=audit_record_9300602 lookup_key=user_930060
+2026-07-14T10:21:40Z level=INFO service=security_service trace_id=rb-102140-013 event=audit_record_read_completed resource_id=audit_record_9300602 rows=1 subject_reference=user_930060 event_code=ACCOUNT_DELETION_RECORDED retention_until=2033-12-31T23:59:59Z
+2026-07-14T10:25:10Z level=DEBUG service=account_service trace_id=rb-102510-014 event=profile_lookup_started resource_id=account_9300701 lookup_key=odalys.fenwright@example.com
+2026-07-14T10:25:10Z level=INFO service=account_service trace_id=rb-102510-014 event=profile_lookup_completed resource_id=account_9300701 rows=1 http_status=200 customer_reference=null email=odalys.fenwright@example.com phone=null
+2026-07-14T10:25:40Z level=DEBUG service=support_platform trace_id=rb-102540-015 event=support_ticket_read_started resource_id=support_9300702 lookup_key=odalys.fenwright@example.com
+2026-07-14T10:25:40Z level=INFO service=support_platform trace_id=rb-102540-015 event=support_ticket_read_completed resource_id=support_9300702 customer_reference=user_930070 requester_name="Odalys Fenwright" requester_email=odalys.fenwright@example.com requester_phone=null
+2026-07-14T11:40:00Z level=INFO service=readback_collector event=export_completed queries=15 dropped=0

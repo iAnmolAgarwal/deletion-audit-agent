@@ -1,0 +1,8 @@
+case_id,deletion_status,steps_json
+case_93001,INCOMPLETE,"[{""step_no"":1,""phase"":""FINDING"",""system_id"":""search_service"",""resource_id"":""search_9300102"",""operation"":""REPORT_REMAINING_RECORD"",""state"":""PRESENT"",""evidence_id"":""evidence_930101""},{""step_no"":2,""phase"":""REMEDIATION"",""system_id"":""search_service"",""resource_id"":""search_9300102"",""operation"":""DELETE_RECORD"",""state"":""ABSENT"",""evidence_id"":""""},{""step_no"":3,""phase"":""VERIFICATION"",""system_id"":""account_service"",""resource_id"":""account_9300101"",""operation"":""VERIFY_RECORD_ABSENT"",""state"":""ABSENT"",""evidence_id"":""""},{""step_no"":4,""phase"":""VERIFICATION"",""system_id"":""search_service"",""resource_id"":""search_9300102"",""operation"":""VERIFY_RECORD_ABSENT"",""state"":""ABSENT"",""evidence_id"":""""},{""step_no"":5,""phase"":""VERIFICATION"",""system_id"":""security_service"",""resource_id"":""audit_record_9300103"",""operation"":""VERIFY_RECORD_PRESENT"",""state"":""PRESENT"",""evidence_id"":""""}]"
+case_93002,NOT_APPLICABLE,[]
+case_93003,NOT_APPLICABLE,[]
+case_93004,NOT_APPLICABLE,[]
+case_93005,NOT_APPLICABLE,[]
+case_93006,COMPLETE,"[{""step_no"":1,""phase"":""VERIFICATION"",""system_id"":""account_service"",""resource_id"":""account_9300601"",""operation"":""VERIFY_RECORD_ABSENT"",""state"":""ABSENT"",""evidence_id"":""evidence_930101""},{""step_no"":2,""phase"":""VERIFICATION"",""system_id"":""security_service"",""resource_id"":""audit_record_9300602"",""operation"":""VERIFY_RECORD_PRESENT"",""state"":""PRESENT"",""evidence_id"":""evidence_930101""}]"
+case_93007,NOT_APPLICABLE,[]

@@ -1,0 +1,22 @@
+2026-07-14T10:00:00Z level=INFO service=readback_collector event=export_started target_count=6 mode=point_in_time
+2026-07-14T10:02:10Z level=DEBUG service=account_service trace_id=rb-100210-001 event=profile_lookup_started resource_id=account_9301101 lookup_key=ines.valcarcel@example.com
+2026-07-14T10:02:10Z level=INFO service=account_service trace_id=rb-100210-001 event=profile_lookup_completed resource_id=account_9301101 rows=1 http_status=200 customer_reference=null email=ines.valcarcel@example.com phone=null
+2026-07-14T10:02:40Z level=DEBUG service=security_service trace_id=rb-100240-002 event=audit_record_read_started resource_id=audit_record_9301102 lookup_key=user_930110
+2026-07-14T10:02:40Z level=INFO service=security_service trace_id=rb-100240-002 event=audit_record_read_completed resource_id=audit_record_9301102 rows=1 subject_reference=user_930110 event_code=ACCOUNT_DELETION_RECORDED retention_until=2033-12-31T23:59:59Z
+2026-07-14T10:06:10Z level=DEBUG service=account_service trace_id=rb-100610-003 event=profile_lookup_started resource_id=account_9301201 lookup_key=joaquim.lontra@example.org
+2026-07-14T10:06:10Z level=INFO service=account_service trace_id=rb-100610-003 event=profile_lookup_completed resource_id=account_9301201 rows=1 http_status=200 customer_reference=null email=joaquim.lontra@example.org phone=null
+2026-07-14T10:06:40Z level=DEBUG service=search_service trace_id=rb-100640-004 event=index_query_started resource_id=search_9301202 lookup_key=joaquim.lontra@example.org
+2026-07-14T10:06:40Z level=INFO service=search_service trace_id=rb-100640-004 event=index_query_completed resource_id=search_9301202 result=hit total_hits=1 index=customer_directory_v3 email=joaquim.lontra@example.org customer_reference=null
+2026-07-14T10:10:10Z level=DEBUG service=account_service trace_id=rb-101010-005 event=profile_lookup_started resource_id=account_9301301 lookup_key=sayo.kurobane@example.com
+2026-07-14T10:10:10Z level=INFO service=account_service trace_id=rb-101010-005 event=profile_lookup_completed resource_id=account_9301301 rows=0 http_status=404
+2026-07-14T10:10:40Z level=DEBUG service=security_service trace_id=rb-101040-006 event=audit_record_read_started resource_id=audit_record_9301302 lookup_key=user_930130
+2026-07-14T10:10:40Z level=INFO service=security_service trace_id=rb-101040-006 event=audit_record_read_completed resource_id=audit_record_9301302 rows=1 subject_reference=user_930130 event_code=ACCOUNT_DELETION_RECORDED retention_until=2033-12-31T23:59:59Z
+2026-07-14T10:14:10Z level=DEBUG service=account_service trace_id=rb-101410-007 event=profile_lookup_started resource_id=account_9301401 lookup_key=wendelin.abernoth@example.net
+2026-07-14T10:14:10Z level=INFO service=account_service trace_id=rb-101410-007 event=profile_lookup_completed resource_id=account_9301401 rows=1 http_status=200 customer_reference=null email=wendelin.abernoth@example.net phone=null
+2026-07-14T10:14:40Z level=DEBUG service=support_platform trace_id=rb-101440-008 event=support_ticket_read_started resource_id=support_9301402 lookup_key=wendelin.abernoth@example.net
+2026-07-14T10:14:40Z level=INFO service=support_platform trace_id=rb-101440-008 event=support_ticket_read_completed resource_id=support_9301402 customer_reference=user_930140 requester_name="Wendelin Abernoth" requester_email=wendelin.abernoth@example.net requester_phone=null
+2026-07-14T10:18:10Z level=DEBUG service=account_service trace_id=rb-101810-009 event=profile_lookup_started resource_id=account_9301501 lookup_key=maelys.tournemire@example.org
+2026-07-14T10:18:10Z level=INFO service=account_service trace_id=rb-101810-009 event=profile_lookup_completed resource_id=account_9301501 rows=0 http_status=404
+2026-07-14T10:22:10Z level=DEBUG service=account_service trace_id=rb-102210-010 event=profile_lookup_started resource_id=account_9301601 lookup_key=anvika.tellore@example.com
+2026-07-14T10:22:10Z level=INFO service=account_service trace_id=rb-102210-010 event=profile_lookup_completed resource_id=account_9301601 rows=1 http_status=200 customer_reference=null email=anvika.tellore@example.com phone=null
+2026-07-14T11:30:00Z level=INFO service=readback_collector event=export_completed queries=10 dropped=0

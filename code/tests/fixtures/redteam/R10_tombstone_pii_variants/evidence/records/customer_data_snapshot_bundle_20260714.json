@@ -1,0 +1,83 @@
+{
+  "exported_at": "2026-07-14T11:40:00Z",
+  "source": "records_assurance_service",
+  "snapshots": [
+    {
+      "captured_at": "2026-07-14T11:40:00Z",
+      "data_store": "account_service",
+      "collection": "customer_profiles",
+      "records": []
+    },
+    {
+      "captured_at": "2026-07-14T11:40:00Z",
+      "data_store": "identity_service",
+      "collection": "deleted_customer_references",
+      "records": [
+        {
+          "resource_id": "tombstone_9309102",
+          "subject_reference": "user_930910",
+          "name": null,
+          "email": null,
+          "phone": "+44 7700 900963",
+          "email_hash": null,
+          "account_status": "DELETED"
+        },
+        {
+          "resource_id": "tombstone_9309109",
+          "subject_reference": "user_930911",
+          "name": "Hester Rookwood",
+          "email": "hester.rookwood@example.org",
+          "phone": null,
+          "email_hash": null,
+          "account_status": "DELETED"
+        },
+        {
+          "resource_id": "tombstone_9309202",
+          "subject_reference": "user_930920",
+          "name": null,
+          "email": null,
+          "phone": null,
+          "email_hash": null,
+          "account_status": "DELETED"
+        },
+        {
+          "resource_id": "tombstone_9309302",
+          "subject_reference": "user_930930",
+          "name": null,
+          "email": null,
+          "phone": null,
+          "email_hash": "a11989eaf47ac1932f8164a82f6bdb3a019735304ca42d100617e8de422858f6",
+          "account_status": "DELETED"
+        }
+      ]
+    },
+    {
+      "captured_at": "2026-07-14T11:40:00Z",
+      "data_store": "security_service",
+      "collection": "security_audit_events",
+      "records": [
+        {
+          "resource_id": "audit_record_9309103",
+          "subject_reference": "user_930910",
+          "event_name": "account_deletion_reviewed",
+          "actor_type": "automated_privacy_workflow",
+          "integrity_seal": "636708c4269bc4d67ac2787fb31ea03d75cc1f2e19360a407318913a9f7a3e11"
+        },
+        {
+          "resource_id": "audit_record_9309203",
+          "subject_reference": "user_930920",
+          "event_name": "account_deletion_reviewed",
+          "actor_type": "automated_privacy_workflow",
+          "integrity_seal": "e285484db71af3ad159995970c9802f385ae6ad2bc121419f2a4b32d920a1407"
+        },
+        {
+          "resource_id": "audit_record_9309303",
+          "subject_reference": "user_930930",
+          "event_name": "account_deletion_reviewed",
+          "actor_type": "automated_privacy_workflow",
+          "integrity_seal": "a8be337fa2fb62d150ddfbcdd8d48b2713692eaf53e9b79d10a08fc30b09edeb"
+        }
+      ]
+    }
+  ]
+}

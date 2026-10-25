@@ -1,0 +1,3 @@
+user_id,name,email,phone,email_hash,updated_at
+user_930210,Rosalind Kettleby,rosalind.kettleby@example.com,+44 7700 900951,e1f3cb6d17cc4b46ac3b27781b87f84b902c11f2c9b4fedfc91e64736eb6b972,2026-03-01T10:00:00Z
+user_930220,Emrys Waddington,emrys.waddington@example.net,+44 7700 900952,71526cab4071b96012506ab9138b24ba8dcf228f6dd00c037655e742e93e9eb2,2026-03-01T10:00:00Z

@@ -1,0 +1,22 @@
+2026-07-14T10:00:00Z level=INFO service=readback_collector event=export_started target_count=10 mode=point_in_time
+2026-07-14T10:05:00Z level=DEBUG service=account_service trace_id=rb-100500-001 event=profile_lookup_started resource_id=account_9311101 lookup_key=delphine.ashcombe@example.com
+2026-07-14T10:05:00Z level=INFO service=account_service trace_id=rb-100500-001 event=profile_lookup_completed resource_id=account_9311101 rows=0 http_status=404
+2026-07-14T10:05:30Z level=DEBUG service=security_service trace_id=rb-100530-002 event=audit_record_read_started resource_id=audit_record_9311102 lookup_key=user_931110
+2026-07-14T10:05:30Z level=INFO service=security_service trace_id=rb-100530-002 event=audit_record_read_completed resource_id=audit_record_9311102 rows=1 subject_reference=user_931110 event_code=ACCOUNT_DELETION_RECORDED retention_until=2033-12-31T23:59:59Z
+2026-07-14T10:09:00Z level=DEBUG service=account_service trace_id=rb-100900-003 event=profile_lookup_started resource_id=account_9311201 lookup_key=eamon.tregarth@example.org
+2026-07-14T10:09:00Z level=INFO service=account_service trace_id=rb-100900-003 event=profile_lookup_completed resource_id=account_9311201 rows=0 http_status=404
+2026-07-14T10:09:30Z level=DEBUG service=security_service trace_id=rb-100930-004 event=audit_record_read_started resource_id=audit_record_9311202 lookup_key=user_931120
+2026-07-14T10:09:30Z level=INFO service=security_service trace_id=rb-100930-004 event=audit_record_read_completed resource_id=audit_record_9311202 rows=1 subject_reference=user_931120 event_code=ACCOUNT_DELETION_RECORDED retention_until=2033-12-31T23:59:59Z
+2026-07-14T10:13:00Z level=DEBUG service=account_service trace_id=rb-101300-005 event=profile_lookup_started resource_id=account_9311211 lookup_key=fenella.tregarth@example.org
+2026-07-14T10:13:00Z level=INFO service=account_service trace_id=rb-101300-005 event=profile_lookup_completed resource_id=account_9311211 rows=0 http_status=404
+2026-07-14T10:13:30Z level=DEBUG service=security_service trace_id=rb-101330-006 event=audit_record_read_started resource_id=audit_record_9311212 lookup_key=user_931121
+2026-07-14T10:13:30Z level=INFO service=security_service trace_id=rb-101330-006 event=audit_record_read_completed resource_id=audit_record_9311212 rows=1 subject_reference=user_931121 event_code=ACCOUNT_DELETION_RECORDED retention_until=2033-12-31T23:59:59Z
+2026-07-14T10:17:00Z level=DEBUG service=account_service trace_id=rb-101700-007 event=profile_lookup_started resource_id=account_9311301 lookup_key=godric.hallam@example.net
+2026-07-14T10:17:00Z level=INFO service=account_service trace_id=rb-101700-007 event=profile_lookup_completed resource_id=account_9311301 rows=0 http_status=404
+2026-07-14T10:17:30Z level=DEBUG service=security_service trace_id=rb-101730-008 event=audit_record_read_started resource_id=audit_record_9311302 lookup_key=user_931130
+2026-07-14T10:17:30Z level=INFO service=security_service trace_id=rb-101730-008 event=audit_record_read_completed resource_id=audit_record_9311302 rows=1 subject_reference=user_931130 event_code=ACCOUNT_DELETION_RECORDED retention_until=2033-12-31T23:59:59Z
+2026-07-14T10:21:00Z level=DEBUG service=account_service trace_id=rb-102100-009 event=profile_lookup_started resource_id=account_9311401 lookup_key=hesper.vinnicombe@example.com
+2026-07-14T10:21:00Z level=INFO service=account_service trace_id=rb-102100-009 event=profile_lookup_completed resource_id=account_9311401 rows=0 http_status=404
+2026-07-14T10:21:30Z level=DEBUG service=security_service trace_id=rb-102130-010 event=audit_record_read_started resource_id=audit_record_9311402 lookup_key=user_931140
+2026-07-14T10:21:30Z level=INFO service=security_service trace_id=rb-102130-010 event=audit_record_read_completed resource_id=audit_record_9311402 rows=1 subject_reference=user_931140 event_code=ACCOUNT_DELETION_RECORDED retention_until=2033-12-31T23:59:59Z
+2026-07-14T11:40:00Z level=INFO service=readback_collector event=export_completed queries=10 dropped=0

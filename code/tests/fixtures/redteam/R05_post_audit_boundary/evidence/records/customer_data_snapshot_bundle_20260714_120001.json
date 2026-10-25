@@ -1,0 +1,28 @@
+{
+  "exported_at": "2026-07-14T12:00:01Z",
+  "source": "records_assurance_service",
+  "snapshots": [
+    {
+      "captured_at": "2026-07-14T12:00:01Z",
+      "data_store": "search_service",
+      "collection": "customer_search_documents",
+      "records": []
+    },
+    {
+      "captured_at": "2026-07-14T12:00:01Z",
+      "data_store": "account_service",
+      "collection": "customer_profiles",
+      "records": [
+        {
+          "resource_id": "account_9304101",
+          "customer_reference": "user_930410",
+          "full_name": "Gideon Farrowby",
+          "email": "gideon.farrowby@example.com",
+          "phone": "+44 7700 900955",
+          "account_status": "ACTIVE",
+          "signup_channel": "referral"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "fixture": "R08_inventory_after_replica_copy",
+  "status": "citation UNSETTLED; status and steps settled by T54",
+  "cases": {
+    "case_93071": {
+      "deletion_status": "INCOMPLETE",
+      "steps_must_include": [
+        "FINDING REPORT_REMAINING_RECORD account_service account_9307101",
+        "FINDING REPORT_REMAINING_RECORD search_service search_9307102",
+        "VERIFICATION VERIFY_RECORD_PRESENT security_service audit_record_9307103"
+      ],
+      "steps_never": ["VERIFY_RECORD_ABSENT account_service account_9307101 in a COMPLETE row"],
+      "account_finding_evidence_id": {
+        "leaning": "evidence_930801 (T66 rule 1)",
+        "alternative": "evidence_930802 (R15-R14 one file per case)"
+      },
+      "search_finding_evidence_id": "evidence_930802"
+    }
+  }
+}

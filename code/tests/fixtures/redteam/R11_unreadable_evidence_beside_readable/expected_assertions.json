@@ -1,0 +1,26 @@
+{
+  "fixture": "R11_unreadable_evidence_beside_readable",
+  "rulings": ["T8", "T42", "T60", "T71 Q5", "T86 (1)", "T77 rule 1"],
+  "parse_statuses": {
+    "evidence_931101": "OK",
+    "evidence_931102": "ERROR (file not found)",
+    "evidence_931103": "ERROR (SQL could not be executed)",
+    "evidence_931104": "UNKNOWN_FAMILY (no family sniffer matched)"
+  },
+  "output": {"row_count": 3, "case_ids": ["case_93101", "case_93102", "case_93103"]},
+  "all_cases": {
+    "never_cite": ["evidence_931102", "evidence_931103", "evidence_931104"],
+    "never_verified_resources": ["support_9310203", "search_9310303"],
+    "deletion_status_never": ["COMPLETE", "NOT_APPLICABLE"],
+    "steps_allowed": [
+      "[]",
+      "VERIFY_RECORD_ABSENT account_service <own account> and VERIFY_RECORD_PRESENT security_service <own audit record>, both with evidence_id \"\""
+    ]
+  },
+  "cases": {
+    "case_93101": {"row_state": "FAILED_CLOSED", "reason_names_file": "evidence_931102", "note": "UNSETTLED dependency reading (i) asserted; see EXPECTED.md"},
+    "case_93102": {"row_state": "FAILED_CLOSED", "reason_names_file": "evidence_931103"},
+    "case_93103": {"row_state": "FAILED_CLOSED", "reason_names_file": "evidence_931104"}
+  },
+  "coherence": {"H03": "reported as hard for every FAILED_CLOSED row"}
+}
