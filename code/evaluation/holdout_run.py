@@ -69,6 +69,10 @@ if TYPE_CHECKING:
 # The caps for this run's paid calls (developer ruling T96 (3)). The only place they are named.
 HOLDOUT_DOLLAR_CAP: float = 1.00
 HOLDOUT_CALL_CAP: int = 60
+
+#: The vision run whose readings the developer acknowledged (T118a in code/docs/DECISIONS.md). A paid
+#: full run refuses screenshots that need review without it, and the holdout engine run is one.
+HOLDOUT_VISION_ACK: str = "pass1-vision-20261025T1323"
 HOLDOUT_MODE: str = "A+"
 
 FREEZE_TAG_RE: re.Pattern[str] = re.compile(r"freeze-[0-9]{8}", re.ASCII)
@@ -368,7 +372,7 @@ def pipeline_runner(*, dataset_dir: Path, run_id: str, cases: Sequence[str], phr
     engine: Callable[..., Any] = pipeline.run
     return engine(dataset_dir, run_id=run_id, cases=list(cases), mode=HOLDOUT_MODE, replay_only=False,
                   holdout_unlock=phrase, model=pipeline.ModelSetup.from_client(client), runs_dir=runs_dir,
-                  command=command)
+                  command=command, vision_ack=HOLDOUT_VISION_ACK)
 
 
 def _published(score: Mapping[str, Any]) -> dict[str, Any]:

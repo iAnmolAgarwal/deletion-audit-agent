@@ -369,7 +369,8 @@ class TestPipelineRunnerAndBudget(unittest.TestCase):
         self.assertEqual(args, (Path("/d"),))
         setup = kw.pop("model")
         self.assertEqual(kw, {"run_id": "holdout-x", "cases": ["case_952", "case_951"], "mode": "A+",
-                              "replay_only": False, "holdout_unlock": PHRASE, "runs_dir": Path("/r"), "command": "c"})
+                              "replay_only": False, "holdout_unlock": PHRASE, "runs_dir": Path("/r"), "command": "c",
+                              "vision_ack": hr.HOLDOUT_VISION_ACK})
         # the holdout client's wiring: same transport, the one $1/60 guard, its policy and log; paid
         self.assertIs(setup.transport, client.transport)
         self.assertIs(setup.budget, budget)
