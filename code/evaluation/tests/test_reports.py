@@ -471,5 +471,24 @@ class TestUsageNamespaces(unittest.TestCase):
         self.assertEqual(usage_report.REPLY_NAMESPACES, tuple(config.REPLY_NAMESPACES))
 
 
+class TestProjectLedgerCheck(unittest.TestCase):
+    """The project ledger check counts a send once per run folder, however many logs repeat it."""
+
+    def test_a_send_repeated_in_a_second_log_counts_once(self) -> None:
+        import json as _json
+        import tempfile
+        line = {"event": "send", "outcome": "ok", "run_id": "r1", "key": "a" * 64, "from_cache": False,
+                "error_class": None, "status": 200, "usage": {"input_tokens": 10, "output_tokens": 2},
+                "cost_usd": 0.5, "attempt": 1}
+        with tempfile.TemporaryDirectory() as tmp:
+            d = Path(tmp) / "r1"
+            d.mkdir()
+            (d / "calls.jsonl").write_text(_json.dumps(line) + "\n" + _json.dumps(line) + "\n")
+            (d / "holdout_calls.jsonl").write_text(_json.dumps(line) + "\n")
+            out = usage_report.project_ledger_check(Path(tmp), [("a" * 64, 0.5), ("a" * 64, 0.5)])
+        self.assertEqual(out["call_log_send_total_usd"], 1.0)  # two sends in one log; the second log repeats one
+        self.assertTrue(out["agree"])
+
+
 if __name__ == "__main__":
     unittest.main()

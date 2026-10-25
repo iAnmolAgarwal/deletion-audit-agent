@@ -384,13 +384,25 @@ def own_calls(calls: Sequence[Call], *, cache_root: Path, run_id: str) -> dict[s
 
 
 def project_ledger_check(runs_root: Path, ledger: Sequence[tuple[str, float]]) -> dict[str, Any]:
-    """Cross-check (3): the whole ledger against every send line in every run's call logs."""
+    """Cross-check (3): the whole ledger against every send line in every run's call logs.
+
+    A run folder can hold two logs of the same sends (the holdout run writes the pipeline's
+    ``calls.jsonl`` and its own client's ``holdout_calls.jsonl``), so within one folder each
+    identical send line counts at its largest multiplicity in any one log, never once per log.
+    Two identical sends in one log (a request sent once per reply namespace) still count twice."""
     total_sends = 0.0
     files = 0
+    by_dir: dict[Path, Counter[tuple[Any, ...]]] = {}
     for p in sorted(runs_root.glob(f"*/{CALL_LOG_GLOB}")):
         calls, _ = read_calls(p)
         files += 1
-        total_sends += sum(c.cost_usd for c in calls if c.event == "send")
+        sends = Counter((c.run_id, c.key, c.outcome, c.cost_usd, tuple(sorted(c.usage.items())))
+                        for c in calls if c.event == "send")
+        merged = by_dir.setdefault(p.parent, Counter())
+        for ident, n in sends.items():
+            merged[ident] = max(merged[ident], n)
+    for merged in by_dir.values():
+        total_sends += sum(ident[3] * n for ident, n in merged.items())
     led = round(sum(c for _, c in ledger), 9)
     return {"ledger_total_usd": led, "call_log_send_total_usd": round(total_sends, 9), "call_logs_read": files,
             "ledger_lines": len(ledger), "agree": _close(led, round(total_sends, 9))}
