@@ -72,12 +72,19 @@ class World:
         self.proposal = self.tmp / "PROPOSAL.md"
         self.proposal.write_text("# P\n\n## The limit, stated plainly\nFirst sentence. Second sentence. Third.\n",
                                  encoding="utf-8")
+        self.ledger = self.tmp / "notes" / "improvements.json"
+        self.ledger.parent.mkdir()
+        self.ledger.write_text(json.dumps({"entries": []}), encoding="utf-8")
+        self.publish_dir = self.tmp / "publish"
+        self.publish_dir.mkdir()
 
     def ctx(self) -> evaluation_report.Context:
         return evaluation_report.Context(runs_root=self.runs, gold_path=self.gold, fixtures_root=self.fixtures,
                                          split_json=self.split, decisions_md=self.decisions,
                                          holdout_proposal_md=self.proposal, cache_root=self.cache,
-                                         access_log=self.runs / "HOLDOUT_ACCESS.log", test_ids=frozenset())
+                                         access_log=self.runs / "HOLDOUT_ACCESS.log", test_ids=frozenset(),
+                                         improvements_json=self.ledger, repo_root=self.tmp,
+                                         publish_dir=self.publish_dir, test_runner=lambda ids, root: {})
 
     def dev_run(self, run_id: str, **kw: Any) -> Path:
         """A DEV run: gold's answers except case_01 gets an extra step and case_02 a wrong status."""
@@ -334,6 +341,22 @@ class TestUsageAttribution(Base):
         self.assertAlmostEqual(a["total"]["cost_settled_usd"], 0.038, places=9)
         self.assertAlmostEqual(a["total"]["cost_repriced_usd"], 0.038, places=9)
         self.assertEqual(usage_report.failures_found(u), [])
+
+    def test_totals_and_per_request_averages(self) -> None:
+        a = self.usage_of()["a_replies_used"]
+        # (a) input 1000+5000+1000+500 = 7500, output 800+1000+300+200 = 2300, total 9800, over 4 replies:
+        #     1875.0 in, 575.0 out, 2450.0 total; $0.038 / 4 = $0.0095
+        self.assertEqual(a["total"]["total_tokens"], 9800)
+        self.assertEqual(a["per_reply"]["total_tokens"], 2450.0)
+        self.assertAlmostEqual(a["per_reply"]["cost_usd"], 0.0095, places=9)
+        u = self.usage_of()
+        rows = {f: v for f, v, _ in usage_report.organiser_rows(u)}
+        self.assertIn("(a) total 9800; 1875.0 input, 575.0 output, 2450.0 total tokens and $0.009500 per reply",
+                      rows["Total and average tokens per request"])
+        # (b) one successful send of 500 in + 200 out, at $0.003
+        self.assertIn("(b) total 700; 500.0 input, 200.0 output, 700.0 total tokens and $0.003000 per successful "
+                      "send", rows["Total and average tokens per request"])
+        self.assertIn("(b) the run made 2 send attempts (1 returned a reply) and 4 cache reads", rows["Model calls"])
 
     def test_own_calls(self) -> None:
         b = self.usage_of()["b_own_calls"]

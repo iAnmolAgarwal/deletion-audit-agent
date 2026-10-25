@@ -1,0 +1,320 @@
+{
+  "comment": "Ledger for evaluation_report.md section 11 (T111, T113). Paths, anchors, T-numbers, commits, run IDs and test names only; the generator (code/evaluation/improvements.py) quotes, checks and runs everything. PENDING = fix not committed yet (fix round 2 / vision-adapter working tree); main fills in the commit.",
+  "entries": [
+    {
+      "id": "I01",
+      "failure": {
+        "kind": "verifier",
+        "path": "notes/verify/g5_verify.md",
+        "anchor": "**1. MAJOR:"
+      },
+      "fix": {
+        "ruling": "T90",
+        "commit": "5819121",
+        "clause": "**(2) G5:**"
+      },
+      "evidence": {
+        "test": "code/tests/pipeline/test_fixtures.py::ExactFixtures.test_output_equals_expected_byte_for_byte"
+      }
+    },
+    {
+      "id": "I02",
+      "failure": {
+        "kind": "verifier",
+        "path": "notes/verify/g5_verify.md",
+        "anchor": "**2. MAJOR:"
+      },
+      "fix": {
+        "ruling": "T90",
+        "commit": "5819121",
+        "clause": "**(2) G5:**"
+      },
+      "evidence": {
+        "test": "code/tests/validate/test_prewrite.py::test_complete_engine_row_with_a_remediation_added_fails"
+      }
+    },
+    {
+      "id": "I03",
+      "failure": {
+        "kind": "verifier",
+        "path": "notes/verify/g5_verify.md",
+        "anchor": "**3. MAJOR:"
+      },
+      "fix": {
+        "ruling": "T90",
+        "commit": "5819121",
+        "clause": "**(2) G5:**"
+      },
+      "evidence": {
+        "test": "code/tests/pipeline/test_request_rows.py::test_clash_is_an_issue_in_each_file_at_its_line"
+      }
+    },
+    {
+      "id": "I04",
+      "failure": {
+        "kind": "verifier",
+        "path": "notes/verify/g5_verify.md",
+        "anchor": "**4. MAJOR:"
+      },
+      "fix": {
+        "ruling": "T90",
+        "commit": "5819121",
+        "clause": "**(2) G5:**"
+      },
+      "evidence": {
+        "test": "code/tests/pipeline/test_request_rows.py::test_only_the_ruled_shape_is_readable"
+      }
+    },
+    {
+      "id": "I05",
+      "failure": {
+        "kind": "verifier",
+        "path": "notes/verify/g5_verify.md",
+        "anchor": "**5. MAJOR:"
+      },
+      "fix": {
+        "ruling": "T90",
+        "commit": "5819121",
+        "clause": "**(2) G5:**"
+      },
+      "evidence": {
+        "test": "code/tests/pipeline/test_uninterpreted.py::test_unknown_system_record_fails_closed"
+      }
+    },
+    {
+      "id": "I06",
+      "failure": {
+        "kind": "review",
+        "path": "log.txt",
+        "anchor": "2026-10-25T11:34:00+05:30",
+        "line": "C. Remove the read_output unlock path"
+      },
+      "fix": {
+        "ruling": "T99",
+        "commit": "64e203f",
+        "clause": "**C:**"
+      },
+      "evidence": {
+        "test": "code/evaluation/tests/test_gold_identity_guard.py::test_read_output_has_no_unlock_route"
+      }
+    },
+    {
+      "id": "I07",
+      "failure": {
+        "kind": "review",
+        "path": "log.txt",
+        "anchor": "2026-10-25T12:38:50+05:30",
+        "line": "1. calls_only: drop it."
+      },
+      "fix": {
+        "ruling": "T107",
+        "commit": "2e7af6c",
+        "clause": "**(1) `calls_only`: drop it.**"
+      },
+      "evidence": {
+        "test": "code/evaluation/tests/test_reports.py::test_usage_run_without_output_is_refused"
+      }
+    },
+    {
+      "id": "I08",
+      "failure": {
+        "kind": "redteam",
+        "path": "code/tests/fixtures/redteam/R06_preaudit_line_in_postaudit_file/EXPECTED.md",
+        "anchor": "# R06:",
+        "line": "case_93051's row is FAILED_CLOSED",
+        "case": "case_93051"
+      },
+      "fix": {
+        "ruling": "T101",
+        "commit": "4dcd719",
+        "clause": "**R06 approved:**"
+      },
+      "evidence": {
+        "test": "code/tests/pipeline/test_redteam_wired.py::TestR06PostAuditOnlyFinding.test_expected_assertions_hold"
+      }
+    },
+    {
+      "id": "I09",
+      "failure": {
+        "kind": "redteam",
+        "path": "notes/agent_reports/g8_engine_run.md",
+        "anchor": "**2. R06 case_93051:",
+        "case": "case_93051"
+      },
+      "fix": {
+        "ruling": "T105",
+        "commit": "227a866",
+        "clause": "**(2\u20135) Approved as proposed:**"
+      },
+      "evidence": {
+        "test": "code/tests/validate/test_prewrite.py::test_failed_hard_contains_citation_is_blanked_in_a_failed_closed_row"
+      }
+    },
+    {
+      "id": "I10",
+      "failure": {
+        "kind": "redteam",
+        "path": "notes/agent_reports/g8_engine_run.md",
+        "anchor": "**1. R04 case_93031:",
+        "case": "case_93031"
+      },
+      "fix": {
+        "ruling": "T105",
+        "commit": "227a866",
+        "clause": "**(1) R04:**"
+      },
+      "evidence": {
+        "test": "code/tests/pipeline/test_fix_round2.py::OwnKeyPerRecord.test_namesakes_live_account_gets_no_step"
+      }
+    },
+    {
+      "id": "I11",
+      "failure": {
+        "kind": "review",
+        "path": "log.txt",
+        "anchor": "2026-10-25T12:06:11+05:30",
+        "line": "(a) a record whose system has no category mapping"
+      },
+      "fix": {
+        "ruling": "T104",
+        "commit": "227a866",
+        "clause": "**(a)**"
+      },
+      "evidence": {
+        "test": "code/tests/pipeline/test_fix_round2.py::NoCategoryRule.test_record_with_a_state_but_no_rule_fails_closed"
+      }
+    },
+    {
+      "id": "I12",
+      "failure": {
+        "kind": "review",
+        "path": "log.txt",
+        "anchor": "2026-10-25T12:06:11+05:30",
+        "line": "(b) A retained record"
+      },
+      "fix": {
+        "ruling": "T104",
+        "commit": "227a866",
+        "clause": "**(b)**"
+      },
+      "evidence": {
+        "test": "code/tests/pipeline/test_fix_round2.py::PresentClaimOverState.test_absent_audit_record_is_flagged_and_its_step_kept"
+      }
+    },
+    {
+      "id": "I13",
+      "failure": {
+        "kind": "verifier",
+        "path": "notes/verify/g7_verify.md",
+        "anchor": "1. **MAJOR:"
+      },
+      "fix": {
+        "ruling": "T112",
+        "commit": "227a866",
+        "clause": "**(1) Finding 1, fix round 2 item 9,**"
+      },
+      "evidence": {
+        "test": "code/tests/pipeline/test_real_data_vision.py::NothingTranscribedNeverCompletes.test_bare_readings_make_no_row_complete"
+      }
+    },
+    {
+      "id": "I14",
+      "failure": {
+        "kind": "verifier",
+        "path": "notes/verify/g7_verify.md",
+        "anchor": "2. **MAJOR:",
+        "line": "**(a) The engine:**"
+      },
+      "fix": {
+        "ruling": "T109",
+        "commit": "227a866",
+        "clause": "(a) a case whose agent outcome is FAILED"
+      },
+      "evidence": {
+        "test": "code/tests/pipeline/test_agent_call_failed.py::FailedLoopAfterNotDeletion.test_row_is_the_engine_path_never_not_applicable"
+      }
+    },
+    {
+      "id": "I15",
+      "failure": {
+        "kind": "verifier",
+        "path": "notes/verify/g7_verify.md",
+        "anchor": "2. **MAJOR:",
+        "line": "**(b) The gate:**"
+      },
+      "fix": {
+        "ruling": "T109",
+        "commit": "227a866",
+        "clause": "(b) `agent/regression.py::_intent_condition`"
+      },
+      "evidence": {
+        "test": "code/tests/pipeline/test_regression_gate.py::test_intent_change_stops_when_the_agent_loop_failed"
+      }
+    },
+    {
+      "id": "I16",
+      "failure": {
+        "kind": "verifier",
+        "path": "notes/verify/g7_verify.md",
+        "anchor": "2. **MAJOR:",
+        "line": "**(c) The freeze check:**"
+      },
+      "fix": {
+        "ruling": "T109",
+        "commit": "227a866",
+        "clause": "(c) The freeze check lists every case"
+      },
+      "evidence": {
+        "test": "code/evaluation/tests/test_freeze_check.py::test_failed_agent_case_blocks_and_is_listed_with_its_error_class"
+      }
+    },
+    {
+      "id": "I17",
+      "failure": {
+        "kind": "verifier",
+        "path": "notes/verify/g7_verify.md",
+        "anchor": "4. **MAJOR:"
+      },
+      "fix": {
+        "ruling": "T108",
+        "commit": "227a866",
+        "clause": "**(1)**"
+      },
+      "evidence": {
+        "test": "code/evaluation/tests/test_vision_artifacts.py::TestRealWriterFixture.test_adapter_reads_every_image"
+      }
+    },
+    {
+      "id": "I18",
+      "failure": {
+        "kind": "verifier",
+        "path": "notes/verify/g7_verify.md",
+        "anchor": "5. **MAJOR:"
+      },
+      "fix": {
+        "ruling": "T112",
+        "commit": "227a866",
+        "clause": "10 = write the root"
+      },
+      "evidence": {
+        "test": "code/tests/pipeline/test_fix_round2_wiring.py::RootWrittenOnlyAfterTheGate.test_stopped_run_leaves_the_root_file_untouched"
+      }
+    },
+    {
+      "id": "I19",
+      "failure": {
+        "kind": "verifier",
+        "path": "notes/verify/g7_verify.md",
+        "anchor": "7. **MINOR:"
+      },
+      "fix": {
+        "ruling": "T112",
+        "commit": "227a866",
+        "clause": "11 = the regression gate is mandatory"
+      },
+      "evidence": {
+        "test": "code/tests/pipeline/test_fix_round2_wiring.py::GateMandatoryWhenTheModelIsOn.test_paid_run_is_gated_and_regression_gate_false_does_not_turn_it_off"
+      }
+    }
+  ]
+}

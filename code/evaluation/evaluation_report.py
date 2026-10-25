@@ -24,6 +24,12 @@ Sections, and what each reads:
    the file (``holdout_run.read_caveat``). No holdout gold is read here.
 10. **Limitations already ruled:** each quoted from its ruling in ``notes/DECISIONS.md`` (or the
     holdout proposal), with the count the final run's artifacts give where one applies.
+11. **Failures found and improvements made** (T111, T113): ``improvements.check_ledger`` on
+    ``notes/improvements.json``; every quote read from the anchored file, every test run, every
+    metric computed from two producer-checked runs (``improvements`` docstring).
+
+The **headline block** (``headline``) is built by ``reports.build_all`` from this data and the
+usage report's, and rendered first.
 """
 from __future__ import annotations
 
@@ -36,7 +42,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from . import agent_report, coherence, custom_cases, drift, holdout_run, runs
+from . import agent_report, coherence, custom_cases, drift, holdout_run, improvements, runs
 from .agent_report import CASES_FILE, METRICS_FILE, OUTPUT_FILE, LoadedRun
 from .freeze_check import is_failed_closed
 from .gold import GoldCase, load_gold, load_requests
@@ -62,6 +68,16 @@ class Context:
     cache_root: Path = REPO_ROOT / "cache"
     access_log: Path = HOLDOUT_ACCESS_LOG
     test_ids: frozenset[str] | None = None
+    improvements_json: Path = REPO_ROOT / "notes" / "improvements.json"
+    repo_root: Path = REPO_ROOT
+    publish_dir: Path = REPO_ROOT / "code" / "evaluation"
+    test_runner: improvements.TestRunner | None = None   # None: run each ledger test in a subprocess
+
+    def ledger_env(self) -> improvements.LedgerEnv:
+        """The ledger checks' paths (the same runs, gold and fixtures as the report)."""
+        return improvements.LedgerEnv(repo_root=self.repo_root, runs_root=self.runs_root, gold_path=self.gold_path,
+                                      fixtures_root=self.fixtures_root, decisions_md=self.decisions_md,
+                                      run_tests=self.test_runner)
 
 
 @dataclass(frozen=True)
@@ -253,6 +269,7 @@ def holdout_part(spec: ReportSpec, ctx: Context) -> dict[str, Any]:
         d, rec = complete[0]
         out["run_id"] = d
         out["caveat_matches_record"] = rec.get("caveat") == caveat
+        out["headline"] = rec.get("headline") if isinstance(rec.get("headline"), Mapping) else None
         out["section_md"] = holdout_run.holdout_section(rec, current_head=runs.git_head())
     return out
 
@@ -371,6 +388,7 @@ def build_evaluation(spec: ReportSpec, loaded: Mapping[str, LoadedRun], ctx: Con
         **agent_report.rows_differ(final.output, prev.output)}
     data["holdout"] = holdout_part(spec, ctx)
     data["limitations"] = limitations(ctx, final, data["dev"])
+    data["improvements"] = improvements.check_ledger(ctx.improvements_json, ctx.ledger_env())
     return data
 
 
@@ -385,6 +403,7 @@ def problems(data: Mapping[str, Any]) -> list[str]:
         out += [f"agent section error: {x}" for x in data["agent"]["availability"]["other_errors"]]
     out += [f"limitation {x['label']}: ruling text not found in {x['quote_source']}"
             for x in data["limitations"] if x["quote"] is None]
+    out += improvements.problems(data["improvements"])
     return out
 
 
@@ -589,7 +608,7 @@ def _md_limitations(L: list[str], lims: Sequence[Mapping[str, Any]]) -> None:
 def render_evaluation(data: Mapping[str, Any]) -> str:
     """The Markdown report, rendered from :func:`build_evaluation`'s dict only."""
     pr = data["protocol"]
-    L = [f"# Evaluation report `{data['report_id']}`", "",
+    L = [f"# Evaluation report `{data['report_id']}`", "", *data.get("headline_md", []),
          f"Generated {data['created_at']} by `{data['command']}` from the named runs' artifacts only "
          "(code/evaluation/evaluation_report.py). Every number names its run. Nothing is typed by hand.", "",
          f"Gold: {data['gold']}, hash `{data['gold_dev_hash'][:16]}`; scorer code `{data['scorer_code_sha256'][:16]}`; "
@@ -616,4 +635,5 @@ def render_evaluation(data: Mapping[str, Any]) -> str:
     _md_coherence_drift(L, data)
     _md_holdout(L, data["holdout"])
     _md_limitations(L, data["limitations"])
+    L += improvements.render_section(data["improvements"])
     return "\n".join(L) + "\n"

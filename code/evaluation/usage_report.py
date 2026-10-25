@@ -21,6 +21,16 @@ summed from the ledger lines for that key. Any disagreement is listed as a cross
 **(b) The run's own calls.** Send attempts against cache hits, failures by event, error class
 and HTTP status, and their cost; per-request averages; per-model totals.
 
+**Totals and averages.** Total tokens = input + output + cache read + cache write tokens (thinking
+tokens are part of output tokens, so they are not added again). "Per request" is per reply in
+part (a) (each reply cost one model request in the run that bought it) and per successful send in
+part (b). Per-model rows and an overall row are given in both parts.
+
+**The organiser's field list** (``notes/ORGANISER_README.md`` line 97, read as data, T111/T113):
+:data:`ORGANISER_FIELDS`, each rendered as one row of the "Required fields" table with its value
+and the section that holds it. ``code/evaluation/tests/test_improvements.py`` checks every row is
+present and filled in a generated report.
+
 **Cross-checks** (each reported, never raised): (1) per reply, settled vs re-priced vs ledger;
 (2) the run's send cost vs the ledger lines for the keys it sent; (3) the whole ledger vs every
 send in every ``runs/*/*calls*.jsonl``; (4) the run's ``usage.json``, when present, vs the call
@@ -46,6 +56,12 @@ PER_MILLION = 1_000_000
 COST_TOLERANCE = 1e-9
 CALL_LOG_GLOB = "*calls*.jsonl"
 PROVIDER = "Anthropic (Messages API)"
+TOTAL_PARTS: tuple[str, ...] = ("input_tokens", "output_tokens", "cache_read_input_tokens",
+                                "cache_creation_input_tokens")
+ORGANISER_SOURCE = "notes/ORGANISER_README.md:97"
+ORGANISER_FIELDS: tuple[str, ...] = (
+    "Final full-dataset run", "Model providers and names", "Model calls", "Input and output tokens",
+    "Total and average tokens per request", "Estimated total and per-request cost", "Per-model and overall totals")
 
 
 @dataclass(frozen=True)
@@ -207,7 +223,15 @@ def _tokens(usages: Iterable[Mapping[str, int]]) -> dict[str, int]:
     for u in usages:
         for f in TOKEN_FIELDS:
             tot[f] += int(u.get(f, 0))
-    return {f: tot[f] for f in TOKEN_FIELDS}
+    return {**{f: tot[f] for f in TOKEN_FIELDS}, "total_tokens": sum(tot[f] for f in TOTAL_PARTS)}
+
+
+def _per(t: Mapping[str, Any], cost: float | None, n: int) -> dict[str, Any] | None:
+    """Per-request averages over ``n`` requests (None when there is none)."""
+    if not n:
+        return None
+    return {"requests": n, "input_tokens": t["input_tokens"] / n, "output_tokens": t["output_tokens"] / n,
+            "total_tokens": t["total_tokens"] / n, "cost_usd": None if cost is None else cost / n}
 
 
 def _close(a: float | None, b: float | None) -> bool:
@@ -270,11 +294,12 @@ def attribute(calls: Sequence[Call], *, runs_root: Path, cache_root: Path, ledge
                          "cost_settled_usd": _sum(r["cost_settled_usd"] for r in rs),
                          "cost_repriced_usd": _sum(r["cost_repriced_usd"] for r in rs)}
         return out
+    total = {"replies": len(ok_replies), **_tokens(r["tokens"] for r in ok_replies),
+             "cost_settled_usd": _sum(r["cost_settled_usd"] for r in ok_replies),
+             "cost_repriced_usd": _sum(r["cost_repriced_usd"] for r in ok_replies)}
     return {"replies_used": len(used), "uses": sum(used.values()), "replies_unresolved": len(replies) - len(ok_replies),
-            "by_buying_run": group("bought_by_run"), "by_model": group("model"),
-            "total": {"replies": len(ok_replies), **_tokens(r["tokens"] for r in ok_replies),
-                      "cost_settled_usd": _sum(r["cost_settled_usd"] for r in ok_replies),
-                      "cost_repriced_usd": _sum(r["cost_repriced_usd"] for r in ok_replies)},
+            "by_buying_run": group("bought_by_run"), "by_model": group("model"), "total": total,
+            "per_reply": _per(total, total["cost_settled_usd"], len(ok_replies)),
             "replies": replies, "problems": problems}
 
 
@@ -311,9 +336,7 @@ def own_calls(calls: Sequence[Call], *, cache_root: Path, run_id: str) -> dict[s
         "send_attempts": len(sends), "sends_ok": n_ok, "cache_hits": sum(1 for c in calls if c.event == "cache_hit"),
         "failures": {k: {"count": n, "cost_usd": failure_cost[k]} for k, n in sorted(failures.items())},
         "cost_usd": cost, "tokens": tok,
-        "per_request": None if not n_ok else {"cost_usd": round(cost / n_ok, 9),
-                                              "input_tokens": tok["input_tokens"] / n_ok,
-                                              "output_tokens": tok["output_tokens"] / n_ok},
+        "per_request": _per(tok, cost, n_ok),
         "per_model": {m: {"sends_ok": v["sends_ok"], "cost_usd": v["cost_usd"], **_tokens(v["usages"])}
                       for m, v in sorted(per_model.items())},
     }
@@ -357,8 +380,12 @@ def usage_json_check(usage: Mapping[str, Any] | None, own: Mapping[str, Any],
 
 
 def build_usage(run_id: str, *, runs_root: Path, cache_root: Path, calls_file: str = "calls.jsonl",
-                usage: Mapping[str, Any] | None = None) -> dict[str, Any]:
-    """The usage report's data for one run (module docstring)."""
+                usage: Mapping[str, Any] | None = None, final: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """The usage report's data for one run (module docstring).
+
+    ``final`` describes the spec's final run for the organiser's "final full-dataset run" field:
+    ``{"run_id", "rows", "test_requests"}`` (rows written by the final run, requests in the test file).
+    """
     table, price_source = price_table()
     calls_all, problems = read_calls(runs_root / run_id / calls_file)
     other = [c for c in calls_all if c.run_id != run_id]
@@ -371,7 +398,7 @@ def build_usage(run_id: str, *, runs_root: Path, cache_root: Path, calls_file: s
     led_sent = round(sum(cost for k, cost in ledger if k in set(sent_keys)), 9)
     return {
         "run_id": run_id, "calls_file": f"runs/{run_id}/{calls_file}",
-        "provider": PROVIDER,
+        "provider": PROVIDER, "final": dict(final) if final is not None else None,
         "price_basis": {"source": price_source, "module": "code/deletion_audit/model/prices.py",
                         "usd_per_million": {m: vars(p) for m, p in sorted(table.items())}},
         "call_log_problems": problems, "ledger_problems": lproblems,
@@ -408,52 +435,110 @@ def _usd(v: Any) -> str:
     return "unknown" if v is None else f"${v:.6f}"
 
 
+TOKEN_COLS: tuple[str, ...] = (*TOKEN_FIELDS, "total_tokens")
+
+
 def _tok_cells(t: Mapping[str, int]) -> str:
-    return " | ".join(str(t[f]) for f in TOKEN_FIELDS)
+    return " | ".join(str(t[f]) for f in TOKEN_COLS)
 
 
-def render_usage(u: Mapping[str, Any], *, report_id: str, created_at: str, command: str) -> str:
-    """The Markdown report, rendered from :func:`build_usage`'s dict only."""
+def _avg(per: Mapping[str, Any] | None, what: str) -> str:
+    if per is None:
+        return f"no {what}, so no average"
+    return (f"{per['input_tokens']:.1f} input, {per['output_tokens']:.1f} output, {per['total_tokens']:.1f} total "
+            f"tokens and {_usd(per['cost_usd'])} per {what} (over {per['requests']})")
+
+
+def models_named(u: Mapping[str, Any]) -> list[str]:
+    """Every model named in part (a) or part (b)."""
+    return sorted(set(u["a_replies_used"]["by_model"]) | set(u["b_own_calls"]["per_model"]))
+
+
+def organiser_rows(u: Mapping[str, Any]) -> list[tuple[str, str, str]]:
+    """One (field, value, section) row per :data:`ORGANISER_FIELDS` entry, values from the report data."""
+    rid, a, b = u["run_id"], u["a_replies_used"], u["b_own_calls"]
+    fin = u.get("final")
+    if fin is None:
+        final_s = f"run `{rid}`; **the spec named no final run for this usage report**"
+    else:
+        full = fin["rows"] == fin["test_requests"]
+        final_s = (f"run `{rid}`" + ("" if fin["run_id"] == rid else f" (**not** the final run `{fin['run_id']}`)")
+                   + f"; the final run wrote {fin['rows']} rows for {fin['test_requests']} test requests "
+                   + ("(the full dataset)" if full else "(**not the full dataset**)"))
+    t, bt = a["total"], b["tokens"]
+    models = models_named(u)
+    return [
+        (ORGANISER_FIELDS[0], final_s, "this table; report title"),
+        (ORGANISER_FIELDS[1], f"{u['provider']}: {', '.join(models) or 'no model reply used or sent by this run'}",
+         "Providers and models"),
+        (ORGANISER_FIELDS[2], f"(a) {t['replies']} model requests bought the {t['replies']} replies the output used; "
+                              f"(b) the run made {b['send_attempts']} send attempts ({b['sends_ok']} returned a reply) "
+                              f"and {b['cache_hits']} cache reads", "(a), (b)"),
+        (ORGANISER_FIELDS[3], f"(a) {t['input_tokens']} input, {t['output_tokens']} output; (b) {bt['input_tokens']} "
+                              f"input, {bt['output_tokens']} output", "(a), (b)"),
+        (ORGANISER_FIELDS[4], f"(a) total {t['total_tokens']}; {_avg(a['per_reply'], 'reply')}. (b) total "
+                              f"{bt['total_tokens']}; {_avg(b['per_request'], 'successful send')}", "(a), (b)"),
+        (ORGANISER_FIELDS[5], f"(a) {_usd(t['cost_settled_usd'])} settled ({_usd(t['cost_repriced_usd'])} re-priced), "
+                              "per reply " + (_usd(a['per_reply']['cost_usd']) if a['per_reply'] else 'n/a (no reply)')
+                              + f"; (b) {_usd(b['cost_usd'])}, per successful send "
+                              + (_usd(b['per_request']['cost_usd']) if b['per_request'] else 'n/a (no successful send)')
+                              + ". Estimated from the price table below", "(a), (b), Price basis"),
+        (ORGANISER_FIELDS[6], f"{len(a['by_model'])} model(s) in (a), {len(b['per_model'])} in (b); each part has "
+                              "a per-model table and an overall total row", "(a), (b)"),
+    ]
+
+
+def render_usage(u: Mapping[str, Any], *, report_id: str, created_at: str, command: str,
+                 headline: Sequence[str] = ()) -> str:
+    """The Markdown report, rendered from :func:`build_usage`'s dict only (``headline``: generated lines)."""
     rid = u["run_id"]
     a, b, cc = u["a_replies_used"], u["b_own_calls"], u["cross_checks"]
-    tok_head = " | ".join(TOKEN_FIELDS)
-    lines = [f"# Usage report `{report_id}`", "",
+    tok_head = " | ".join(TOKEN_COLS)
+    ncol = len(TOKEN_COLS)
+    lines = [f"# Usage report `{report_id}`", "", *headline,
              f"Generated {created_at} by `{command}` from `{u['calls_file']}`, the reply cache entries it names, "
              "the buying runs' call logs and `cache/ledger.jsonl` (code/evaluation/usage_report.py). "
-             "Every figure names its run. Nothing is typed by hand.", ""]
-    lines += ["## Providers and models", "", f"- Provider: {u['provider']}.",
-              f"- Models of the replies used (run `{rid}`): {', '.join(a['by_model']) or 'none'}.", "",
+             "Every figure names its run. Nothing is typed by hand. Total tokens = input + output + cache read + "
+             "cache write tokens.", ""]
+    lines += [f"## Required fields ({ORGANISER_SOURCE}, read as data)", "",
+              "| field | value | section |", "|---|---|---|"]
+    lines += [f"| {f} | {v.replace('|', '/')} | {sec} |" for f, v, sec in organiser_rows(u)]
+    lines += ["", "## Providers and models", "", f"- Provider: {u['provider']}.",
+              f"- Models of the replies used (run `{rid}`): {', '.join(a['by_model']) or 'none'}.",
+              f"- Models of the run's own successful sends: {', '.join(b['per_model']) or 'none'}.", "",
               "## (a) Tokens and cost originally spent on the replies this run used", "",
               f"Run `{rid}` used {a['replies_used']} distinct replies in {a['uses']} uses (cache hits and successful "
               f"sends); {a['replies_unresolved']} could not be followed to a cache entry. Each reply is summed once, "
               "under the run that bought it; tokens are the cache entry's original usage.", "",
               f"| bought by run | replies | uses | {tok_head} | cost settled | cost re-priced |",
-              "|---|---:|---:|" + "---:|" * len(TOKEN_FIELDS) + "---:|---:|"]
+              "|---|---:|---:|" + "---:|" * ncol + "---:|---:|"]
     for run, g in a["by_buying_run"].items():
         lines.append(f"| `{run}` | {g['replies']} | {g['uses']} | {_tok_cells(g)} | {_usd(g['cost_settled_usd'])} "
                      f"| {_usd(g['cost_repriced_usd'])} |")
     t = a["total"]
     lines += [f"| **total** | {t['replies']} | {a['uses']} | {_tok_cells(t)} | {_usd(t['cost_settled_usd'])} | "
-              f"{_usd(t['cost_repriced_usd'])} |", "", "Per model:", "",
+              f"{_usd(t['cost_repriced_usd'])} |", "",
+              f"- Model requests behind these replies: {t['replies']} (one per reply).",
+              f"- Per request (per reply): {_avg(a['per_reply'], 'reply')}.", "", "Per model:", "",
               f"| model | replies | uses | {tok_head} | cost settled |",
-              "|---|---:|---:|" + "---:|" * len(TOKEN_FIELDS) + "---:|"]
+              "|---|---:|---:|" + "---:|" * ncol + "---:|"]
     lines += [f"| {m} | {g['replies']} | {g['uses']} | {_tok_cells(g)} | {_usd(g['cost_settled_usd'])} |"
               for m, g in a["by_model"].items()]
+    lines += [f"| **overall** | {t['replies']} | {a['uses']} | {_tok_cells(t)} | {_usd(t['cost_settled_usd'])} |"]
     lines += ["", f"## (b) Calls made by run `{rid}` itself", "",
-              f"- Send attempts: {b['send_attempts']} ({b['sends_ok']} returned a reply); cache hits: "
+              f"- Model calls (send attempts): {b['send_attempts']} ({b['sends_ok']} returned a reply); cache hits: "
               f"{b['cache_hits']}. Cost of the sends: {_usd(b['cost_usd'])}.",
               f"- Events (event:outcome): {b['events'] or '{}'}.",
-              "- Per request (per successful send): " + ("no successful send" if b["per_request"] is None else
-                                                         f"{_usd(b['per_request']['cost_usd'])}, "
-                                                         f"{b['per_request']['input_tokens']:.1f} input and "
-                                                         f"{b['per_request']['output_tokens']:.1f} output tokens"),
-              "", f"| send tokens | {tok_head} |", "|---|" + "---:|" * len(TOKEN_FIELDS),
+              f"- Per request (per successful send): {_avg(b['per_request'], 'successful send')}.",
+              "", f"| send tokens | {tok_head} |", "|---|" + "---:|" * ncol,
               f"| all send attempts | {_tok_cells(b['tokens'])} |", "",
               "Failures (event:outcome:error class:HTTP status):", ""]
     lines += [f"- `{k}`: {v['count']}, cost {_usd(v['cost_usd'])}" for k, v in b["failures"].items()] or ["- none"]
     lines += ["", "Per model (successful sends):", "", f"| model | sends ok | cost | {tok_head} |",
-              "|---|---:|---:|" + "---:|" * len(TOKEN_FIELDS)]
+              "|---|---:|---:|" + "---:|" * ncol]
     lines += [f"| {m} | {v['sends_ok']} | {_usd(v['cost_usd'])} | {_tok_cells(v)} |" for m, v in b["per_model"].items()]
+    lines += [f"| **overall (all send attempts)** | {b['sends_ok']} | {_usd(b['cost_usd'])} | "
+              f"{_tok_cells(b['tokens'])} |"]
     pb = u["price_basis"]
     lines += ["", "## Price basis", "", f"USD per million tokens, from `{pb['module']}` (the budget guard's table). "
               f"Its stated source: {pb['source']}", "",

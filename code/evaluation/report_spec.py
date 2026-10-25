@@ -13,7 +13,9 @@ A spec is a JSON object (``reports.py --spec <file>``)::
       "custom_runs": {"<fixture folder>": "<run id>"},   # folder relative to code/tests/fixtures
       "usage": {"run": "<run id>", "calls_file": "calls.jsonl"},
       "holdout_run": null,                         # optional: must match a completed record
-      "coherence": true                            # run the coherence checks on final and DEV output
+      "coherence": true,                           # run the coherence checks on final and DEV output
+      "final": false                               # true only for the shipped runs: reports.py --publish
+                                                   #   refuses a spec without it
     }
 
 ``arms`` is :class:`agent_report.Spec`'s mapping (``ARM`` is ``A+``, ``A`` or ``tools_off``).
@@ -38,7 +40,7 @@ from . import runs
 from .agent_report import LoadedRun, ReportRefused, Spec, load_run, run_path
 
 TOP_KEYS: frozenset[str] = frozenset({"report_id", "final_run", "dev_run", "previous_run", "dev_history", "arms",
-                                      "custom_runs", "usage", "holdout_run", "coherence"})
+                                      "custom_runs", "usage", "holdout_run", "coherence", "final"})
 USAGE_KEYS: frozenset[str] = frozenset({"run", "calls_file"})
 ARM_KEYS: frozenset[str] = frozenset({"dev", "test", "fixtures"})
 DEFAULT_CALLS_FILE = "calls.jsonl"
@@ -66,6 +68,7 @@ class ReportSpec:
     usage: UsageSpec | None = None
     holdout_run: str | None = None
     coherence: bool = True
+    final: bool = False
 
     @property
     def usage_spec(self) -> UsageSpec:
@@ -135,11 +138,14 @@ def spec_from_mapping(raw: Mapping[str, Any]) -> ReportSpec:
     coherence = raw.get("coherence", True)
     if not isinstance(coherence, bool):
         raise ValueError("spec 'coherence' must be true or false")
+    final = raw.get("final", False)
+    if not isinstance(final, bool):
+        raise ValueError("spec 'final' must be true or false")
     spec = ReportSpec(report_id=report_id, final_run=final_run, dev_run=dev_run,
                       previous_run=_str(raw, "previous_run", required=False),
                       dev_history=tuple(runs.check_run_id(x) for x in hist), arms=arms,
                       custom_runs={k: runs.check_run_id(v) for k, v in custom.items()}, usage=usage,
-                      holdout_run=_str(raw, "holdout_run", required=False), coherence=coherence)
+                      holdout_run=_str(raw, "holdout_run", required=False), coherence=coherence, final=final)
     for rid in spec.arms.run_ids():
         runs.check_run_id(rid)
     if spec.report_id in spec.input_runs():
