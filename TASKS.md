@@ -52,6 +52,7 @@ Rebuilt at the developer's direction (turn 2026-10-25T00:08:45+05:30). Updated a
     1. the four §11 review checkpoints have no log.txt entries yet;
     2. "I chose" and the D4c approval show only in the SESSION START provenance line (the prep session's, D16), so G10 must cite them truthfully;
     3. cite `g5-dev22-20261025T0530` for DEV 19/22.
+  - **Running (T106):** the report generators (`orch-eval-engineer`, high, since about 12:10; brief `reports_brief.md`), alongside the G7 wiring.
   - **T105 ruled.** The plan:
     1. the wiring is checked and committed;
     2. the G7 verifier (export of that commit), in parallel with G5 fix round 2 (`orch-builder-core`, high; brief `g5fix2_brief.md`) and stage 1 plus vision (main, export);
