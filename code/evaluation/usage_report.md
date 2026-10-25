@@ -21,7 +21,7 @@ Generated from the same run artifacts as the sections below (code/evaluation/hea
 
 > **Holdout caveat (verbatim from `notes/split.json 'created'`):** 2026-10-24 prep session. Made AFTER the prep forensics agent had read all 32 sample answers; stratification used gold status, step count and operations. Rules are re-derived on DEV only; holdout scores are an optimistic estimate.
 
-Generated 2026-10-25T16:37:43+05:30 by `python3 -B code/evaluation/reports.py --spec code/evaluation/specs/reports_final.json --publish` from `runs/freeze-test-Aplus-20261025T1629/calls.jsonl`, the reply cache entries it names, the buying runs' call logs and `cache/ledger.jsonl` (code/evaluation/usage_report.py). Every figure names its run. Nothing is typed by hand. Total tokens = input + output + cache read + cache write tokens.
+Generated 2026-10-25T17:11:32+05:30 by `python3 -B code/evaluation/reports.py --spec code/evaluation/specs/reports_final.json --publish` from `runs/freeze-test-Aplus-20261025T1629/calls.jsonl`, the reply cache entries it names, the buying runs' call logs and `cache/ledger.jsonl` (code/evaluation/usage_report.py). Every figure names its run. Nothing is typed by hand. Total tokens = input + output + cache read + cache write tokens.
 
 ## Required fields (notes/ORGANISER_README.md:97, read as data)
 
@@ -43,7 +43,7 @@ Generated 2026-10-25T16:37:43+05:30 by `python3 -B code/evaluation/reports.py --
 
 ## (a) Tokens and cost originally spent on the replies this run used
 
-Run `freeze-test-Aplus-20261025T1629` used 897 distinct replies in 1569 uses (cache hits and successful sends); 0 could not be followed to a cache entry. Each reply is summed once, under the run that bought it; tokens are the cache entry's original usage.
+Run `freeze-test-Aplus-20261025T1629` used 897 distinct request keys in 1569 uses (cache hits and successful sends); 0 could not be followed to a cache entry. Those keys hold 1283 replies across the 2 reply namespaces (`replies`, `replies-replica-1`): a request also sent as the turn-1 replicate or the second vision reading has one entry per namespace under the same key, and every entry of a used key counts. The table counts replies. Each reply is summed once, under the run that bought it; tokens are the cache entry's original usage.
 
 | bought by run | replies | uses | input_tokens | output_tokens | cache_read_input_tokens | cache_creation_input_tokens | output_tokens_details.thinking_tokens | total_tokens | cost settled | cost re-priced |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
@@ -58,6 +58,7 @@ Run `freeze-test-Aplus-20261025T1629` used 897 distinct replies in 1569 uses (ca
 
 - Model requests behind these replies: 1283 (one per reply).
 - Per request (per reply): 4757.3 input, 147.8 output, 4905.1 total tokens and $0.010992 per reply (over 1283).
+- Per test request (part (a) totals over the 518 requests in the test file): 12149.0 total tokens (6293202 / 518) and $0.027226.
 
 Per model:
 
@@ -98,6 +99,6 @@ USD per million tokens, from `code/deletion_audit/model/prices.py` (the budget g
 
 - Per reply, settled cost vs re-priced usage vs ledger: all agree.
 - Run `freeze-test-Aplus-20261025T1629` send cost $0.000000 vs the ledger lines for its 0 sent key(s) $0.000000: agree.
-- Whole ledger (1412 lines) $15.461994 vs every send in 103 call log(s) under runs/ $15.461994: agree.
+- Whole ledger (1412 lines) $15.461994 vs every send in 109 call log(s) under runs/ $15.461994: agree.
 - `usage.json` of `freeze-test-Aplus-20261025T1629`: agrees with the call log.
 

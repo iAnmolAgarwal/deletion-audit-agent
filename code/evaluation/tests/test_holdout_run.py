@@ -325,6 +325,22 @@ class TestHoldoutSection(Base):
         self.assertNotIn("Pre-change", hr.holdout_section(rec, current_head=self.w.commit))
         self.assertIn("Pre-change", hr.holdout_section(rec, current_head="f" * 40))
 
+    def test_pre_change_states_whether_the_package_moved(self) -> None:
+        """T127 B6: the pre-change line says whether code/deletion_audit differs, from the caller's git result."""
+        rec, other = self.completed(), "f" * 40
+        same = hr.holdout_section(rec, current_head=other, package_changed=False)
+        moved = hr.holdout_section(rec, current_head=other, package_changed=True)
+        unknown = hr.holdout_section(rec, current_head=other, package_changed=None)
+        self.assertIn("is identical in the two commits", same)
+        self.assertIn("differs between the two commits", moved)
+        self.assertIn("was not computed (git failed)", unknown)
+        self.assertNotIn("identical", hr.holdout_section(rec, current_head=rec["freeze_commit"], package_changed=False))
+
+    def test_notes_render_after_the_table_and_before_the_lock_note(self) -> None:
+        text = hr.holdout_section(self.completed(), notes=["- note one"])
+        self.assertLess(text.index("Sequence pairwise order"), text.index("- note one"))
+        self.assertLess(text.index("- note one"), text.index("T48"))
+
     def test_refuses_without_caveat_or_completion(self) -> None:
         rec = self.completed()
         for bad in ({**rec, "caveat": ""}, {k: v for k, v in rec.items() if k != "caveat"},

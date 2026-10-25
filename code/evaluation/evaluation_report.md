@@ -21,9 +21,9 @@ Generated from the same run artifacts as the sections below (code/evaluation/hea
 
 > **Holdout caveat (verbatim from `notes/split.json 'created'`):** 2026-10-24 prep session. Made AFTER the prep forensics agent had read all 32 sample answers; stratification used gold status, step count and operations. Rules are re-derived on DEV only; holdout scores are an optimistic estimate.
 
-Generated 2026-10-25T16:37:43+05:30 by `python3 -B code/evaluation/reports.py --spec code/evaluation/specs/reports_final.json --publish` from the named runs' artifacts only (code/evaluation/evaluation_report.py). Every number names its run. Nothing is typed by hand.
+Generated 2026-10-25T17:11:32+05:30 by `python3 -B code/evaluation/reports.py --spec code/evaluation/specs/reports_final.json --publish` from the named runs' artifacts only (code/evaluation/evaluation_report.py). Every number names its run. Nothing is typed by hand.
 
-Gold: DEV only (evaluation.gold.load_gold defaults), hash `d05501012bad1529`; scorer code `c7f626d2884d8765`; git HEAD `07b7a7c36c90`.
+Gold: DEV only (evaluation.gold.load_gold defaults), hash `d05501012bad1529`; scorer code `2243a72c1927beb3`; git HEAD `bec751a9650e`.
 
 ## 1. Inputs
 
@@ -33,7 +33,7 @@ Gold: DEV only (evaluation.gold.load_gold defaults), hash `d05501012bad1529`; sc
 | dev | `cand-dev-A-20261025T1352` | ok | `641dbc8d921186ef` | 22 | `python -m deletion_audit --run-id cand-dev-A-20261025T1352 --set dev --mode A --vision-ack pass1-vision-20261025T1323` |
 | previous | `g5-test-20261025T0530` | ok | `cf2a90b070db7854` | 518 | `python -m deletion_audit --run-id g5-test-20261025T0530 --set test` |
 | dev_history | `g5-dev22-20261025T0530` | ok | `641dbc8d921186ef` | 22 | `python -m deletion_audit --run-id g5-dev22-20261025T0530 --set dev` |
-| custom:F01_non_deletion_negation_traps | `fx-F01-tools_off-20261025T1435` | ok | `1e16cf49bdf131d8` | 3 | `python -m deletion_audit --run-id fx-F01-tools_off-20261025T1435 --dataset tests/fixtures/F01_non_deletion_negation_traps --set test --mode tools_off` |
+| custom:F01_non_deletion_negation_traps | `fx-F01-tools_off-t127-20261025T1712` | ok | `0390218bbd6e731e` | 3 | `python -m deletion_audit --run-id fx-F01-tools_off-t127-20261025T1712 --dataset code/tests/fixtures/F01_non_deletion_negation_traps --set test --mode tools_off` |
 | custom:F06_regional_replica_and_active_connector | `fx-F06-tools_off-20261025T1435` | ok | `ae6fe078133a3ef0` | 1 | `python -m deletion_audit --run-id fx-F06-tools_off-20261025T1435 --dataset tests/fixtures/F06_regional_replica_and_active_connector --set test --mode tools_off` |
 | custom:F08_tombstone_with_email_hash | `fx-F08-tools_off-20261025T1435` | ok | `a5a5ee54b7e9a6fe` | 1 | `python -m deletion_audit --run-id fx-F08-tools_off-20261025T1435 --dataset tests/fixtures/F08_tombstone_with_email_hash --set test --mode tools_off` |
 | custom:F10_legal_hold_and_attachment | `fx-F10-tools_off-20261025T1435` | ok | `950719098f401c81` | 1 | `python -m deletion_audit --run-id fx-F10-tools_off-20261025T1435 --dataset tests/fixtures/F10_legal_hold_and_attachment --set test --mode tools_off` |
@@ -119,13 +119,13 @@ Each row: `score_predictions` on that run's `output.csv` against DEV gold, compu
 
 ## 5. Custom eval cases (reported apart from DEV and holdout)
 
-Marked in each fixture's `EXPECTED.md` (code/tests/fixtures/); 11 case(s) marked, 11 scored, 0 not run, 11 passed. Measured: scorer.score_case on each case's expected row (or the supported assertion keys), from the run named for its fixture folder in the spec's custom_runs. Each expected output was derived by hand in the folder's `EXPECTED.md` (rule cited per step); the statement column quotes what a correct system must do.
+Marked in each fixture's `EXPECTED.md` (code/tests/fixtures/); 11 case(s) marked, 11 scored, 0 not run, 9 passed. Measured: scorer.score_case on each case's expected row (or the supported assertion keys), from the run named for its fixture folder in the spec's custom_runs. Each expected output was derived by hand in the folder's `EXPECTED.md` (rule cited per step); the statement column quotes what a correct system must do.
 
 | fixture | case | expected (source) | provisional | run | result | statement |
 |---|---|---|---|---|---|---|
-| F01_non_deletion_negation_traps | case_90101 | NOT_APPLICABLE, 0 steps (`F01_non_deletion_negation_traps/expected_output.csv`) | yes | `fx-F01-tools_off-20261025T1435` | row exact (status NOT_APPLICABLE; steps tp 0/0, pred 0) | a request that names deletion words inside a negation, or asks for access or correction, gets `NOT_APPLICABLE` with `[]`, whatever the evidence shows. Every person here has live, identifier-linked records, so a misread produces a destructive plan for an account the person wants kept: the most harmful |
-| F01_non_deletion_negation_traps | case_90102 | NOT_APPLICABLE, 0 steps (`F01_non_deletion_negation_traps/expected_output.csv`) | yes | `fx-F01-tools_off-20261025T1435` | row exact (status NOT_APPLICABLE; steps tp 0/0, pred 0) | a request that names deletion words inside a negation, or asks for access or correction, gets `NOT_APPLICABLE` with `[]`, whatever the evidence shows. Every person here has live, identifier-linked records, so a misread produces a destructive plan for an account the person wants kept: the most harmful |
-| F01_non_deletion_negation_traps | case_90103 | NOT_APPLICABLE, 0 steps (`F01_non_deletion_negation_traps/expected_output.csv`) | yes | `fx-F01-tools_off-20261025T1435` | row exact (status NOT_APPLICABLE; steps tp 0/0, pred 0) | a request that names deletion words inside a negation, or asks for access or correction, gets `NOT_APPLICABLE` with `[]`, whatever the evidence shows. Every person here has live, identifier-linked records, so a misread produces a destructive plan for an account the person wants kept: the most harmful |
+| F01_non_deletion_negation_traps | case_90101 | NOT_APPLICABLE, 0 steps (`F01_non_deletion_negation_traps/expected_output.csv`) | yes | `fx-F01-tools_off-t127-20261025T1712` | row exact (status NOT_APPLICABLE; steps tp 0/0, pred 0) | a request that names deletion words inside a negation, or asks for access or correction, gets `NOT_APPLICABLE` with `[]`, whatever the evidence shows. Every person here has live, identifier-linked records, so a misread produces a destructive plan for an account the person wants kept: the most harmful |
+| F01_non_deletion_negation_traps | case_90102 | NOT_APPLICABLE, 0 steps (`F01_non_deletion_negation_traps/expected_output.csv`) | yes | `fx-F01-tools_off-t127-20261025T1712` | row differs (status INCOMPLETE; steps tp 0/0, pred 7) | a request that names deletion words inside a negation, or asks for access or correction, gets `NOT_APPLICABLE` with `[]`, whatever the evidence shows. Every person here has live, identifier-linked records, so a misread produces a destructive plan for an account the person wants kept: the most harmful |
+| F01_non_deletion_negation_traps | case_90103 | NOT_APPLICABLE, 0 steps (`F01_non_deletion_negation_traps/expected_output.csv`) | yes | `fx-F01-tools_off-t127-20261025T1712` | row differs (status INCOMPLETE; steps tp 0/0, pred 10) | a request that names deletion words inside a negation, or asks for access or correction, gets `NOT_APPLICABLE` with `[]`, whatever the evidence shows. Every person here has live, identifier-linked records, so a misread produces a destructive plan for an account the person wants kept: the most harmful |
 | F06_regional_replica_and_active_connector | case_90601 | INCOMPLETE, 10 steps (`F06_regional_replica_and_active_connector/expected_output.csv`) | no | `fx-F06-tools_off-20261025T1435` | row exact (status INCOMPLETE; steps tp 10/10, pred 10) | It is a non-provisional case with every finding type except restore risk, in a layout DEV never uses as a primary |
 | F08_tombstone_with_email_hash | case_90801 | INCOMPLETE, 5 steps (`F08_tombstone_with_email_hash/expected_output.csv`) | yes | `fx-F08-tools_off-20261025T1435` | row exact (status INCOMPLETE; steps tp 5/5, pred 5) | a tombstone whose name, email and phone are null but whose `email_hash` is still sha256(lower(email)), the person's own hash. The spec names the email hash as a direct identifier that must be removed. A rule learned from DEV's only (clean) tombstone, "a tombstone is always VERIFY_RECORD_REDACTED", ge |
 | F10_legal_hold_and_attachment | case_91001 | INCOMPLETE, 6 steps (`F10_legal_hold_and_attachment/expected_output.csv`) | yes | `fx-F10-tools_off-20261025T1435` | row exact (status INCOMPLETE; steps tp 6/6, pred 6) | a `legal_hold_*` record (legal_service, `retained_order_records`, retained until 2033) for the person. Policy says retain it; it must **never** get a DELETE. Test has 8 cases; DEV has 0; |
@@ -135,7 +135,7 @@ Marked in each fixture's `EXPECTED.md` (code/tests/fixtures/); 11 case(s) marked
 | redteam/R07_replica_copy_after_inventory | case_93061 | INCOMPLETE, 4 steps (`redteam/R07_replica_copy_after_inventory/expected_output.csv`) | no | `fx-R07-tools_off-20261025T1435` | row exact (status INCOMPLETE; steps tp 4/4, pred 4) | A correct system reports a profile still present in a read replica as a remaining `account_service` record, even when a complete primary inventory and the deletion and replication jobs all say it is gone. |
 | redteam/R09_restore_and_sync_paths | case_93082 | INCOMPLETE, 5 steps (`redteam/R09_restore_and_sync_paths/expected_output.csv`) | not stated | `fx-R09-tools_off-20261025T1435` | row exact (status INCOMPLETE; steps tp 5/5, pred 5) | A correct system finds a sync connector linked only by the person's phone, reports it active from the latest pre-audit evidence, and ignores a post-audit repopulation claim. |
 
-Custom-case aggregate (row expectations only): status 11/11 (1.0000), row exact 11/11 (1.0000), step F1 1.0000, sequence exact 11/11 (1.0000).
+Custom-case aggregate (row expectations only): status 9/11 (0.8182), row exact 9/11 (0.8182), step F1 0.8411, sequence exact 9/11 (0.8182).
 
 ## 5b. Validation set: rule-derived fixtures, apart from DEV and holdout
 
@@ -147,7 +147,7 @@ Fixtures passed 19/22 scored (24 listed, 24 run, 2 not scored); cases passed 36/
 
 | fixture | run | producer check | cases passed | failed cases | replay misses | rows without expectation | result |
 |---|---|---|---:|---|---:|---:|---|
-| F01_non_deletion_negation_traps | `fx-F01-Aplus-20261025T1435` | ok | 1/3 | case_90102, case_90103 | 2 | 0 | fail |
+| F01_non_deletion_negation_traps | `fx-F01-Aplus-t127-20261025T1712` | ok | 1/3 | case_90102, case_90103 | 2 | 0 | fail |
 | F02_korean_deletion_syslog_export | `fx-F02-Aplus-20261025T1435` | ok | 1/1 | none | 1 | 0 | pass |
 | F03_historical_uppercase_email | `fx-F03-Aplus-20261025T1435` | ok | 1/1 | none | 1 | 0 | pass |
 | F04_lookalike_jr_and_duplicate_name | `fx-F04-Aplus-20261025T1435` | ok | 1/1 | none | 1 | 0 | pass |
@@ -159,8 +159,8 @@ Fixtures passed 19/22 scored (24 listed, 24 run, 2 not scored); cases passed 36/
 | F10_legal_hold_and_attachment | `fx-F10-Aplus-20261025T1435` | ok | 1/1 | none | 1 | 0 | pass |
 | F11a_missing_evidence_file | `fx-F11a-Aplus-20261025T1435` | refused | n/a | n/a | n/a | n/a | not scored: producer check refused: failure: evidence_11001:ERROR |
 | F11b_malformed_request_rows | `fx-F11b-Aplus-20261025T1435` | ok | 5/5 | none | 2 | 0 | pass; keys not checked ['coherence', 'failed_closed_reason', 'steps'] |
-| redteam/R01_negation_and_nondeletion | `fx-R01-Aplus-20261025T1435` | ok | 2/7 | case_93002, case_93003, case_93004, case_93005, case_93007 | 7 | 0 | fail |
-| redteam/R02_multilingual_requests | `fx-R02-Aplus-20261025T1435` | ok | 3/6 | case_93012, case_93014, case_93016 | 6 | 0 | fail |
+| redteam/R01_negation_and_nondeletion | `fx-R01-Aplus-t127-20261025T1712` | ok | 2/7 | case_93002, case_93003, case_93004, case_93005, case_93007 | 7 | 0 | fail |
+| redteam/R02_multilingual_requests | `fx-R02-Aplus-t127-20261025T1712` | ok | 3/6 | case_93012, case_93014, case_93016 | 6 | 0 | fail |
 | redteam/R03_injection_request_and_evidence | `fx-R03-Aplus-20261025T1435` | ok | 2/2 | none | 2 | 0 | pass |
 | redteam/R04_lookalike_sharing_trace | `fx-R04-Aplus-20261025T1435` | ok | 1/1 | none | 1 | 0 | pass |
 | redteam/R05_post_audit_boundary | `fx-R05-Aplus-20261025T1435` | ok | 1/1 | none | 1 | 0 | pass |
@@ -174,11 +174,11 @@ Fixtures passed 19/22 scored (24 listed, 24 run, 2 not scored); cases passed 36/
 
 ### Arm tools_off
 
-Fixtures passed 22/22 scored (24 listed, 24 run, 2 not scored); cases passed 46/46 scored; replay misses in scored runs 0.
+Fixtures passed 19/22 scored (24 listed, 24 run, 2 not scored); cases passed 36/46 scored; replay misses in scored runs 0.
 
 | fixture | run | producer check | cases passed | failed cases | replay misses | rows without expectation | result |
 |---|---|---|---:|---|---:|---:|---|
-| F01_non_deletion_negation_traps | `fx-F01-tools_off-20261025T1435` | ok | 3/3 | none | 0 | 0 | pass |
+| F01_non_deletion_negation_traps | `fx-F01-tools_off-t127-20261025T1712` | ok | 1/3 | case_90102, case_90103 | 0 | 0 | fail |
 | F02_korean_deletion_syslog_export | `fx-F02-tools_off-20261025T1435` | ok | 1/1 | none | 0 | 0 | pass |
 | F03_historical_uppercase_email | `fx-F03-tools_off-20261025T1435` | ok | 1/1 | none | 0 | 0 | pass |
 | F04_lookalike_jr_and_duplicate_name | `fx-F04-tools_off-20261025T1435` | ok | 1/1 | none | 0 | 0 | pass |
@@ -190,8 +190,8 @@ Fixtures passed 22/22 scored (24 listed, 24 run, 2 not scored); cases passed 46/
 | F10_legal_hold_and_attachment | `fx-F10-tools_off-20261025T1435` | ok | 1/1 | none | 0 | 0 | pass |
 | F11a_missing_evidence_file | `fx-F11a-tools_off-20261025T1435` | refused | n/a | n/a | n/a | n/a | not scored: producer check refused: failure: evidence_11001:ERROR |
 | F11b_malformed_request_rows | `fx-F11b-tools_off-20261025T1435` | ok | 5/5 | none | 0 | 0 | pass; keys not checked ['coherence', 'failed_closed_reason', 'steps'] |
-| redteam/R01_negation_and_nondeletion | `fx-R01-tools_off-20261025T1435` | ok | 7/7 | none | 0 | 0 | pass |
-| redteam/R02_multilingual_requests | `fx-R02-tools_off-20261025T1435` | ok | 6/6 | none | 0 | 0 | pass |
+| redteam/R01_negation_and_nondeletion | `fx-R01-tools_off-t127-20261025T1712` | ok | 2/7 | case_93002, case_93003, case_93004, case_93005, case_93007 | 0 | 0 | fail |
+| redteam/R02_multilingual_requests | `fx-R02-tools_off-t127-20261025T1712` | ok | 3/6 | case_93012, case_93014, case_93016 | 0 | 0 | fail |
 | redteam/R03_injection_request_and_evidence | `fx-R03-tools_off-20261025T1435` | ok | 2/2 | none | 0 | 0 | pass |
 | redteam/R04_lookalike_sharing_trace | `fx-R04-tools_off-20261025T1435` | ok | 1/1 | none | 0 | 0 | pass |
 | redteam/R05_post_audit_boundary | `fx-R05-tools_off-20261025T1435` | ok | 1/1 | none | 0 | 0 | pass |
@@ -209,7 +209,7 @@ Embedded from `agent_report.render_markdown` (headings demoted):
 
 ### Agent report `reports-final-20261025T1640`
 
-Generated 2026-10-25T16:37:43+05:30 by `python3 -B code/evaluation/reports.py --spec code/evaluation/specs/reports_final.json --publish` from run artifacts only (code/evaluation/agent_report.py). Every number names its run.
+Generated 2026-10-25T17:11:33+05:30 by `python3 -B code/evaluation/reports.py --spec code/evaluation/specs/reports_final.json --publish` from run artifacts only (code/evaluation/agent_report.py). Every number names its run.
 
 | run | producer check | output sha256 | producer mode |
 |---|---|---|---|
@@ -819,7 +819,7 @@ Drift of run `freeze-test-Aplus-20261025T1629` against DEV gold (`drift.drift_ta
 
 > **Caveat (verbatim from `notes/split.json 'created'`):** 2026-10-24 prep session. Made AFTER the prep forensics agent had read all 32 sample answers; stratification used gold status, step count and operations. Rules are re-derived on DEV only; holdout scores are an optimistic estimate.
 
-**Pre-change:** the code has changed since this run (HEAD `07b7a7c36c90`, frozen `bca55eb3800b`). These numbers describe the frozen commit only.
+**Pre-change:** the code has changed since this run (HEAD `bec751a9650e`, frozen `bca55eb3800b`). These numbers describe the frozen commit only. `code/deletion_audit` (the code that writes `output.csv`) is identical in the two commits (`git diff --quiet <frozen> HEAD -- code/deletion_audit`); only other files changed.
 
 - Frozen code: tag `freeze-20261025` at commit `bca55eb3800b9e9ab79366285bffae025595eaf6`; freeze run `freeze-test-Aplus-20261025T1629`.
 - Unlocked: engine at 2026-10-25T10:59:39+00:00, gold at 2026-10-25T11:00:19+00:00; completed at 2026-10-25T11:00:19+00:00; attempts: 2.
@@ -836,6 +836,9 @@ Drift of run `freeze-test-Aplus-20261025T1629` against DEV gold (`drift.drift_ta
 | Field on matched: step_no | 55/56 (0.9821) |
 | Sequence exact | 8/10 (0.8000) |
 | Sequence pairwise order | 194/194 (1.0000) |
+
+- **Turn-1 replicate (run `holdout-20261025T1628`):** 8 of 10 cases had no second turn-1 intent reading: the replicate replays from the cache only, and the cache held no replicate reply for those texts (8 `replay_miss` events with outcome `give_up` in `calls.jsonl`). The loop flags 8 cases `TURN1_REPLICATES_DISAGREE` (`agent/loop.py`: a missing reading counts as a different one), although no two readings disagree: 0 cases have two different labels; the readings present are {'DELETION_REQUEST': 12}.
+- No holdout row changed because of it: 0 of 10 rows differ from the model-free rows (`regression_vs_engine.json`). In `agent/model_changes.py` `_intent_condition`, a `NOT_APPLICABLE` change needs at least two turn-1 readings, all NOT_DELETION, so a missing replicate can only block an intent change, never make one; and a deletion reading takes the same deletion path as the model-free row.
 
 Lock incident T48 (notes/DECISIONS.md): before this run, a G4 verification probe parsed the holdout gold rows in memory. It printed counts only; no value was seen and no decision used it.
 
@@ -854,7 +857,7 @@ Lock incident T48 (notes/DECISIONS.md): before this run, a G4 verification probe
 
 ## 11. Failures found and improvements made
 
-Generated from the ledger `code/evaluation/improvements.json` (sha256 `044cdd1a617edca6`), which holds paths, anchors, T-numbers, commits, run IDs and test names only. Each failure is quoted from its anchored file ("before" is the failure itself); each fix names its ruling (quoted from `notes/DECISIONS.md`) and its commit (checked with `git cat-file -e`); each piece of evidence is a test run here or a metric computed here from two producer-checked runs. Tests: each test run by name at build time in code/ (`python -B -c <runner> <unittest id>`, evaluation/improvements.py RUNNER); git HEAD `07b7a7c36c90`.
+Generated from the ledger `code/evaluation/improvements.json` (sha256 `044cdd1a617edca6`), which holds paths, anchors, T-numbers, commits, run IDs and test names only. Each failure is quoted from its anchored file ("before" is the failure itself); each fix names its ruling (quoted from `notes/DECISIONS.md`) and its commit (checked with `git cat-file -e`); each piece of evidence is a test run here or a metric computed here from two producer-checked runs. Tests: each test run by name at build time in code/ (`python -B -c <runner> <unittest id>`, evaluation/improvements.py RUNNER); git HEAD `bec751a9650e`.
 
 Entries: 19; improvements made (fix committed, evidence checked): 19; fix not yet committed (PENDING): 0; refused: 0.
 

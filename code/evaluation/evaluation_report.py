@@ -39,6 +39,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import re
+import subprocess
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -273,8 +274,72 @@ def holdout_part(spec: ReportSpec, ctx: Context) -> dict[str, Any]:
         out["run_id"] = d
         out["caveat_matches_record"] = rec.get("caveat") == caveat
         out["headline"] = rec.get("headline") if isinstance(rec.get("headline"), Mapping) else None
-        out["section_md"] = holdout_run.holdout_section(rec, current_head=runs.git_head())
+        commit = str(rec.get("freeze_commit") or "")
+        out["section_md"] = holdout_run.holdout_section(
+            rec, current_head=runs.git_head(), package_changed=package_differs(ctx.repo_root, commit),
+            notes=replicate_notes(ctx.runs_root / d))
     return out
+
+
+def package_differs(repo: Path, commit: str) -> bool | None:
+    """Whether ``code/deletion_audit`` differs between ``commit`` and HEAD, by
+    ``git diff --quiet <commit> HEAD -- code/deletion_audit`` at generation time (exit 0: identical,
+    1: differs); None when git fails or the commit is empty. Reason: the holdout numbers describe the
+    frozen commit, so the report must say whether the code that writes ``output.csv`` moved since.
+    """
+    if not commit:
+        return None
+    try:
+        r = subprocess.run(["git", "-C", str(repo), "diff", "--quiet", commit, "HEAD", "--", "code/deletion_audit"],
+                           capture_output=True, timeout=30, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return {0: False, 1: True}.get(r.returncode)
+
+
+def _jsonl(path: Path) -> list[Mapping[str, Any]] | None:
+    """The JSON objects of a JSONL file, or None when it is missing or any line is unreadable."""
+    try:
+        rows = [json.loads(x) for x in path.read_text(encoding="utf-8").splitlines() if x.strip()]
+    except (OSError, ValueError):
+        return None
+    return rows if all(isinstance(r, Mapping) for r in rows) else None
+
+
+def replicate_notes(run_dir: Path) -> list[str]:
+    """Generated lines on the holdout run's turn-1 replicate, from its ``calls.jsonl``, ``cases.jsonl``
+    and ``regression_vs_engine.json``.
+
+    Reason (domain logic): the turn-1 replicate replays from the cache only (``pipeline`` "the run's
+    clients", T88 (1), T97), so a holdout text whose replicate reply the cache does not hold gets no
+    second reading; ``agent/loop.py`` then flags ``TURN1_REPLICATES_DISAGREE``, because a missing
+    reading counts as a different one. The report must say that nothing disagreed and why no row
+    changed. A file that cannot be read gives an explicit line, never "nothing found".
+    """
+    calls, cases = _jsonl(run_dir / "calls.jsonl"), _jsonl(run_dir / CASES_FILE)
+    reg = _read_json(run_dir / "regression_vs_engine.json")
+    if calls is None or cases is None or not isinstance(reg, Mapping):
+        return [f"- Turn-1 replicate: not reported; `{run_dir.name}`'s calls.jsonl, {CASES_FILE} or "
+                "regression_vs_engine.json could not be read."]
+    misses = sum(1 for c in calls if c.get("event") == "replay_miss" and c.get("outcome") == "give_up")
+    agents = [(str(c.get("case_id")), c.get("agent") if isinstance(c.get("agent"), Mapping) else {}) for c in cases]
+    missing = sorted(cid for cid, a in agents if None in (a.get("turn1_replicates") or [None]))
+    flagged = sorted(cid for cid, a in agents if "TURN1_REPLICATES_DISAGREE" in (a.get("flags") or []))
+    labels = Counter(str(x) for _, a in agents for x in (a.get("turn1_replicates") or []) if x is not None)
+    split = sorted(cid for cid, a in agents if len({x for x in (a.get("turn1_replicates") or []) if x is not None}) > 1)
+    return [
+        f"- **Turn-1 replicate (run `{run_dir.name}`):** {len(missing)} of {len(agents)} cases had no second turn-1 "
+        f"intent reading: the replicate replays from the cache only, and the cache held no replicate reply for "
+        f"those texts ({misses} `replay_miss` events with outcome `give_up` in `calls.jsonl`). The loop flags "
+        f"{len(flagged)} cases `TURN1_REPLICATES_DISAGREE` (`agent/loop.py`: a missing reading counts as a "
+        f"different one), although no two readings disagree: {len(split)} cases have two different labels; "
+        f"the readings present are {dict(sorted(labels.items()))}.",
+        f"- No holdout row changed because of it: {reg.get('changed_rows')} of {reg.get('rows_compared')} rows "
+        "differ from the model-free rows (`regression_vs_engine.json`). In `agent/model_changes.py` "
+        "`_intent_condition`, a `NOT_APPLICABLE` change needs at least two turn-1 readings, all NOT_DELETION, so "
+        "a missing replicate can only block an intent change, never make one; and a deletion reading takes the "
+        "same deletion path as the model-free row.",
+    ]
 
 
 def _row_cell(path: Path, ruling: str) -> str | None:

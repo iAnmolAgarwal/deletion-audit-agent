@@ -3,12 +3,16 @@
 Every number here carries its run ID, the command that produced it and what it measures
 (the kit rules, `../../../CLAUDE.md` section 4, outside this repo). The block between the markers is regenerated from
 `runs/<run_id>/score.json` by `python3 -B code/evaluation/evaluate.py numbers`; nothing inside
-it is typed by hand. The prose outside the block gives context only and quotes no figures.
+it is typed by hand. The prose outside the block gives context only and quotes no figures, except the holdout line under "Scope and lock", which names its run and file.
 
 ## Scope and lock
 - All scores are on the 22 DEV cases. Gold loads only through `code/evaluation/gold.py`, which
-  drops holdout rows on their first CSV field before `steps_json` is parsed. The holdout has
-  not been scored. It will be scored once, after freeze, on the developer's "HOLDOUT EVALUATION RUN".
+  drops holdout rows on their first CSV field before `steps_json` is parsed. The holdout was
+  scored once, after freeze, on the developer's "HOLDOUT EVALUATION RUN": run
+  `holdout-20261025T1628` (`code/evaluation/holdout_run.py`, frozen tag `freeze-20261025`, commit
+  `bca55eb`), 10 cases: status 9/10, rows exact 8/10, step P/R/F1 1.0000 / 0.9492 / 0.9739
+  (56 of 59 gold steps matched). Source: `aggregate.published` in
+  `runs/holdout-20261025T1628/score.json`. This is the only figure outside the block.
 - The split was made after the prep forensics agent had read all 32 answers, and its
   stratification used gold status, step count and operations (`code/evaluation/split.py`). DEV
   numbers are in-sample: every prototype rule was designed while looking at DEV.

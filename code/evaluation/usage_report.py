@@ -542,6 +542,23 @@ def organiser_rows(u: Mapping[str, Any]) -> list[tuple[str, str, str]]:
     ]
 
 
+def _per_test_request(u: Mapping[str, Any]) -> str:
+    """Total tokens and settled cost of part (a) divided by the test file's request count (``final``).
+
+    Reason: a per-request figure for the whole output, from the same totals the table shows; n/a when
+    the spec names no final run or its request count is not a positive integer.
+    """
+    t = u["a_replies_used"]["total"]
+    fin = u.get("final") or {}
+    n = fin.get("test_requests")
+    if not isinstance(n, int) or isinstance(n, bool) or n <= 0:
+        return "Per test request: n/a (no final run with a request count)"
+    cost = t.get("cost_settled_usd")
+    per_cost = _usd(cost / n) if isinstance(cost, (int, float)) else "n/a"
+    return (f"Per test request (part (a) totals over the {n} requests in the test file): "
+            f"{t['total_tokens'] / n:.1f} total tokens ({t['total_tokens']} / {n}) and {per_cost}")
+
+
 def render_usage(u: Mapping[str, Any], *, report_id: str, created_at: str, command: str,
                  headline: Sequence[str] = ()) -> str:
     """The Markdown report, rendered from :func:`build_usage`'s dict only (``headline``: generated lines)."""
@@ -561,9 +578,13 @@ def render_usage(u: Mapping[str, Any], *, report_id: str, created_at: str, comma
               f"- Models of the replies used (run `{rid}`): {', '.join(a['by_model']) or 'none'}.",
               f"- Models of the run's own successful sends: {', '.join(b['per_model']) or 'none'}.", "",
               "## (a) Tokens and cost originally spent on the replies this run used", "",
-              f"Run `{rid}` used {a['replies_used']} distinct replies in {a['uses']} uses (cache hits and successful "
-              f"sends); {a['replies_unresolved']} could not be followed to a cache entry. Each reply is summed once, "
-              "under the run that bought it; tokens are the cache entry's original usage.", "",
+              f"Run `{rid}` used {a['replies_used']} distinct request keys in {a['uses']} uses (cache hits and "
+              f"successful sends); {a['replies_unresolved']} could not be followed to a cache entry. Those keys hold "
+              f"{a['total']['replies']} replies across the {len(REPLY_NAMESPACES)} reply namespaces "
+              f"({', '.join(f'`{n}`' for n in REPLY_NAMESPACES)}): a request also sent as the turn-1 replicate or "
+              "the second vision reading has one entry per namespace under the same key, and every entry of a "
+              "used key counts. The table counts replies. Each reply is summed once, under the run that bought it; "
+              "tokens are the cache entry's original usage.", "",
               f"| bought by run | replies | uses | {tok_head} | cost settled | cost re-priced |",
               "|---|---:|---:|" + "---:|" * ncol + "---:|---:|"]
     for run, g in a["by_buying_run"].items():
@@ -573,7 +594,8 @@ def render_usage(u: Mapping[str, Any], *, report_id: str, created_at: str, comma
     lines += [f"| **total** | {t['replies']} | {a['uses']} | {_tok_cells(t)} | {_usd(t['cost_settled_usd'])} | "
               f"{_usd(t['cost_repriced_usd'])} |", "",
               f"- Model requests behind these replies: {t['replies']} (one per reply).",
-              f"- Per request (per reply): {_avg(a['per_reply'], 'reply')}.", "", "Per model:", "",
+              f"- Per request (per reply): {_avg(a['per_reply'], 'reply')}.",
+              f"- {_per_test_request(u)}.", "", "Per model:", "",
               f"| model | replies | uses | {tok_head} | cost settled |",
               "|---|---:|---:|" + "---:|" * ncol + "---:|"]
     lines += [f"| {m} | {g['replies']} | {g['uses']} | {_tok_cells(g)} | {_usd(g['cost_settled_usd'])} |"

@@ -25,7 +25,7 @@
  "final": true,
  "validation": {
   "A+": {
-   "F01_non_deletion_negation_traps": "fx-F01-Aplus-20261025T1435",
+   "F01_non_deletion_negation_traps": "fx-F01-Aplus-t127-20261025T1712",
    "F02_korean_deletion_syslog_export": "fx-F02-Aplus-20261025T1435",
    "F03_historical_uppercase_email": "fx-F03-Aplus-20261025T1435",
    "F04_lookalike_jr_and_duplicate_name": "fx-F04-Aplus-20261025T1435",
@@ -37,8 +37,8 @@
    "F10_legal_hold_and_attachment": "fx-F10-Aplus-20261025T1435",
    "F11a_missing_evidence_file": "fx-F11a-Aplus-20261025T1435",
    "F11b_malformed_request_rows": "fx-F11b-Aplus-20261025T1435",
-   "redteam/R01_negation_and_nondeletion": "fx-R01-Aplus-20261025T1435",
-   "redteam/R02_multilingual_requests": "fx-R02-Aplus-20261025T1435",
+   "redteam/R01_negation_and_nondeletion": "fx-R01-Aplus-t127-20261025T1712",
+   "redteam/R02_multilingual_requests": "fx-R02-Aplus-t127-20261025T1712",
    "redteam/R03_injection_request_and_evidence": "fx-R03-Aplus-20261025T1435",
    "redteam/R04_lookalike_sharing_trace": "fx-R04-Aplus-20261025T1435",
    "redteam/R05_post_audit_boundary": "fx-R05-Aplus-20261025T1435",
@@ -51,7 +51,7 @@
    "redteam/R12_malformed_request_rows_v2": "fx-R12-Aplus-20261025T1435"
   },
   "tools_off": {
-   "F01_non_deletion_negation_traps": "fx-F01-tools_off-20261025T1435",
+   "F01_non_deletion_negation_traps": "fx-F01-tools_off-t127-20261025T1712",
    "F02_korean_deletion_syslog_export": "fx-F02-tools_off-20261025T1435",
    "F03_historical_uppercase_email": "fx-F03-tools_off-20261025T1435",
    "F04_lookalike_jr_and_duplicate_name": "fx-F04-tools_off-20261025T1435",
@@ -63,8 +63,8 @@
    "F10_legal_hold_and_attachment": "fx-F10-tools_off-20261025T1435",
    "F11a_missing_evidence_file": "fx-F11a-tools_off-20261025T1435",
    "F11b_malformed_request_rows": "fx-F11b-tools_off-20261025T1435",
-   "redteam/R01_negation_and_nondeletion": "fx-R01-tools_off-20261025T1435",
-   "redteam/R02_multilingual_requests": "fx-R02-tools_off-20261025T1435",
+   "redteam/R01_negation_and_nondeletion": "fx-R01-tools_off-t127-20261025T1712",
+   "redteam/R02_multilingual_requests": "fx-R02-tools_off-t127-20261025T1712",
    "redteam/R03_injection_request_and_evidence": "fx-R03-tools_off-20261025T1435",
    "redteam/R04_lookalike_sharing_trace": "fx-R04-tools_off-20261025T1435",
    "redteam/R05_post_audit_boundary": "fx-R05-tools_off-20261025T1435",
@@ -78,7 +78,7 @@
   }
  },
  "custom_runs": {
-  "F01_non_deletion_negation_traps": "fx-F01-tools_off-20261025T1435",
+  "F01_non_deletion_negation_traps": "fx-F01-tools_off-t127-20261025T1712",
   "F06_regional_replica_and_active_connector": "fx-F06-tools_off-20261025T1435",
   "F08_tombstone_with_email_hash": "fx-F08-tools_off-20261025T1435",
   "F10_legal_hold_and_attachment": "fx-F10-tools_off-20261025T1435",

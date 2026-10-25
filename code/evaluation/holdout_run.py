@@ -472,12 +472,16 @@ def _num(v: Any) -> str:
     return "n/a" if not isinstance(v, (int, float)) else f"{v:.4f}"
 
 
-def holdout_section(record: Mapping[str, Any], *, current_head: str | None = None) -> str:
+def holdout_section(record: Mapping[str, Any], *, current_head: str | None = None,
+                    package_changed: bool | None = None, notes: Sequence[str] = ()) -> str:
     """Render the ``evaluation_report.md`` holdout section from a completed record, caveat first.
 
     Raises ValueError for a record that is not complete or carries no caveat: the section never
     renders a holdout number without ``notes/split.json``'s caveat. When ``current_head`` is given
-    and differs from the frozen commit, the section is marked "pre-change" (../CLAUDE.md section 6).
+    and differs from the frozen commit, the section is marked "pre-change" (../CLAUDE.md section 6),
+    and says whether ``code/deletion_audit`` differs between the two commits (``package_changed``,
+    computed by the caller with git; None: git could not tell). ``notes``: generated lines added
+    after the metric table (the caller computes them from the run's artifacts).
     """
     if record.get("status") != "complete":
         raise ValueError("holdout_section needs a completed holdout record")
@@ -498,7 +502,8 @@ def holdout_section(record: Mapping[str, Any], *, current_head: str | None = Non
     commit = str(record.get("freeze_commit") or "")
     if current_head is not None and current_head != commit:
         lines += [f"**Pre-change:** the code has changed since this run (HEAD `{current_head[:12]}`, frozen "
-                  f"`{commit[:12]}`). These numbers describe the frozen commit only.", ""]
+                  f"`{commit[:12]}`). These numbers describe the frozen commit only. "
+                  + _package_clause(package_changed), ""]
     lines += [
         f"- Frozen code: tag `{record.get('freeze_tag')}` at commit `{commit}`; freeze run "
         f"`{record.get('freeze_run')}`.",
@@ -520,10 +525,22 @@ def holdout_section(record: Mapping[str, Any], *, current_head: str | None = Non
         f"| Sequence exact | {_rate(h.get('sequence_exact'))} |",
         f"| Sequence pairwise order | {_rate(h.get('sequence_pairwise_order'))} |",
         "",
+        *notes,
+        *([""] if notes else []),
         LOCK_INCIDENT_NOTE,
         "",
     ]
     return "\n".join(lines)
+
+
+def _package_clause(changed: bool | None) -> str:
+    """The pre-change line's statement about ``code/deletion_audit`` (computed with git by the caller)."""
+    if changed is None:
+        return "Whether `code/deletion_audit` differs between the two commits was not computed (git failed)."
+    if changed:
+        return "`code/deletion_audit` (the code that writes `output.csv`) differs between the two commits."
+    return ("`code/deletion_audit` (the code that writes `output.csv`) is identical in the two commits "
+            "(`git diff --quiet <frozen> HEAD -- code/deletion_audit`); only other files changed.")
 
 
 # ---- command line ----------------------------------------------------------------------------
