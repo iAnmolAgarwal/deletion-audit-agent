@@ -5035,3 +5035,29 @@ parent_agent=none
 worktree=main
 branch=main
 repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T12:08:40+05:30] T105: G8 rulings (R04 per-record own key); order (i); fix-round-2 brief
+
+User Prompt (verbatim, secrets redacted):
+G8 rulings:
+1. R04: apply the own-key rule per record across all its observations, not per trace. If any observation's own key resolves the record to a person other than the requester, no lookup-only link may claim it for the requester. If own keys resolve to different people, flag it and fail the row closed. Expected signals: case_93031 gives its 5 steps; DEV 641dbc8d... and test cf2a90b0... stay byte-identical; every other fixture is unchanged. If either real hash changes, stop and show me the changed rows before going on. Add your safety net as a hard validator check: no step may name a record whose own key belongs to another known person.
+2-5. Approved as proposed: the R06 citation blanking and the single count; distinct R11 reasons; a committed test over R01-R12; my T104 changes (a) and (b). All five must leave the approved output's hash unchanged, then a fresh verifier on the round.
+Order: (i). Wiring → G7 verifier → stage 1 plus vision, with the fix round in parallel → its verifier. The mode-A run waits until the fix round's verifier passes, so the file I review is built on the final engine.
+
+Time is not a factor.
+
+Agent Response Summary:
+Orchestration decision (developer): G5 fix round 2 by orch-builder-core at high effort, directed_by 2026-10-25T12:07:17+05:30, runs in parallel with the G7 verifier and stage 1 once the wiring finishes (same agent type as the wiring), and gates the mode-A run through its own verifier. I recorded T105, including the developer's per-record own-key rule, the hard validator safety net and the stop-if-a-real-hash-moves condition. To run the verifier and the fix round in parallel without editing under each other, the checked wiring will be committed before its review, as with 92fabd2 and 73c2309, and the verifier and stage 1 run from an export of that commit. The fix-round-2 brief is written and launches when the wiring lands.
+
+Actions:
+* notes/DECISIONS.md T105; TASKS.md (the plan; the G8 findings).
+* scratchpad g5fix2_brief.md (0 lines starting with "## ["). Its six fixes are R04 per-record own key and the validator check, R06 blanking and a single count, R11 reasons, a committed R01–R12 test, T104 (a) and (b). It carries the output-lock stop rule, and the base commit is filled in at launch.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26

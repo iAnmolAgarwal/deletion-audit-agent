@@ -52,7 +52,14 @@ Rebuilt at the developer's direction (turn 2026-10-25T00:08:45+05:30). Updated a
     1. the four §11 review checkpoints have no log.txt entries yet;
     2. "I chose" and the D4c approval show only in the SESSION START provenance line (the prep session's, D16), so G10 must cite them truthfully;
     3. cite `g5-dev22-20261025T0530` for DEV 19/22.
-  - **G8 engine run done** (about 12:08; report `notes/agent_reports/g8_engine_run.md`). **Waiting for the developer's ruling on the fixes (T43):**
+  - **T105 ruled.** The plan:
+    1. the wiring is checked and committed;
+    2. the G7 verifier (export of that commit), in parallel with G5 fix round 2 (`orch-builder-core`, high; brief `g5fix2_brief.md`) and stage 1 plus vision (main, export);
+    3. the fix round's verifier;
+    4. then the mode-A run.
+    - Fix round 2: the R04 per-record own-key rule plus a hard validator check, R06 blanking and a single count, R11 reasons, a committed R01–R12 test, T104 (a) and (b).
+    - It stops and shows the changed rows if a real hash moves.
+  - **G8 engine run done** (about 12:08; report `notes/agent_reports/g8_engine_run.md`). Findings:
     1. **R04 case_93031 FAIL (custom eval case):** the engine plans to delete three other people's records. The cause is own-key precedence applied per line, not per trace and resource (`links.py:105-119`). The approved test output is unaffected (0 of 2895 trace groups).
     2. **R06:** the reason does not name the resource, and the written row keeps a citation that fails `HARD_CONTAINS`. The wiring adds the dedicated rule; the gate's handling of a failed `HARD_CONTAINS` citation is a G5 gap.
     3. **R11:** the reason labels are wrong (a SQL error and an unknown family are shown as `MISSING_EVIDENCE_FILE`).
