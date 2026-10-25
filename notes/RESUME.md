@@ -2,7 +2,7 @@
 
 The durable state is in these files. Read them first after a compaction:
 - `TASKS.md`: gate status, the agent queue, the G9 list and the freeze checks.
-- `notes/DECISIONS.md`: T1–T95, every developer ruling.
+- `notes/DECISIONS.md`: T1–T96, every developer ruling.
 - `notes/INTERFACES.md`:
   - §7 is G5's engine, amended by T68–T77; §7.1 holds its **as-built signatures**, accepted under T87.
   - §8 is GM's model client.
@@ -33,6 +33,7 @@ Scratchpad below means `/private/tmp/claude-501/-Users-anmolagarwal-hackerrank-o
 
 **Running:**
 - The G5 fix round: `orch-builder-core`, high, directed_by 2026-10-25T06:08:27+05:30, brief at scratchpad `g5fix_brief.md`, since about 06:52. On its verdict, T93 applies.
+- The holdout run build: `orch-eval-engineer`, high, directed_by 2026-10-25T06:32:14+05:30, brief `holdout_run_brief.md` (T96). Afterwards, main adds `holdout_unlock` to `pipeline.py` with the engine-guard tests, after G5 commits.
 - (Done: G7a, about 06:50, checked by main and uncommitted until the G7 verifier. Its wiring proposals and screenshot risks are on TASKS.md.)
 - G8 red team: `orch-redteam`, high, directed_by 2026-10-25T06:18:59+05:30, brief at scratchpad `g8_redteam_brief.md`. On completion, check the fixtures, then commit `code/tests/fixtures/redteam/` before any engine run.
 - (Done: the GP ruff cleanup, committed `447818a`, with all three baselines unchanged.)

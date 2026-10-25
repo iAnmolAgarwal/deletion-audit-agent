@@ -4380,3 +4380,35 @@ parent_agent=none
 worktree=main
 branch=main
 repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T06:34:01+05:30] T96: holdout run ruled; build launched; routing check and vision proposed
+
+User Prompt (verbatim, secrets redacted):
+Holdout run rulings:
+1. Keep the phrase, exact match. Fix gold.py:61 so the refusal no longer prints the phrase.
+2. Trigger: my message carries the phrase, and you run the command in that same turn. That keeps the trigger and my verbatim User Prompt in one log entry; a ! command may not land in log.txt as a prompt.
+3. Caps: $1 and 60 sends, as proposed.
+4. Build: approved. orch-eval-engineer (high), directed_by = this turn, starting now in the free slot. You add the unlock parameter to pipeline.py after G5 commits, and all of it lands before the G9 clean-cache run. Record the frozen commit as a git tag (freeze-<date>), and have holdout_run.py check HEAD against it. The report's holdout section repeats split.json's caveat: the prep forensics had read all 32 sample answers, so the holdout score is optimistic.
+
+Time is not a factor.
+
+Agent Response Summary:
+Orchestration decision (developer): orch-eval-engineer at high effort builds holdout_run.py, its static and behavioural tests and the gold.py:61 message fix, directed_by 2026-10-25T06:32:14+05:30. It gates the G9 clean-cache run, and main adds the pipeline.py unlock parameter after G5 commits. I recorded T96 and marked the proposal as ruled, with the freeze tag freeze-<YYYYMMDD> and split.json's caveat read from its created field. With G7a's per-call estimates, the reply also proposes the routing check and the vision step, with call counts and costs, to run after the G7 verifier.
+
+Actions:
+* Brief at scratchpad holdout_run_brief.md (0 lines starting with "## ["). It covers T96's five points; the engine runner and client factory are injectable, so tests use a fake runner and FakeTransport; synthetic gold only; runs/HOLDOUT_ACCESS.log must still not exist at the end; and an engine-guard test spec for main. Agent orch-eval-engineer launched (3 running: red team, G5 fix, holdout build).
+* notes/DECISIONS.md T96; notes/HOLDOUT_RUN_PROPOSAL.md (ruling section); TASKS.md; notes/RESUME.md.
+* Routing proposal, from G7a's estimates of about $0.0103 per call expected, $0.021 high and $0.063 worst-case reservation:
+  - stage 1: 37 texts × 2 = 74 calls, about $0.76 expected and $1.56 high, plus 2 calls per G8 red-team text once committed;
+  - vision: 22 calls, $0.49 expected and $1.04 high;
+  - stage 2: 368 new test texts × 2 = 736 calls, $7.6 expected and $15.5 high.
+* The previous [auto] turn's commit was f0b867a.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26

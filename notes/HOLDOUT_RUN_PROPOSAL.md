@@ -1,6 +1,6 @@
 # How the HOLDOUT EVALUATION RUN gets past the holdout guards: a proposal (for the developer's ruling)
 
-Main drafted this at 2026-10-25 ~06:27 IST at the developer's request. It is a proposal only; nothing here is built.
+Main drafted this at 2026-10-25 ~06:27 IST at the developer's request. **Ruled by the developer under T96 (2026-10-25T06:32:14+05:30):** approved, with the changes listed in the ruling section at the end.
 
 ## What exists today (main checked)
 - **Gold side:** `evaluation/gold.py`. `load_gold(holdout=True, unlock_phrase=...)` opens holdout gold only when the phrase equals `UNLOCK_PHRASE = "HOLDOUT EVALUATION RUN"`. Otherwise it raises `HoldoutLockedError` before any I/O. A granted unlock prints a stderr banner and appends one JSON line to `runs/HOLDOUT_ACCESS.log`.
@@ -66,3 +66,11 @@ The phrase is a constant in the source, not a secret. The lock stops accidental 
 2. Trigger (a) or (b).
 3. The paid-call caps for the 10 holdout texts.
 4. The build: `orch-eval-engineer` (high) builds `holdout_run.py`, the static and behavioural tests and the message fix. The `holdout_unlock` parameter goes into `pipeline.py` after G5 commits. Both land before the G9 clean-cache run, so the final verifier and judge review them.
+
+## The ruling (T96, 2026-10-25T06:32:14+05:30)
+1. The phrase is kept, matched exactly. `gold.py:61` stops printing it.
+2. **Trigger (a):** the developer's message carries the phrase, and main runs the command in that same turn. A `!` command may not land in log.txt as a prompt.
+3. Caps: $1 and 60 sends.
+4. Build: `orch-eval-engineer` (high), started at about 06:33 with brief `holdout_run_brief.md`. Main adds `holdout_unlock` to `pipeline.py` after G5 commits, together with the engine-guard tests. All of it lands before the G9 clean-cache run.
+5. **The frozen commit is the git tag `freeze-<YYYYMMDD>`,** created by main at freeze. `holdout_run.py` takes `--freeze-tag` instead of `--freeze-commit` and checks that HEAD equals the tag's commit.
+6. The holdout section repeats `notes/split.json`'s `created` caveat: the split was made after the prep forensics had read all 32 sample answers, so the score is optimistic.
