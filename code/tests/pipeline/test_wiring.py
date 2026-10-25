@@ -103,10 +103,14 @@ class TestPaidRun(Base):
         cases = cases_jsonl(d)
         a1, a2 = cases[C1]["agent"], cases[C2]["agent"]
         self.assertEqual((a1["intent"]["source"], a1["audit_case_calls"]), ("MODEL", 1))
-        self.assertEqual((cases[C2]["status"], cases[C2]["n_steps"]), ("NOT_APPLICABLE", 0))
+        # C2's NOT_DELETION has one turn-1 reading (the replicate missed), so the intent change fails its
+        # condition: the output and cases.jsonl carry the model-free row; output_raw.csv the computed one
+        self.assertNotEqual(cases[C2]["status"], "NOT_APPLICABLE")
+        self.assertIn("MODEL_CHANGE_FELL_BACK", {f["code"] for f in cases[C2]["flags"]})
+        self.assertIn(f"{C2},NOT_APPLICABLE,[]", (d / "output_raw.csv").read_text(encoding="utf-8"))
         self.assertEqual(a2["intent"]["committed_label"], "NOT_DELETION")
         self.assertEqual(a2["turn1_replicates"], ["NOT_DELETION", None])  # replicate namespace: replay miss
-        self.assertEqual(cases[C2]["intent_label"], "NOT_DELETION")
+        self.assertIsNone(cases[C2]["intent_label"])  # the fallback record is the model-free one (fail-closed)
         self.assertIn("instruction_like_text", cases[C1])
         calls = [json.loads(x) for x in (d / "calls.jsonl").read_text(encoding="utf-8").splitlines()]
         self.assertEqual(sum(1 for c in calls if c["event"] == "send"), 3)
@@ -261,8 +265,13 @@ class TestVisionWiring(Base):
         self.assertTrue(line["agent"]["steps_differ_when_applied"])
         self.assertIn(q, line["open_questions"])
         self.assertEqual(line["answers"], [q])
-        flow = next(r for r in line["resources"] if r["resource_id"] == "data_flow_900000003")
-        self.assertEqual(flow["outcome"], "FINDING")  # the answered field (sync enabled) is now a finding
+        # the answered field (sync enabled) gives a finding in the computed row; the readings disagree on
+        # it, so the change falls back to the model-free row (T118 rule (a)) and cases.jsonl says so
+        raw = next(x for x in (self.runs / "ans" / "output_raw.csv").read_text(encoding="utf-8").splitlines()
+                   if x.startswith(C1 + ","))
+        self.assertIn("FINDING", raw)
+        changes = read_json(self.runs / "ans" / "regression_vs_engine.json")
+        self.assertIn((C1, "image", "fell_back"), [(r["case_id"], r["cause"], r["verdict"]) for r in changes["rows"]])
 
     def test_texts_never_reach_the_artifacts(self) -> None:
         root = self.write(image=PNG)

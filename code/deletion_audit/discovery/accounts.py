@@ -1,32 +1,42 @@
-"""Primary-account assignment: one global pass over every request of both request files (T32).
+"""Primary-account assignment: one global pass over every request of both request files.
 
-Order (each stage with its basis; ``notes/gold_forensics.md`` G2 follow-up 2 baseline,
-``g2f2-g2f2_baseline-0242``: DEV 21/22 accounts correct, one hand-built DEV account a known miss):
+Rule: every request gets at most one primary account, from the first stage below that finds one,
+and one account has one owner per *person* (two requests of one person may share it). Reason: an
+account candidate is shared between requests, so only a pass over all requests can keep two people
+from getting the same account (T29, T32 in code/docs/DECISIONS.md). Baseline on DEV, run
+``g2f2-g2f2_baseline-0242``: 21 of 22 accounts correct; the one miss is a hand-built DEV account.
 
-1. **S1 identifier link**: an ``account_service`` record linked to the person in the window.
-   Basis: T4 step 1; DEV 11/11.
-2. **S2 timed rule**: account delete rows -75..-44 min before ``reported_at`` (inclusive) whose
-   result matches the reported status, excluding accounts that any input ties to another person
-   (the owner filter). Basis: T4 step 2; DEV 7/7; test pseudo-labels 116/116 (full mask).
-3. **T26**: only when S1 and S2 find nothing: a delete row within +-10 min, result-matched,
-   owner-filtered. Basis: T26 (Option A); DEV 3/3, test 0. The mismatched-result fallback is not
-   shipped (T4 "not shipped"; its one DEV case stays a known miss, T58).
-4. **S3 one-to-one**: unique candidates are fixed and removed from other people's candidate sets,
-   to a fixed point. One owner per *person*, not per case: two requests of one person may share an
-   account (T29).
-5. **S4 D17 fingerprint**, then S4b one-to-one again. Basis: T5; DEV 4/4 under ablation; test
-   pseudo-labels 77/77 and 28/28.
-6. **S5 flagged pick** (T6/T39): a one-to-one *matching* per group of tied requests: the most
-   picks, then the smallest total distance from -60 min, then the order of sha256 of the
-   person's ``user_id``. It is openly a coin flip and every pick is flagged (T39, T57).
-7. **T27**: still nothing: the person's own email or phone as a log lookup key joined to an
-   account on the same trace, at any line time. Identity only: the account's state and every
-   citation still come from evidence at or before ``audit_at``; flagged. Basis: T27.
-8. **T28**: still nothing: no account step, flagged; an account ID is never invented.
+1. **S1 identifier link:** an ``account_service`` record linked to the person in the request
+   window. DEV 11 of 11 (T4).
+2. **S2 timed rule:** account delete rows -75..-44 min before ``reported_at`` (inclusive) whose
+   result matches the reported status, leaving out accounts any input ties to another person (the
+   owner filter). DEV 7 of 7; on test with identifier links hidden, it picks the linked account
+   116 of 116 (T4).
+3. **T26 near window:** only when S1 and S2 find nothing, a delete row within +-10 min,
+   result-matched and owner-filtered. DEV 3 of 3, test 0. The mismatched-result fallback is not
+   used; its one DEV case stays a known miss (T26, T58).
+4. **S3 one-to-one:** a request with a single candidate keeps it, and that account leaves the
+   other people's candidate sets, repeated to a fixed point.
+5. **S4 D17 fingerprint, then S4b one-to-one again:** keep the candidates whose timing phase fits
+   every one of the person's own deletion-worker rows (bands and their basis in ``config.py``'s
+   job-timing block). On test with identifier links hidden: 77 of 77 and 28 of 28 (T5).
+6. **S5 tie order:** for each group of requests still tied over shared candidates, a one-to-one
+   matching is chosen that gives the most requests an account, then the smallest total distance
+   of the picked rows from -60 min. Among matchings still equal, the requests are taken in the
+   order of sha256 of the resolved ``user_id``, each preferring its own candidates by distance from
+   -60 min and then by account ID. No input separates these ties, so the order is deterministic
+   but carries no evidence: every row it decides is flagged ``D18_TIE_PICK`` (T6, T39, T57). In
+   the shipped test run ``cand-test-Aplus-20261025T1352`` it decides 27 of 518 cases (25 between
+   2 candidates, 2 among 3; ``cases.jsonl``, account stage ``S5_TIE_PICK``).
+7. **T27 later lookup:** still nothing: the person's own email or phone used as a log lookup key,
+   joined on the same trace to an account, at any line time. This settles identity only: the
+   account's state and every citation still come from evidence at or before ``audit_at``; flagged.
+8. **T28 none:** still nothing: no account step, flagged. An account ID is never invented.
 
-No stage reads ``sample_output.csv``, a case ID, a file name or a row position. Every order is
-named: visiting and tie order are sha256 of the resolved ``user_id`` (an unresolved request uses
-sha256 of its email), then the request's own times.
+T-numbers refer to the developer's rulings in code/docs/DECISIONS.md; D17 is the job-timing
+fingerprint (T5) and D18 the tie pick (T6). No stage reads sample answers, a case ID, a file name
+or a row position. Every order is named: the visiting and tie order is sha256 of the resolved
+``user_id`` (an unresolved request uses sha256 of its email), then the request's own times.
 """
 
 from __future__ import annotations
@@ -103,13 +113,13 @@ def person_key(req: DeletionRequest, ident: IdentityResolution) -> str:
 
 
 def order_key(req: DeletionRequest, ident: IdentityResolution) -> str:
-    """T39 tie order: sha256 of the resolved ``user_id`` (else of the email), then the request times."""
+    """The visiting and tie order: sha256 of the resolved ``user_id`` (else of the email), then the request times."""
     base = ident.person or req.email.value
     return hashlib.sha256(base.encode("utf-8")).hexdigest() + "|" + req.requested_at + "|" + req.reported_at
 
 
 def account_delete_rows(activity: Sequence[ActivityRow]) -> tuple[ActivityRow, ...]:
-    """Every ``DELETE_RECORD`` row aimed at ``account_service`` (G2 Q1 definition), file order."""
+    """Every ``DELETE_RECORD`` row aimed at ``account_service`` in file order."""
     return tuple(
         a for a in activity if a.event_type == "DELETE_RECORD" and a.target_system == ACCOUNT_SYSTEM and a.resource_id
     )
@@ -277,12 +287,12 @@ def _components(sts: list[_State]) -> list[list[_State]]:
 
 
 def _tie_cost(st: _State, rep: str, k: str) -> tuple[float, str]:
-    """Distance of a candidate from -60 min, then its ID (the S5 cost; T39)."""
+    """Distance of a candidate from -60 min, then its ID: a request's preference order in S5."""
     return (abs(offset_min(st.candidates[k], rep) + 60), k)
 
 
 def _s5(states: dict[str, _State]) -> None:
-    """T6/T39 flagged pick: a maximum one-to-one matching per tied group (module docstring)."""
+    """S5: a deterministic one-to-one matching per tied group, each pick flagged (module docstring, stage 6)."""
     unresolved = sorted((s for s in states.values() if s.stage is None and s.candidates), key=lambda s: s.order)
     for comp in _components(unresolved):
         comp.sort(key=lambda s: s.order)

@@ -1,15 +1,18 @@
 """One call per case for the pipeline: loop -> answer validation -> intent -> compile twice -> report.
 
-The pipeline wiring (after G5 commits) calls :func:`audit_with_agent` for each case and writes
-``result.applied`` (the record whose steps are the output, except that a FAILED loop is replaced
-by the engine-path row in ``pipeline.run``, flagged ``AGENT_CALL_FAILED``) and ``result.report`` (the ``"agent"``
-object of ``cases.jsonl``). The withheld compilation exists only to measure whether the answers
-changed the row (G3 section 9 item 2).
+``pipeline.run`` calls :func:`audit_with_agent` for each case. It writes ``result.report`` as the
+``"agent"`` object of ``cases.jsonl``. It writes ``result.applied`` (the record compiled with the
+validated answers applied) as the row, except when the loop's status is FAILED: then the pipeline
+writes the engine-path row without model intent instead, flagged ``AGENT_CALL_FAILED`` (T109 (a)
+in code/docs/DECISIONS.md).
 
-Image answers (G7a wiring proposal 6): a validated ``IMAGE_FIELD_UNREADABLE`` answer fills one
-image field, so the applied compilation needs a world built on the patched image observations.
-The caller passes ``world_for_answers``, which builds that world from the validated answers; it is
-called only when such an answer exists, so a case without one compiles on ``world`` alone.
+The answers are compiled twice, applied and withheld. The withheld compilation is never written;
+it only measures whether the answers changed the row (``steps_differ_when_applied``).
+
+Image answers: a validated ``IMAGE_FIELD_UNREADABLE`` answer fills one image field, so the applied
+compilation needs a world built on the patched image observations. The caller passes
+``world_for_answers``, which builds that world from the validated answers. It is called only when
+such an answer exists, so a case without one compiles on ``world`` alone.
 """
 
 from __future__ import annotations
@@ -42,7 +45,7 @@ class AgentCaseResult:
 
     @property
     def applied(self) -> CaseRecord:
-        """The record whose steps are written (answers applied)."""
+        """The record compiled with the validated answers applied; ``pipeline.run`` writes it unless the loop FAILED."""
         return self.compiled.applied
 
 

@@ -11,12 +11,17 @@ from typing import Any
 from deletion_audit.agent.crosscheck import intake_crosscheck
 from deletion_audit.agent.loop import FixedIntent
 from deletion_audit.agent.tools import TOOL_NAMES, CaseTools, tool_definitions
-from deletion_audit.engine import EngineBrief, audit_case, brief
-from deletion_audit.record import CrossCheck, IntentDecision
+from deletion_audit.engine import EngineBrief, audit_case
+from deletion_audit.record import CaseRecord, CrossCheck, IntentDecision
 
 from ._support import ADA, BO, C1, C2, dataset, world_of
 
 TOOLS_SOURCE = Path(__file__).resolve().parents[2] / "deletion_audit" / "agent" / "tools.py"
+
+
+def brief(record: CaseRecord) -> EngineBrief:
+    """An engine brief with no open questions, built from one engine record."""
+    return EngineBrief(record.case_id, record.resources, record.citation, (), record.flags)
 
 
 def tools_for(case_id: str, intake_for_ada: bool = False) -> CaseTools:

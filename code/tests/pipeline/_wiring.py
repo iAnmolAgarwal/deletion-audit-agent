@@ -1,4 +1,4 @@
-"""Shared builders for the G7 wiring tests: model setups on GM's FakeTransport, cache seeding, approvals.
+"""Shared builders for the G7 wiring tests: model setups on GM's FakeTransport, cache seeding, a planted model-free row.
 
 Every value is made up (the agent tests' synthetic datasets). No test here makes a network call,
 reads ``.env``, reads the repo's reply cache or run directories, or opens a gold file: every cache
@@ -7,18 +7,20 @@ and run directory is a temporary one.
 
 from __future__ import annotations
 
-import hashlib
+import contextlib
+import dataclasses
 import json
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from pathlib import Path
 from typing import Any
+from unittest import mock
 
 from deletion_audit.agent.intent import run_turn1
 from deletion_audit.agent.tools import tool_definitions
 from deletion_audit.model import BudgetGuard, FakeTransport, MemoryCallLog, ModelClient, ReplyCache, RetryPolicy
 from deletion_audit.pipeline import ModelSetup, namespace_roots
 
-from ..agent._support import ADA, tmpdir
+from ..agent._support import ADA
 
 
 def paid_setup(cache_dir: Path, script: Sequence[Any], *, dollar_cap: float = 5.0, call_cap: int = 200) -> ModelSetup:
@@ -46,26 +48,25 @@ def seed_turn1(cache_dir: Path, text: str, replies: Sequence[dict[str, Any]]) ->
             client.close()
 
 
-def approve(output: Path, *, plant: tuple[str, str] | None = None) -> Path:
-    """An approved-output record (T101) for ``output`` (absolute path). ``plant`` = (case_id, status)
-    rewrites that row's status in a copy first, so the baseline differs from the run with no cause."""
-    target = output
-    if plant is not None:
-        lines = output.read_text(encoding="utf-8").splitlines(keepends=True)
-        cid, status = plant
-        out = []
-        for line in lines:
-            if line.startswith(cid + ","):
-                rest = line.split(",", 2)
-                line = ",".join([rest[0], status, rest[2]])
-            out.append(line)
-        target = output.with_name("planted_output.csv")
-        target.write_text("".join(out), encoding="utf-8")
-    record = tmpdir() / "approved_output.json"
-    sha = hashlib.sha256(target.read_bytes()).hexdigest()
-    record.write_text(json.dumps({"approved_output": {"run_id": "synthetic", "path": str(target), "sha256": sha}}),
-                      encoding="utf-8")
-    return record
+@contextlib.contextmanager
+def plant_model_free(case_id: str | None = None) -> Iterator[None]:
+    """Patch ``pipeline.model_free_records`` so one case's model-free row (default: the first case) loses
+    its last step: the run's row then differs from it with no model input to explain it, so the
+    model-change check must mark it ``stop``."""
+    from deletion_audit import pipeline
+
+    real = pipeline.model_free_records
+
+    def planted(*args: Any, **kw: Any) -> dict[str, Any]:
+        out = real(*args, **kw)
+        cid = case_id or sorted(out)[0]
+        if not out[cid].steps:
+            raise AssertionError(f"{cid} has no step to plant a difference on")
+        out[cid] = dataclasses.replace(out[cid], steps=out[cid].steps[:-1])
+        return out
+
+    with mock.patch.object(pipeline, "model_free_records", planted):
+        yield
 
 
 def reading(records: Sequence[dict[str, Any]]) -> dict[str, Any]:

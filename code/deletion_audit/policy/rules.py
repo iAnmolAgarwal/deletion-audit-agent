@@ -1,34 +1,40 @@
 """Policy: a record's data category, and what ``deletion_rules.csv`` requires for its state.
 
-Category rules, each with its basis:
+T-numbers refer to the developer's rulings in code/docs/DECISIONS.md.
 
-* By system: account -> USER_PROFILE (rule_01), search -> SEARCH_INDEX_ENTRY (rule_03), export ->
-  USER_EXPORT (rule_09), security -> SECURITY_AUDIT_LOG (rule_12), legal -> LEGAL_HOLD_RECORD
+Category rules, each rule then its reason:
+
+* **By system:** account -> USER_PROFILE (rule_01), search -> SEARCH_INDEX_ENTRY (rule_03), export
+  -> USER_EXPORT (rule_09), security -> SECURITY_AUDIT_LOG (rule_12), legal -> LEGAL_HOLD_RECORD
   (rule_13), backup -> BACKUP_ARCHIVE (rule_14), identity -> ACCOUNT_TOMBSTONE (rule_15),
   marketing -> MARKETING_PROFILE (rule_10), object storage -> SUPPORT_ATTACHMENT, integration ->
-  DATA_FLOW (no rule row; research/15 R9). Basis: research/15 R9/R10, DEV 29/29 findings.
-* R11 content cue: an analytics record seen as a contact lookup or carrying ``email_opt_in`` is a
-  marketing record (DELETE, not ANONYMIZE). Basis: research/15 R11 (one DEV case; the worker's own
-  row for it is the only analytics DELETE in 4,011 rows).
-* T55 support category: an attachment cue visible at or before ``audit_at`` makes a support
-  record an attachment (rule_06 DELETE); otherwise the deletion worker's own action decides,
-  flagged: only DELETE rows -> attachment, only REDACT rows -> message; otherwise a message
-  (rule_05 REDACT). Basis: T55; G2 H4 (184/184 agreement where both are visible).
+  DATA_FLOW (no rule row). Reason: the DEV sample answers categorize every record this way (29 of
+  29 findings).
+* **An analytics record seen as a contact lookup, or carrying ``email_opt_in``, is a marketing
+  record** (DELETE, not ANONYMIZE). Reason: one DEV case shows it, and the deletion worker's own
+  row for that record is the only analytics DELETE in 4,011 activity rows.
+* **A support record is an attachment** (rule_06 DELETE) when an attachment cue is visible at or
+  before ``audit_at``. Without a cue the deletion worker's own action decides, flagged: only
+  DELETE rows -> attachment, only REDACT rows -> message; otherwise a message (rule_05 REDACT).
+  Reason: where both are visible, cue and worker action agree on 184 of 184 records (T55 in
+  code/docs/DECISIONS.md).
 
-Decision table (``deletion_rules.csv`` action, mapped as DEV shows; the rule *conditions* are not
-gated, G2 Q6):
+Decision table (the ``deletion_rules.csv`` action, mapped as the DEV sample answers show). The rule
+*conditions* are not checked: the actions alone match DEV on 29 of 29 findings and 47 compliant
+verifications (T9 in code/docs/DECISIONS.md).
 
 * DELETE: PRESENT / IDENTIFIABLE -> REPORT_REMAINING_RECORD, DELETE_RECORD, VERIFY_RECORD_ABSENT;
   otherwise VERIFY_RECORD_ABSENT.
 * REDACT: IDENTIFIABLE / EXPOSED_PII -> REPORT_EXPOSED_PII, REDACT_RECORD, VERIFY_RECORD_REDACTED;
-  otherwise VERIFY_RECORD_REDACTED (rule_15: a clean tombstone in DEV; T9 for a PII one).
+  otherwise VERIFY_RECORD_REDACTED (rule_15: a clean tombstone in DEV; T9 for one that holds PII).
 * ANONYMIZE: IDENTIFIABLE -> REPORT_EXPOSED_PII, ANONYMIZE_RECORD, VERIFY_RECORD_ANONYMIZED;
   otherwise VERIFY_RECORD_ANONYMIZED.
-* RETAIN (audit log, legal hold): never a finding, never a delete -> VERIFY_RECORD_PRESENT
-  (rule_12/13; 17 DEV steps; T42 "a legal hold is retained, never deleted").
-* RETAIN, BACKUP_ARCHIVE: rule_14's condition is "restore access can be blocked", and DEV shows
-  the restore path, never VERIFY_RECORD_PRESENT (4/4 DEV backups): RESTORABLE ->
-  REPORT_RESTORE_RISK, BLOCK_RESTORE, VERIFY_RESTORE_BLOCKED; otherwise VERIFY_RESTORE_BLOCKED.
+* RETAIN (audit log, legal hold): never a finding, never a delete -> VERIFY_RECORD_PRESENT. Reason:
+  a retained record must stay (rule_12/13; 17 DEV steps; T42: "a legal hold is retained, never
+  deleted").
+* RETAIN, BACKUP_ARCHIVE: RESTORABLE -> REPORT_RESTORE_RISK, BLOCK_RESTORE, VERIFY_RESTORE_BLOCKED;
+  otherwise VERIFY_RESTORE_BLOCKED. Reason: rule_14's condition is "restore access can be
+  blocked", and all 4 DEV backups take the restore path, never VERIFY_RECORD_PRESENT.
 * DATA_FLOW: FLOW_ENABLED -> REPORT_ACTIVE_DATA_FLOW, DISABLE_DATA_FLOW, VERIFY_DATA_FLOW_DISABLED;
   otherwise VERIFY_DATA_FLOW_DISABLED.
 * A record with no state gets no step (``NO_STEP``), as does a hold that names no resource (T69).
@@ -190,9 +196,9 @@ def decide(state: ResourceState, cat: Categorization, rules: RuleTable) -> Polic
 
 
 def _attachment_cue(o: Observation, attachment_documents: frozenset[str]) -> bool:
-    """A visible attachment cue on one record (research/15 R12). A PDF's cue is document-level: a
-    record named on any page of a document that calls itself an attachment (research/15 read the
-    whole text layer; in the one DEV attachment the cue is on page 2, the record on page 1)."""
+    """A visible attachment cue on one record. A PDF's cue is document-level: a record named on any
+    page of a document that calls itself an attachment counts, because in the one DEV attachment
+    PDF the cue is on page 2 and the record on page 1."""
     a = leaves(o)
     if o.event == "attachment_pii_scan" or is_attachment_listing(o):
         return True
@@ -204,7 +210,7 @@ def _attachment_cue(o: Observation, attachment_documents: frozenset[str]) -> boo
 
 
 def attachment_documents(observations: Sequence[Observation]) -> frozenset[str]:
-    """PDF files whose text layer (any page) says "attachment" (research/15 R12 cue)."""
+    """PDF files whose text layer (any page) says "attachment" (the document-level cue above)."""
     return frozenset(
         o.file_id for o in observations if o.locator.kind == "pdf_page" and "attachment" in (o.text or "").lower()
     )
@@ -216,7 +222,6 @@ def categorize(
     activity: Sequence[ActivityRow],
     audit_at: str,
     *,
-    catalog_attachment: bool = False,
     attachment_documents: frozenset[str] = frozenset(),
 ) -> Categorization:
     """The record's data category (module docstring). ``activity`` is the resource's own rows."""
@@ -227,7 +232,7 @@ def categorize(
         return Categorization("ANALYTICS_PROFILE", "resource_type")
     if system == "support_platform":
         visible = [o for o in observations if at_or_before(observation_time(o), audit_at)]
-        if catalog_attachment or any(_attachment_cue(o, attachment_documents) for o in visible):
+        if any(_attachment_cue(o, attachment_documents) for o in visible):
             return Categorization("SUPPORT_ATTACHMENT", "content_cue")
         acts = {
             a.event_type

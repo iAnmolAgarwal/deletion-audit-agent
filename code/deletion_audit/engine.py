@@ -1,64 +1,57 @@
 """The deterministic auditor: inputs -> one :class:`~deletion_audit.record.CaseRecord` per case.
 
-Stages (``notes/ARCHITECTURE_OPTIONS.md`` section 1.0): parse evidence (GP) -> resolve identity
--> link records -> assign primary accounts (global, both request files, T32) -> attach
-identifier-free analytics (global) -> per case: state at ``audit_at``, category, decision,
-citation, steps -> pre-write validation.
+T-numbers refer to the developer's rulings in code/docs/DECISIONS.md.
+
+Stages: parse the evidence -> resolve each request's identity -> link records to people -> assign
+primary accounts (one global pass over both request files) -> attach identifier-free analytics
+records (global) -> per case: each record's state at ``audit_at``, its category and decision, the
+citation, the steps -> pre-write validation.
 
 The engine settles every fact. The model (``agent/``, wired in ``pipeline.run``) supplies the
-request intent and screenshot readings and may answer typed open questions; without a validated
-model intent a case takes the fail-closed deletion path of T71 Q2.
+request intent and the screenshot readings, and may answer typed open questions. A case with no
+validated model intent takes the deletion path and is flagged, because an unread request must not
+become NOT_APPLICABLE (T71 Q2 in code/docs/DECISIONS.md).
 
-Fail-closed rules, each with its basis:
+Fail-closed rules. A FAILED_CLOSED row is INCOMPLETE and keeps the steps the other inputs still
+give; it is never COMPLETE. Each rule, then its reason:
 
-* **T8**: a non-OK evidence file is never read as "nothing found". A file that failed for a
-  structural reason (``ERROR``, ``EMPTY``, unknown or ambiguous family, a non-PNG that needs a
-  model) could concern anyone, so every case whose ``audit_at`` is at or after its capture time
-  depends on it. A PNG that waits for the vision gate (``NEEDS_MODEL`` with the PNG signature,
-  T72) is a dependency of a case only where a record is known solely through a catalog row and no
-  parsed evidence gives its state. A case with a dependency is FAILED_CLOSED (INCOMPLETE with the
-  steps the other inputs still give), never COMPLETE: T8 as restated by T86 item 1; a file the
-  manifest names but the disk lacks gives the reason MISSING_EVIDENCE_FILE.
-* **T86 item 2**: a request row that could not be loaded gives a FAILED_CLOSED row for its case
-  (when the case ID is readable) with no step; every such row is listed in the run artifacts.
-* **T63**: an unresolved identity is searched by the raw request email and its hash, and a
+* **An evidence file that did not parse is never read as "nothing found".** A file that failed
+  for a structural reason (``ERROR``, ``EMPTY``, an unknown or ambiguous family, a non-PNG that
+  needs a model) could concern anyone, so every case whose ``audit_at`` is at or after its capture
+  time depends on it. A PNG still waiting for the vision step is a dependency only of a case with a
+  record known solely through a catalog row and with no parsed state. The reason names the kind:
+  MISSING_EVIDENCE_FILE, EVIDENCE_PARSE_ERROR, UNKNOWN_EVIDENCE_FAMILY, else UNPARSED_DEPENDENCY,
+  with one FAILED_DEPENDENCY flag per file. Reason: an unread file may hold the very record the
+  audit must report (T8, T86 item 1 and T105 in code/docs/DECISIONS.md).
+* **A screenshot the vision step read is not unread.** A PNG in ``AuditContext.vision_read`` (both
+  of its readings succeeded, so its records are in ``image_observations``) is neither pending nor
+  a dependency. A PNG whose reading failed, or that was never read, stays a dependency as above.
+* **A request row that could not be loaded** gives a FAILED_CLOSED row with no step when its case
+  ID is readable, because nothing else in the row can be trusted (T86 item 2).
+* **An unresolved identity** is searched by the raw request email and its hash only, and a
   deletion request's row is FAILED_CLOSED(IDENTITY_UNRESOLVED). A request the model reads as
-  NOT_DELETION is NOT_APPLICABLE whatever the identity, since nothing is to be deleted.
-* **T71 Q11**: an image whose subject is not the person a catalog row names keeps the record in
-  scope (the catalog link wins) and raises IMAGE_SUBJECT_CONFLICT.
-* **UNINTERPRETED_RECORD** (``../CLAUDE.md`` section 3, "a failed read is never nothing found";
-  developer approval 2026-10-25T06:08:27+05:30, G5 verifier finding 5): a record in the case's
-  scope that has evidence at or before ``audit_at``, but from which the engine derives no step
-  (no state can be read from it, or no rule covers its category, such as an unknown system), fails
-  the row closed with its own reason and flag. R8's no-step rule stays for a record with no
-  observation at all, and T69 is unchanged: a legal-hold register entry that names no resource is
-  not a record here (records are keyed by resource ID), so it still gives no step. Real data
-  (runs ``g5fix1-dev22-20261025T0650``, ``g5fix1-test-20261025T0650``): 0 such records; the only
-  NO_STEP records are 3 catalog-only records with no observation, waiting for images, already
-  FAILED_CLOSED(UNPARSED_DEPENDENCY).
-* **A screenshot the vision step read is not unread** (G7a wiring proposal 5; T60: zero skips at
-  freeze). A PNG named in ``AuditContext.vision_read`` (both of its readings succeeded, so its
-  records are in ``image_observations``) is neither a pending image nor a skip. A PNG whose
-  reading failed, or that was never read, stays a :class:`FileFailure` and an unparsed dependency
-  exactly as T8 says.
-* **Fix round 2 (T104, T105, T108, T112):** an unread dependency names its own kind
-  (MISSING_EVIDENCE_FILE, EVIDENCE_PARSE_ERROR, UNKNOWN_EVIDENCE_FAMILY, else UNPARSED_DEPENDENCY)
-  with a FAILED_DEPENDENCY flag per file (R11); a record whose own keys name a known person other
-  than the requester fails the row closed as OWN_KEY_CONFLICT (R04; ``discovery/links.py``); a state
-  that no rule covers is NO_CATEGORY_RULE, never a silent NO_STEP (T104 (a); T69 is unchanged,
-  since a hold that names no resource is not a record); a retained record whose state is not
-  PRESENT keeps VERIFY_RECORD_PRESENT, flagged PRESENT_CLAIM_OVER_STATE (T104 (b); DEV gold does
-  the same on 9 audit records); a record that would wait on an image (STATE_NEEDS_IMAGE) when the
-  images were read and no reading mentions it is IMAGE_OMITS_CATALOG_RECORD (T108, T112), and one
-  a reading shows with no visible state is IMAGE_STATE_NOT_SHOWN (T112 item 9: an omission
-  elsewhere never stands in for the screenshot the record waited on). Measured
-  on real data, replay-only: DEV and test output hashes unchanged (``notes/approved_output.json``).
-* **POST_AUDIT_ONLY_FINDING** (developer ruling T101 on red-team fixture R06): a FINDING whose
-  record is held only by files captured after ``audit_at`` fails its row closed with its own
-  reason and a ``POST_AUDIT_ONLY_FINDING`` flag naming the resource. Such a finding can cite no
-  file that both contains it and was captured at or before ``audit_at`` (T66 rule 1 and CD-F21
-  cannot both hold), so the row is decided here, never left to the validator. Measured by main on
-  real data: 0 such findings on DEV and on test.
+  NOT_DELETION is NOT_APPLICABLE whatever the identity, since nothing is to be deleted (T63).
+* **A record whose own keys name another known person** fails the row closed as
+  OWN_KEY_CONFLICT, because deleting it could delete someone else's data (T105).
+* **A FINDING held only by files captured after ``audit_at``** fails the row closed as
+  POST_AUDIT_ONLY_FINDING: no citable file both contains it and was captured at or before
+  ``audit_at``, so no valid step can be written for it (T101).
+* **A state that no rule covers** is NO_CATEGORY_RULE, never a silently dropped record, because a
+  dropped record could let a COMPLETE row hide it (T104 (a)). A legal-hold entry that names no
+  resource is not a record here (records are keyed by resource ID), so it still gives no step (T69).
+* **A record that waited on a screenshot** is IMAGE_OMITS_CATALOG_RECORD when the images were read
+  and none mentions it, and IMAGE_STATE_NOT_SHOWN when a reading shows it with no visible state.
+  An omission elsewhere never stands in for the screenshot the record waited on (T108, T112).
+* **A record with evidence at or before ``audit_at`` from which no step follows** is
+  UNINTERPRETED_RECORD, because evidence the engine cannot read is no proof of absence. A record
+  with no observation at all still gets no step; only an account with no observation is read as
+  absent by default.
+* **A case with no FINDING or COMPLIANT record** is NOTHING_FOUND.
+
+Two flags without a fail-closed reason: an image whose subject is not the person a catalog row
+names keeps the record in scope and raises IMAGE_SUBJECT_CONFLICT (the catalog link wins, T71
+Q11); a retained record whose state is not PRESENT keeps VERIFY_RECORD_PRESENT and raises
+PRESENT_CLAIM_OVER_STATE (DEV sample answers do the same on 9 audit records, T104 (b)).
 """
 
 from __future__ import annotations
@@ -87,6 +80,7 @@ from .inputs.model import ActivityRow, AuditLogRow, IdentityRow
 from .inputs.requests import DeletionRequest, RequestIssue, load_requests_checked
 from .policy.rules import RuleTable, attachment_documents, categorize, decide, load_rules, violating_states
 from .record import CaseRecord, CrossCheck, FailedClosedReason, IntentDecision, ResourceFinding, fail_closed_intent
+from .state.observe import observation_state
 from .state.reconstruct import (
     ResourceKey,
     ScopeListing,
@@ -109,7 +103,6 @@ OpenQuestionType = Literal[
     "IMAGE_FIELD_UNREADABLE",
     "IMAGE_SUBJECT_CONFLICT",
     "UNKNOWN_FORMAT",
-    "INSTRUCTION_LIKE_TEXT",
 ]
 STAGE_BASIS = {
     "S1_IDENTIFIER": "identifier",
@@ -243,23 +236,45 @@ class World:
     attachment_documents: frozenset[str]
 
 
+def dataset_path(dataset_dir: Path, relative: str) -> Path | None:
+    """The manifest path inside ``dataset_dir``, or None when it resolves outside it.
+
+    This is the containment check the evidence parser applies before it reads a file: a manifest
+    path is untrusted input, so the engine never opens or tests a file outside the dataset either.
+    """
+    root = Path(dataset_dir).resolve()
+    path = (root / relative).resolve()
+    return path if root in path.parents else None
+
+
+def _starts_with_png_signature(path: Path | None) -> bool:
+    """Whether the file at ``path`` begins with the PNG signature (False when unreadable or None)."""
+    if path is None:
+        return False
+    try:
+        with path.open("rb") as handle:
+            return handle.read(len(PNG_SIGNATURE)) == PNG_SIGNATURE
+    except OSError:
+        return False
+
+
 def _failures(ctx: AuditContext, file_captured: Mapping[str, str]) -> tuple[FileFailure, ...]:
-    """Manifest files that did not parse to OK, minus the PNGs the vision step read (module docstring)."""
+    """Manifest files that did not parse to OK, minus the PNGs the vision step read (module docstring).
+
+    A file is ``missing`` when it failed with ``ERROR`` and its path, inside the dataset, is not a
+    file. A path outside the dataset is never tested on disk, so it is not ``missing``: it keeps the
+    parser's ``ERROR`` and is an EVIDENCE_PARSE_ERROR dependency.
+    """
     out = []
     for ref in ctx.manifest:
         fp = ctx.index.files.get(ref.file_id)
         if fp is None or fp.ok:
             continue
-        png = False
-        if fp.status == "NEEDS_MODEL":
-            try:
-                with (ctx.dataset_dir / ref.path).open("rb") as handle:
-                    png = handle.read(len(PNG_SIGNATURE)) == PNG_SIGNATURE
-            except OSError:
-                png = False
+        path = dataset_path(ctx.dataset_dir, ref.path)
+        png = fp.status == "NEEDS_MODEL" and _starts_with_png_signature(path)
         if png and ref.file_id in ctx.vision_read:
             continue  # read by the vision step: its records are image observations, not a pending file
-        missing = fp.status == "ERROR" and not (ctx.dataset_dir / ref.path).is_file()
+        missing = fp.status == "ERROR" and path is not None and not path.is_file()
         out.append(FileFailure(ref.file_id, fp.status, file_captured[ref.file_id], png, missing))
     return tuple(out)
 
@@ -434,8 +449,8 @@ def build_validation_context(
 
 def _resource_system(rid: str, w: World, hint: str | None) -> str:
     """The output ``system_id`` of a resource: the system its own evidence names most often, else
-    the resource-type prefix, else the catalog/activity hint (INTERFACES rule 6: from the evidence,
-    never from ``system_activity.target_system`` when evidence names one)."""
+    the resource-type prefix, else the catalog/activity hint. The evidence wins over
+    ``system_activity.target_system`` because it is what the system itself shows."""
     counts = Counter(o.system_id for o in w.obs_by_resource.get(rid, ()) if o.system_id)
     if counts:
         return sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[0][0]
@@ -443,7 +458,7 @@ def _resource_system(rid: str, w: World, hint: str | None) -> str:
 
 
 def crosscheck(req: DeletionRequest, w: World, account: str | None, links: Sequence[Link]) -> CrossCheck:
-    """Q10: CLASSIFY_REQUEST intake rows at or before ``audit_at`` on the person's own records."""
+    """The intake cross-check (T71 Q10): CLASSIFY_REQUEST rows at or before ``audit_at`` on the person's own records."""
     own = {lk.resource_id for lk in links if lk.resource_id}
     if account:
         own.add(account)
@@ -455,8 +470,251 @@ def crosscheck(req: DeletionRequest, w: World, account: str | None, links: Seque
     return CrossCheck(bool(rows), tuple(rows))
 
 
+_LINK_BASIS = {
+    "record_identifier": "identifier",
+    "trace_lookup": "trace",
+    "link_row": "link_row",
+    "alias": "alias",
+    "image_extraction": "image",
+}
+
+
+def records_in_scope(
+    case_id: str, w: World, asg: AccountAssignment | None, flags: list[Flag]
+) -> dict[str, tuple[str, str | None]]:
+    """The records that belong to a case: resource ID -> (link basis, system hint).
+
+    In order: every record a link puts in the request window, then the primary account (basis from
+    its assignment stage), then each identifier-free analytics claim (whose flags join ``flags``).
+    The first basis found for a record is kept.
+    """
+    found: dict[str, tuple[str, str | None]] = {}
+    for lk in w.case_links[case_id]:
+        if lk.in_window and lk.resource_id:
+            found.setdefault(lk.resource_id, (_LINK_BASIS[lk.basis], lk.system_id))
+    if asg is not None and asg.resource_id and asg.resource_id not in found:
+        found[asg.resource_id] = (STAGE_BASIS.get(asg.stage, "account"), "account_service")
+    for claim in w.analytics.get(case_id, ()):
+        if claim.resource_id not in found:
+            found[claim.resource_id] = ("slot_band", None)
+            flags.extend(claim.flags)
+    return found
+
+
+@dataclass(frozen=True)
+class CaseView:
+    """The per-case facts every record of the case is evaluated against."""
+
+    audit_at: str
+    identifiers: IdentifierSet
+    person: str | None
+    pending_png: tuple[str, ...]  # PNGs captured at or before audit_at still waiting for the vision step
+    read_png: tuple[str, ...]  # PNGs captured at or before audit_at that the vision step read
+    case_file: str | None  # the case's cited file
+
+
+@dataclass(frozen=True)
+class ResourceEvaluation:
+    """One record's finding, the unread files its state depends on, and the fail-closed reasons it raises."""
+
+    finding: ResourceFinding
+    depends_on: frozenset[str]
+    reasons: frozenset[FailedClosedReason]
+
+
+def _readings(key: ResourceKey, obs: Sequence[Observation], view: CaseView, w: World) -> list[StateObservation]:
+    """The record's own readings plus a PRESENT reading per catalog alias linked at or before audit_at."""
+    readings = list(record_readings(key, obs, view.identifiers))
+    for a in w.aliases:
+        if a.resource_id == key.resource_id and timeutil.le(a.link_time, view.audit_at):
+            readings.append(
+                StateObservation(
+                    "PRESENT",
+                    observation_time(a.observation),
+                    a.file_id,
+                    a.observation.captured_at,
+                    a.observation.locator,
+                    "alias",
+                )
+            )
+    return readings
+
+
+def evaluate_resource(rid: str, basis: str, hint: str | None, view: CaseView, w: World) -> ResourceEvaluation:
+    """Evaluate one record of a case: its state at ``audit_at``, category, decision, citation and flags.
+
+    The fail-closed reasons it can raise are those of the module docstring that concern one record:
+    NO_CATEGORY_RULE, UNINTERPRETED_RECORD, IMAGE_STATE_NOT_SHOWN, IMAGE_OMITS_CATALOG_RECORD,
+    OWN_KEY_CONFLICT and POST_AUDIT_ONLY_FINDING. :func:`fail_closed_reason` picks the row's one reason.
+    """
+    rules = w.ctx.rules
+    audit_at = view.audit_at
+    system = _resource_system(rid, w, hint)
+    key = ResourceKey(system, rid)
+    obs = w.obs_by_resource.get(rid, [])
+    activity = w.activity_by_resource.get(rid, [])
+    cat = categorize(key, obs, activity, audit_at, attachment_documents=w.attachment_documents)
+    readings = _readings(key, obs, view, w)
+    usable = [r for r in readings if at_or_before(r.time, audit_at)]
+    replica = any(is_replica_copy(o) for o in obs if observation_state_ok(o, key, audit_at))
+    if not replica:
+        attachment = cat.category == "SUPPORT_ATTACHMENT"
+        readings.extend(omission_readings(key, w.listings, w.file_captured, attachment))
+    rflags: list[Flag] = []
+    reasons: set[FailedClosedReason] = set()
+    depends: frozenset[str] = frozenset()
+    if not usable and basis == "link_row" and view.pending_png:
+        depends = frozenset(view.pending_png)
+        rflags.append(
+            Flag("STATE_NEEDS_IMAGE", f"{rid}: known only by a catalog row; {len(view.pending_png)} image(s) unread")
+        )
+    violating = violating_states(cat.category, rules)
+    state = state_at(
+        key, readings, audit_at, violating=violating, default_absent=cat.category == "USER_PROFILE", depends_on=depends
+    )
+    if state.value is None and depends and cat.category == "USER_PROFILE":
+        state = state_at(key, readings, audit_at, violating=violating, default_absent=True)
+        state = replace(state, depends_on=depends)
+    decision = decide(state, cat, rules)
+    if cat.flag is not None:
+        rflags.append(cat.flag)
+    if state.basis == "default_absent":
+        rflags.append(Flag("DEFAULT_ABSENT", f"{rid}: no observation at or before audit_at (R8)"))
+    if state.time_basis == "pdf_stated":
+        rflags.append(Flag("PDF_STATED_TIME", f"{rid}: page time used (T68)"))
+    if rid in w.image_conflicts:
+        rflags.append(
+            Flag("IMAGE_SUBJECT_CONFLICT", f"{rid}: catalog link kept; images {','.join(w.image_conflicts[rid])}")
+        )
+    if state.value is None:
+        rflags.append(Flag("NO_STATE", f"{rid}: no state at or before audit_at; no step"))
+    seen = sum(1 for o in obs if at_or_before(observation_time(o), audit_at)) + sum(
+        1 for r in usable if r.kind == "alias"
+    )
+    if decision.outcome == "NO_STEP" and state.value is not None:
+        reasons.add("NO_CATEGORY_RULE")  # a state with no rule covering its category is never dropped silently
+        rflags.append(
+            Flag(
+                "NO_CATEGORY_RULE",
+                f"{rid}: state {state.value} but no rule covers category {cat.category} (system {system}); no step",
+            )
+        )
+    elif decision.outcome == "NO_STEP" and seen:
+        reasons.add("UNINTERPRETED_RECORD")
+        rflags.append(
+            Flag(
+                "UNINTERPRETED_RECORD",
+                f"{rid}: {seen} reading(s) at or before audit_at give no step "
+                f"(state {state.value}, category {cat.category}, system {system})",
+            )
+        )
+    shown_in_image = any(o.locator.kind == "image" for o in obs)
+    waited_on_image = not usable and basis == "link_row" and bool(view.read_png) and not depends
+    if waited_on_image and shown_in_image:
+        # the record would wait on an image, a reading shows it, but nothing visible on screen gives it
+        # a state; an omission elsewhere is no substitute for the screenshot it waited on
+        reasons.add("IMAGE_STATE_NOT_SHOWN")
+        rflags.append(
+            Flag(
+                "IMAGE_STATE_NOT_SHOWN",
+                f"{rid}: waited on an image; the image(s) read show it with no visible state "
+                f"(state {state.value}, {state.basis})",
+            )
+        )
+    if waited_on_image and not shown_in_image:
+        # the record would wait on an image (STATE_NEEDS_IMAGE), the images were read, and no reading mentions it
+        reasons.add("IMAGE_OMITS_CATALOG_RECORD")
+        rflags.append(
+            Flag(
+                "IMAGE_OMITS_CATALOG_RECORD",
+                f"{rid}: waited on an image (no state at or before audit_at from other evidence); "
+                f"{len(view.read_png)} image(s) read by the vision step do not show it",
+            )
+        )
+    if decision.outcome == "COMPLIANT" and decision.verification_op == "VERIFY_RECORD_PRESENT" and (
+        state.value != "PRESENT"
+    ):
+        rflags.append(  # the output step is kept (DEV sample answers do the same); the artifacts say so
+            Flag(
+                "PRESENT_CLAIM_OVER_STATE",
+                f"{rid}: retained ({cat.category}) gets VERIFY_RECORD_PRESENT while the derived state is "
+                f"{state.value} ({state.basis})",
+            )
+        )
+    mine = {view.person} if view.person else set()
+    others = w.links.own_persons.get(rid, frozenset()) - mine
+    if others:
+        reasons.add("OWN_KEY_CONFLICT")  # the record's own key belongs to another known person
+        rflags.append(
+            Flag(
+                "OWN_KEY_CONFLICT",
+                f"{rid}: its own keys name {len(others)} known person(s) other than the requester",
+            )
+        )
+    if system_from_prefix(rid) and system_from_prefix(rid) != system:
+        rflags.append(Flag("SYSTEM_DIFFERS_FROM_PREFIX", f"{rid}: {system}"))
+    if decision.outcome == "FINDING" and _held_only_after(rid, obs, w, audit_at):
+        reasons.add("POST_AUDIT_ONLY_FINDING")
+        rflags.append(
+            Flag(
+                "POST_AUDIT_ONLY_FINDING",
+                f"{rid}: only files captured after audit_at hold this record, so no citable file contains it "
+                "(T101; T66 rule 1 and CD-F21)",
+            )
+        )
+    cite = ""
+    if decision.outcome == "FINDING":
+        vfiles = [r.file_id for r in state.readings if r.value == state.value and r.kind != "omission"]
+        cite = finding_citation(view.case_file, vfiles, w.file_captured, w.manifest_pos, audit_at)
+    finding = ResourceFinding(key, basis, state, cat, decision, None, cite, tuple(rflags))
+    return ResourceEvaluation(finding, frozenset(state.depends_on), frozenset(reasons))
+
+
+#: The order in which a record-level reason decides a row, after IDENTITY_UNRESOLVED,
+#: OWN_KEY_CONFLICT and the unread-dependency reasons (module docstring).
+_RECORD_REASON_ORDER: tuple[FailedClosedReason, ...] = (
+    "POST_AUDIT_ONLY_FINDING",
+    "NO_CATEGORY_RULE",
+    "IMAGE_OMITS_CATALOG_RECORD",
+    "IMAGE_STATE_NOT_SHOWN",
+    "UNINTERPRETED_RECORD",
+)
+
+
+def fail_closed_reason(
+    resolved: bool,
+    evaluations: Sequence[ResourceEvaluation],
+    deps: frozenset[str],
+    dep_kinds: Mapping[str, FailedClosedReason],
+) -> FailedClosedReason | None:
+    """The one reason a case's row fails closed, or None.
+
+    The gravest reason wins, in this order: an unresolved identity; a record whose own keys name
+    another person; an unread dependency (its gravest kind, :data:`_DEPENDENCY_REASONS`); then the
+    record-level reasons in :data:`_RECORD_REASON_ORDER`; last, NOTHING_FOUND when no record is a
+    FINDING or COMPLIANT. A request read as NOT_DELETION clears the reason later (in ``audit_case``).
+    """
+    raised = {r for e in evaluations for r in e.reasons}
+    if not resolved:
+        return "IDENTITY_UNRESOLVED"
+    if "OWN_KEY_CONFLICT" in raised:
+        return "OWN_KEY_CONFLICT"
+    if deps:
+        return next(k for k in _DEPENDENCY_REASONS if k in dep_kinds.values()) if dep_kinds else "UNPARSED_DEPENDENCY"
+    for reason in _RECORD_REASON_ORDER:
+        if reason in raised:
+            return reason
+    if not any(e.finding.decision.outcome in ("FINDING", "COMPLIANT") for e in evaluations):
+        return "NOTHING_FOUND"
+    return None
+
+
 def audit_case(case_id: str, w: World, intent_for: IntentProvider) -> CaseRecord:
-    """Audit one case end to end (module docstring) and pass it through the pre-write gate."""
+    """Audit one case end to end (module docstring) and pass it through the pre-write gate.
+
+    The engine poses no open questions, so the record's ``open_questions``, ``answers`` and
+    ``rejected`` are empty here; the agent loop poses questions and ``pipeline`` records them.
+    """
     ctx = w.ctx
     req = next(r for r in ctx.requests if r.case_id == case_id)
     ident = w.resolutions[case_id]
@@ -464,30 +722,8 @@ def audit_case(case_id: str, w: World, intent_for: IntentProvider) -> CaseRecord
     asg = w.assignments.get(case_id)
     flags: list[Flag] = list(asg.flags if asg else ())
     audit_at = req.audit_at
-    # --- which records belong to the case
-    found: dict[str, tuple[str, str | None]] = {}  # rid -> (link basis, system hint)
-    for lk in links:
-        if lk.in_window and lk.resource_id:
-            basis = {
-                "record_identifier": "identifier",
-                "trace_lookup": "trace",
-                "link_row": "link_row",
-                "alias": "alias",
-                "image_extraction": "image",
-            }[lk.basis]
-            found.setdefault(lk.resource_id, (basis, lk.system_id))
-    if asg is not None and asg.resource_id and asg.resource_id not in found:
-        found[asg.resource_id] = (STAGE_BASIS.get(asg.stage, "account"), "account_service")
-    for claim in w.analytics.get(case_id, ()):
-        if claim.resource_id not in found:
-            found[claim.resource_id] = ("slot_band", None)
-            flags.extend(claim.flags)
-    # --- unparsed dependencies (T8)
+    found = records_in_scope(case_id, w, asg, flags)
     structural = {f.file_id for f in w.failures if not f.png and timeutil.le(f.captured_at, audit_at)}
-    pending_png = sorted(f.file_id for f in w.failures if f.png and timeutil.le(f.captured_at, audit_at))
-    read_png = sorted(
-        fid for fid in ctx.vision_read if fid in w.file_captured and timeutil.le(w.file_captured[fid], audit_at)
-    )
     case = choose_citation(
         links,
         audit_at,
@@ -496,180 +732,28 @@ def audit_case(case_id: str, w: World, intent_for: IntentProvider) -> CaseRecord
         owned_observations=_owned_observations(w, links, audit_at),
         account_files=w.account_files,
     )
-    resources: list[ResourceFinding] = []
-    deps: set[str] = set(structural)
-    uninterpreted: list[str] = []
-    post_audit_only: list[str] = []
-    no_rule: list[str] = []
-    image_omits: list[str] = []
-    image_no_state: list[str] = []
-    own_conflict: list[str] = []
-    mine = {ident.person} if ident.person else set()
-    for rid in sorted(found):
-        basis, hint = found[rid]
-        system = _resource_system(rid, w, hint)
-        key = ResourceKey(system, rid)
-        obs = w.obs_by_resource.get(rid, [])
-        cat = categorize(
-            key, obs, w.activity_by_resource.get(rid, []), audit_at, attachment_documents=w.attachment_documents
-        )
-        readings = list(record_readings(key, obs, ident.identifiers))
-        for a in w.aliases:
-            if a.resource_id == rid and timeutil.le(a.link_time, audit_at):
-                readings.append(
-                    StateObservation(
-                        "PRESENT",
-                        observation_time(a.observation),
-                        a.file_id,
-                        a.observation.captured_at,
-                        a.observation.locator,
-                        "alias",
-                    )
-                )
-        usable = [r for r in readings if at_or_before(r.time, audit_at)]
-        replica = any(is_replica_copy(o) for o in obs if observation_state_ok(o, key, audit_at))
-        if not replica:
-            attachment = cat.category == "SUPPORT_ATTACHMENT"
-            readings.extend(omission_readings(key, w.listings, w.file_captured, attachment))
-        rflags: list[Flag] = []
-        depends: frozenset[str] = frozenset()
-        if not usable and basis == "link_row" and pending_png:
-            depends = frozenset(pending_png)
-            rflags.append(
-                Flag("STATE_NEEDS_IMAGE", f"{rid}: known only by a catalog row; {len(pending_png)} image(s) unread")
+    view = CaseView(
+        audit_at=audit_at,
+        identifiers=ident.identifiers,
+        person=ident.person,
+        pending_png=tuple(sorted(f.file_id for f in w.failures if f.png and timeutil.le(f.captured_at, audit_at))),
+        read_png=tuple(
+            sorted(
+                fid for fid in ctx.vision_read if fid in w.file_captured and timeutil.le(w.file_captured[fid], audit_at)
             )
-        state = state_at(
-            key,
-            readings,
-            audit_at,
-            violating=violating_states(cat.category, ctx.rules),
-            default_absent=cat.category == "USER_PROFILE",
-            depends_on=depends,
-        )
-        if state.value is None and depends and cat.category == "USER_PROFILE":
-            state = state_at(
-                key, readings, audit_at, violating=violating_states(cat.category, ctx.rules), default_absent=True
-            )
-            state = replace(state, depends_on=depends)
-        deps |= set(state.depends_on)
-        decision = decide(state, cat, ctx.rules)
-        if cat.flag is not None:
-            rflags.append(cat.flag)
-        if state.basis == "default_absent":
-            rflags.append(Flag("DEFAULT_ABSENT", f"{rid}: no observation at or before audit_at (R8)"))
-        if state.time_basis == "pdf_stated":
-            rflags.append(Flag("PDF_STATED_TIME", f"{rid}: page time used (T68)"))
-        if rid in w.image_conflicts:
-            rflags.append(
-                Flag("IMAGE_SUBJECT_CONFLICT", f"{rid}: catalog link kept; images {','.join(w.image_conflicts[rid])}")
-            )
-        if state.value is None:
-            rflags.append(Flag("NO_STATE", f"{rid}: no state at or before audit_at; no step"))
-        seen = sum(1 for o in obs if at_or_before(observation_time(o), audit_at)) + sum(
-            1 for r in usable if r.kind == "alias"
-        )
-        if decision.outcome == "NO_STEP" and state.value is not None:
-            no_rule.append(rid)  # T104 (a): a state with no rule covering its category is never dropped silently
-            rflags.append(
-                Flag(
-                    "NO_CATEGORY_RULE",
-                    f"{rid}: state {state.value} but no rule covers category {cat.category} (system {system}); no step",
-                )
-            )
-        elif decision.outcome == "NO_STEP" and seen:
-            uninterpreted.append(rid)
-            rflags.append(
-                Flag(
-                    "UNINTERPRETED_RECORD",
-                    f"{rid}: {seen} reading(s) at or before audit_at give no step "
-                    f"(state {state.value}, category {cat.category}, system {system})",
-                )
-            )
-        shown_in_image = any(o.locator.kind == "image" for o in obs)
-        if not usable and basis == "link_row" and read_png and not depends and shown_in_image:
-            # T112 item 9: the record would wait on an image, a reading shows it, but nothing visible on
-            # screen gives it a state; an omission elsewhere is no substitute for the screenshot it waited on
-            image_no_state.append(rid)
-            rflags.append(
-                Flag(
-                    "IMAGE_STATE_NOT_SHOWN",
-                    f"{rid}: waited on an image; the image(s) read show it with no visible state "
-                    f"(state {state.value}, {state.basis})",
-                )
-            )
-        if not usable and basis == "link_row" and read_png and not depends and not shown_in_image:
-            # T108, widened by T112 (G7 verifier finding 6): the record would wait on an image
-            # (STATE_NEEDS_IMAGE), the images were read, and no reading mentions it
-            image_omits.append(rid)
-            rflags.append(
-                Flag(
-                    "IMAGE_OMITS_CATALOG_RECORD",
-                    f"{rid}: waited on an image (no state at or before audit_at from other evidence); "
-                    f"{len(read_png)} image(s) read by the vision step do not show it",
-                )
-            )
-        if decision.outcome == "COMPLIANT" and decision.verification_op == "VERIFY_RECORD_PRESENT" and (
-            state.value != "PRESENT"
-        ):
-            rflags.append(  # T104 (b): the output step is kept (DEV gold does the same); the artifacts say so
-                Flag(
-                    "PRESENT_CLAIM_OVER_STATE",
-                    f"{rid}: retained ({cat.category}) gets VERIFY_RECORD_PRESENT while the derived state is "
-                    f"{state.value} ({state.basis})",
-                )
-            )
-        others = w.links.own_persons.get(rid, frozenset()) - mine
-        if others:
-            own_conflict.append(rid)  # T105: the record's own key belongs to another known person
-            rflags.append(
-                Flag(
-                    "OWN_KEY_CONFLICT",
-                    f"{rid}: its own keys name {len(others)} known person(s) other than the requester",
-                )
-            )
-        if system_from_prefix(rid) and system_from_prefix(rid) != system:
-            rflags.append(Flag("SYSTEM_DIFFERS_FROM_PREFIX", f"{rid}: {system}"))
-        if decision.outcome == "FINDING" and _held_only_after(rid, obs, w, audit_at):
-            post_audit_only.append(rid)
-            rflags.append(
-                Flag(
-                    "POST_AUDIT_ONLY_FINDING",
-                    f"{rid}: only files captured after audit_at hold this record, so no citable file contains it "
-                    "(T101; T66 rule 1 and CD-F21)",
-                )
-            )
-        cite = ""
-        if decision.outcome == "FINDING":
-            vfiles = [r.file_id for r in state.readings if r.value == state.value and r.kind != "omission"]
-            cite = finding_citation(case.file_id, vfiles, w.file_captured, w.manifest_pos, audit_at)
-        resources.append(ResourceFinding(key, basis, state, cat, decision, None, cite, tuple(rflags)))
-        flags.extend(rflags)
-    resources.sort(key=lambda r: (r.key.system_id, r.key.resource_id))
+        ),
+        case_file=case.file_id,
+    )
+    evaluations = [evaluate_resource(rid, *found[rid], view, w) for rid in sorted(found)]
+    for e in evaluations:
+        flags.extend(e.finding.flags)
+    resources = sorted((e.finding for e in evaluations), key=lambda r: (r.key.system_id, r.key.resource_id))
+    deps = frozenset(structural.union(*(e.depends_on for e in evaluations)))
     by_file = {f.file_id: f for f in w.failures}
     dep_kinds = {fid: _failure_kind(by_file[fid]) for fid in sorted(deps) if fid in by_file}
     for fid, kind in dep_kinds.items():
         flags.append(Flag("FAILED_DEPENDENCY", f"{fid}: {kind} (parse status {by_file[fid].status})"))
-    failed: FailedClosedReason | None = None
-    if ident.person is None:
-        failed = "IDENTITY_UNRESOLVED"
-    elif own_conflict:
-        failed = "OWN_KEY_CONFLICT"  # T105: own keys name someone other than the requester
-    elif deps:
-        # T8/T86 item 1: an unread dependency fails the row closed, even with findings; the reason is
-        # the gravest kind among the row's dependencies, and each file has its own flag (T105, R11)
-        failed = next(k for k in _DEPENDENCY_REASONS if k in dep_kinds.values()) if dep_kinds else "UNPARSED_DEPENDENCY"
-    elif post_audit_only:
-        failed = "POST_AUDIT_ONLY_FINDING"  # T101 (R06): decided here, not left to the validator
-    elif no_rule:
-        failed = "NO_CATEGORY_RULE"  # T104 (a): a silent drop is how a COMPLETE row could hide a record
-    elif image_omits:
-        failed = "IMAGE_OMITS_CATALOG_RECORD"  # T108: the freeze check names it
-    elif image_no_state:
-        failed = "IMAGE_STATE_NOT_SHOWN"  # T112 item 9: a screenshot that shows nothing proves nothing
-    elif uninterpreted:
-        failed = "UNINTERPRETED_RECORD"  # module docstring: evidence the engine cannot read is no proof
-    elif not any(r.decision.outcome in ("FINDING", "COMPLIANT") for r in resources):
-        failed = "NOTHING_FOUND"
+    failed = fail_closed_reason(ident.person is not None, evaluations, deps, dep_kinds)
     if deps:
         flags.append(Flag("UNPARSED_DEPENDENCY", f"{len(deps)} unparsed file(s) this case depends on"))
     cc = crosscheck(req, w, asg.resource_id if asg else None, links)
@@ -694,7 +778,7 @@ def audit_case(case_id: str, w: World, intent_for: IntentProvider) -> CaseRecord
         open_questions=(),
         answers=(),
         rejected=(),
-        failed_dependencies=frozenset(deps),
+        failed_dependencies=deps,
         steps=steps,
         checks=(),
         flags=tuple(sorted(set(flags), key=lambda f: (f.code, f.detail))),
@@ -712,7 +796,7 @@ _DEPENDENCY_REASONS: tuple[FailedClosedReason, ...] = (
 
 
 def _failure_kind(f: FileFailure) -> FailedClosedReason:
-    """Why a dependency is unread (T105 on R11): a file the manifest names but the disk lacks, a file
+    """Why a dependency is unread (T105): a file the manifest names but the disk lacks, a file
     on disk that failed to parse (``ERROR``, e.g. SQL that cannot run), a file no family sniffer
     matched, or anything else not OK (``EMPTY``, ``AMBIGUOUS_FAMILY``, an image waiting for a model)."""
     if f.missing:
@@ -725,7 +809,7 @@ def _failure_kind(f: FileFailure) -> FailedClosedReason:
 
 
 def _held_only_after(rid: str, obs: Sequence[Observation], w: World, audit_at: str) -> bool:
-    """T101 (R06): every file that holds ``rid`` (an observation of it, or a catalog alias of it) was
+    """T101: every file that holds ``rid`` (an observation of it, or a catalog alias of it) was
     captured after ``audit_at``. False when no manifest file holds it (no file evidence to judge)."""
     holders = {o.file_id for o in obs} | {a.file_id for a in w.aliases if a.resource_id == rid}
     known = [f for f in sorted(holders) if f in w.file_captured]
@@ -734,15 +818,13 @@ def _held_only_after(rid: str, obs: Sequence[Observation], w: World, audit_at: s
 
 def observation_state_ok(o: Observation, key: ResourceKey, audit_at: str) -> bool:
     """The observation states something about the resource at or before ``audit_at``."""
-    from .state.observe import observation_state
-
     return observation_state(o, o.system_id or key.system_id) is not None and at_or_before(
         observation_time(o), audit_at
     )
 
 
 def _owned_observations(w: World, links: Sequence[Link], audit_at: str) -> list[Observation]:
-    """Records of resources a catalog row at or before ``audit_at`` ties to the person (R14)."""
+    """Records of resources a catalog row at or before ``audit_at`` ties to the person (citation candidates)."""
     owned = {
         lk.resource_id
         for lk in links
@@ -755,7 +837,7 @@ def _owned_observations(w: World, links: Sequence[Link], audit_at: str) -> list[
 
 
 class IntentProvider:
-    """Gives a case its intent decision. G5's provider is :class:`FailClosedIntent` (T71 Q2)."""
+    """Gives a case its intent decision; the engine's own provider is :class:`FailClosedIntent` (T71 Q2)."""
 
     def __call__(self, req: DeletionRequest, crosscheck: CrossCheck) -> IntentDecision:  # pragma: no cover
         """The intent decision for one request."""
@@ -763,12 +845,10 @@ class IntentProvider:
 
 
 class FailClosedIntent(IntentProvider):
-    """No model gate yet: every case gets the engine's deletion-path row, flagged (T71 Q2)."""
+    """No model intent: every case gets the engine's deletion-path row, flagged (T71 Q2)."""
 
     def __call__(self, req: DeletionRequest, crosscheck: CrossCheck) -> IntentDecision:
         """The fail-closed decision, whatever the request says."""
-        from .record import fail_closed_intent
-
         return fail_closed_intent(crosscheck)
 
 
@@ -812,8 +892,3 @@ def malformed_record(case_id: str, w: World) -> CaseRecord:
         failed_closed="MALFORMED_REQUEST",
     )
     return gate(record, w.validation)
-
-
-def brief(record: CaseRecord) -> EngineBrief:
-    """The engine's read-only brief for one case (the ``audit_case`` tool's backend, G7)."""
-    return EngineBrief(record.case_id, record.resources, record.citation, (), record.flags)

@@ -1,24 +1,25 @@
 """Turn 1: the model commits the request's intent from the request text alone.
 
-Basis (each rule is a developer ruling or G3 design, not organiser text):
+Rules, each rule then its reason (T-numbers refer to rulings in code/docs/DECISIONS.md):
 
-* **Text only** (G3 section 1.2; T70). The turn-1 request holds the system prompt, the tool
-  definitions and the fenced request text, and nothing case-specific: no email, no case ID, no
-  evidence. Identical texts therefore give identical requests, so the reply cache routes them
-  identically, and evidence cannot sway the intent.
-* **The model decides** (T63 pin 1; T7). The label is the model's answer; code never overrides it
-  with a phrase table. ``UNCERTAIN`` is a legal answer.
-* **basis_quote is checked in code** (G7a brief item 1): it must be a substring of the request
-  text (exactly, or after Unicode NFC and whitespace collapsing). A failed check means the answer
-  is not a validated model answer: a final answer's label is read as ``UNCERTAIN`` (flag
-  ``BASIS_QUOTE_INVALID``), which routes to a tool or to the fail-closed row (T71 Q2), and an
-  ``audit_case`` commit with a bad quote is refused and not committed. An
-  ``UNCERTAIN`` answer may carry an empty quote.
-* **Failures are explicit** (``../CLAUDE.md`` section 3): a failed call gives an
-  :class:`~deletion_audit.record.IntentDecision` with ``source`` ``FAILED_CLOSED`` or
-  ``FAILED_BUDGET`` and no label, which the engine turns into its deletion-path row, flagged
-  ``INTENT_FAILED_CLOSED`` / ``INTENT_FAILED_BUDGET`` (T71 Q2, T87). Never NOT_APPLICABLE, and never
-  a value copied from the input.
+* **Text only.** The turn-1 request holds the system prompt, the tool definitions and the fenced
+  request text, and nothing case-specific: no email, no case ID, no evidence. Reason: identical
+  texts then give identical requests, so the reply cache answers them identically, and evidence
+  cannot sway the intent (T70 in code/docs/DECISIONS.md).
+* **The model decides.** The label is the model's answer; code never overrides it with a phrase
+  table, and ``UNCERTAIN`` is a legal answer. Reason: the model interprets and code decides
+  facts; per-row keyword tables are ruled out (T7, T63 pin 1).
+* **``basis_quote`` is checked in code:** it must occur in the request text, exactly or after
+  Unicode NFC and whitespace collapsing. An ``UNCERTAIN`` answer may carry an empty quote. When the
+  check fails, the answer is not a validated model answer and the loop flags
+  ``BASIS_QUOTE_INVALID``: a final answer's label is read as ``UNCERTAIN``, which routes to a tool
+  or to the fail-closed row, and an ``audit_case`` call with a bad quote commits nothing. Reason: a
+  quote the text does not contain shows the answer is not grounded in the request (T71 Q2).
+* **Failures are explicit:** a failed call gives an :class:`~deletion_audit.record.IntentDecision`
+  with ``source`` ``FAILED_CLOSED`` or ``FAILED_BUDGET`` and no label, which the engine turns into
+  its deletion-path row, flagged ``INTENT_FAILED_CLOSED`` / ``INTENT_FAILED_BUDGET``. It is never
+  NOT_APPLICABLE and never a value copied from the input. Reason: a failed read is not "nothing to
+  delete" (T71 Q2, T87).
 """
 
 from __future__ import annotations
@@ -153,7 +154,7 @@ def failed_source(reason: str | None) -> Literal["FAILED_CLOSED", "FAILED_BUDGET
 
 
 def agreement(label: str | None, cc: CrossCheck) -> bool | None:
-    """Whether a decided label agrees with the intake cross-check (Q10); None when undecided."""
+    """Whether a decided label agrees with the intake cross-check (T71 Q10); None when undecided."""
     if label not in ("DELETION_REQUEST", "NOT_DELETION"):
         return None
     return (label == "NOT_DELETION") == cc.intake_non_deletion

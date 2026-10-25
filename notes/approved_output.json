@@ -25,7 +25,7 @@
   "approved_outputs": {
     "dev": {
       "run_id": "t118-eng-dev",
-      "path": "code/approved/dev_output.csv",
+      "path": "notes/approved/dev_output.csv",
       "sha256": "641dbc8d921186efbf92514b2c71fe25a3b133d412515dd952da19f8ac85b15c",
       "rows": 22,
       "approved_by": "developer",
@@ -35,7 +35,7 @@
     },
     "test": {
       "run_id": "g5-test-20261025T0530",
-      "path": "code/approved/test_output.csv",
+      "path": "notes/approved/test_output.csv",
       "sha256": "cf2a90b070db785456b2cb26398add0eba95a69ae8a763eb838a367f135751fc",
       "rows": 518,
       "approved_by": "developer",
@@ -44,7 +44,7 @@
       "copied_from": "runs/g5-test-20261025T0530/output.csv (byte copy, sha256 checked; T117 B2 packaging fix)"
     }
   },
-  "note": "The gate reads code/approved/approved_output.json (shipped in code.zip); notes/approved_output.json is a byte-identical copy for the freeze check (code/tests/pipeline/test_approved_baselines.py).",
+  "note": "Read by code/evaluation/freeze_check.py (the approved output and the T118 step 4 acceptance) and code/evaluation/regression_check.py (a finished run against the approved file for its case set). The runtime reads no stored output file (T120 WP1): the engine's model-free rows are computed in each run. The per-split files live in notes/approved/.",
   "freeze_accepts_failed_closed_identical_to": {
     "sha256": "cf2a90b070db785456b2cb26398add0eba95a69ae8a763eb838a367f135751fc",
     "ruling": "T118 step 4",

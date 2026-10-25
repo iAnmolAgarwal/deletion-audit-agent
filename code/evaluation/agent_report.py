@@ -11,8 +11,11 @@ The report goes to ``runs/<report_id>/agent_report.json`` and ``agent_report.md`
 number in it names the run it came from and how it was measured. Nothing is typed by hand.
 
 What it reports, per arm:
-1. **N:** cases with at least one tool call other than ``audit_case``, per tool, and the
-   tool-sequence histogram. ``audit_case`` calls are counted separately.
+1. **N:** two tool-use rates over the run's cases, each with its run ID: cases where the model
+   called ``audit_case`` (``agent.audit_case_calls`` > 0), and cases with a call to any other
+   read-only tool (:data:`READ_ONLY_TOOLS`, from ``agent.tool_calls``); a tool name outside both is
+   counted on its own, never folded into either rate. Plus calls per tool and the tool-sequence
+   histogram.
 2. **M:** cases whose steps differ with validated answers applied vs withheld, and the
    rejected answers by reason.
 3. **Arm deltas:** DEV status, row exact and step F1 from ``scorer.score_predictions`` on DEV
@@ -146,6 +149,8 @@ FAILED_SOURCES: frozenset[str] = frozenset({"FAILED_CLOSED", "FAILED_BUDGET"})
 AGENT_STATUSES: tuple[str, ...] = ("OK", "FINALIZED_AT_CAP", "FAILED")
 ROW_STATES: tuple[str, ...] = ("VALID", "FAILED_CLOSED")
 AUDIT_CASE_TOOL = "audit_case"
+# The read-only tools other than audit_case (deletion_audit/agent/tools.py TOOL_NAMES; a test keeps them equal).
+READ_ONLY_TOOLS: tuple[str, ...] = ("get_request_context", "inspect_evidence", "lookup_identity", "list_activity")
 INTENT_FAILED_FLAG = "INTENT_FAILED_CLOSED"
 INTENT_DRIFT_FLAG = "INTENT_DRIFT"
 READINGS_PER_IMAGE = 2                 # T88: each image is read twice, in separate cache namespaces
@@ -929,7 +934,7 @@ def load_run(runs_root: Path, run_id: str) -> LoadedRun:
 
 # ---- The counts (each reads only the adapter's views) ----
 def count_tools(cases: Sequence[AgentView]) -> dict[str, Any]:
-    """N: cases with a tool call other than audit_case, per tool, sequence histogram, audit_case."""
+    """N: the two tool-use rates (audit_case; other read-only tools), per tool, sequence histogram."""
     per_tool: dict[str, dict[str, int]] = {}
     seqs: Counter[str] = Counter()
     for a in cases:
@@ -943,6 +948,8 @@ def count_tools(cases: Sequence[AgentView]) -> dict[str, Any]:
     return {
         "cases": len(cases),
         "cases_with_tool_call": sum(1 for a in cases if a.tool_calls),
+        "cases_with_read_only_tool": sum(1 for a in cases if any(t.name in READ_ONLY_TOOLS for t in a.tool_calls)),
+        "cases_with_unknown_tool": sum(1 for a in cases if any(t.name not in READ_ONLY_TOOLS for t in a.tool_calls)),
         "tool_calls": sum(len(a.tool_calls) for a in cases),
         "per_tool": dict(sorted(per_tool.items())),
         "sequence_histogram": dict(sorted(seqs.items(), key=lambda kv: (-kv[1], kv[0]))),
@@ -1086,8 +1093,9 @@ def fixture_result(output: OutputFile, expected: OutputFile) -> dict[str, Any]:
 
 # ---- Building the report ----
 MEASURED = {
-    "n_tools": f"{CASES_FILE} {AGENT_KEY}.tool_calls (audit_case excluded by contract) and "
-               f"{AGENT_KEY}.audit_case_calls, one count per case record",
+    "n_tools": f"{CASES_FILE} {AGENT_KEY}.audit_case_calls > 0 (audit_case rate) and {AGENT_KEY}.tool_calls "
+               "names in READ_ONLY_TOOLS (other read-only tools; audit_case excluded by contract), one count per "
+               "case record, over the run's cases",
     "m_answers": f"{CASES_FILE} {AGENT_KEY}.steps_differ_when_applied (each case compiled with validated answers "
                  f"applied and withheld) and {AGENT_KEY}.answers_rejected[].reason",
     "intent": f"{CASES_FILE} {AGENT_KEY}.intent.label (null = FAILED) x intent.crosscheck.intake_non_deletion; "
@@ -1312,10 +1320,20 @@ def _md_role_section(lines: list[str], title: str, sec: Mapping[str, Any], body:
             lines.append("")
 
 
+def rate_text(n: int, of: int) -> str:
+    """``n/of (rate)``, or ``n/0`` with no rate when there are no cases."""
+    return f"{n}/{of} ({n / of:.4f})" if of else f"{n}/0"
+
+
 def _md_tools(lines: list[str], v: Mapping[str, Any]) -> None:
-    lines.append(f"- N = {v['cases_with_tool_call']} of {v['cases']} cases with a tool call other than audit_case; "
-                 f"{v['tool_calls']} such calls. audit_case: {v['audit_case']['calls']} calls in "
-                 f"{v['audit_case']['cases_with_call']} cases. Agent status: {v['agent_status']}.")
+    rid, of = v["run_id"], v["cases"]
+    lines += [f"- Tool-use rate, audit_case: {rate_text(v['audit_case']['cases_with_call'], of)} cases called "
+              f"{AUDIT_CASE_TOOL} ({v['audit_case']['calls']} calls); run `{rid}`.",
+              f"- Tool-use rate, other read-only tools ({', '.join(READ_ONLY_TOOLS)}): "
+              f"{rate_text(v['cases_with_read_only_tool'], of)} cases ({v['tool_calls']} calls other than "
+              f"{AUDIT_CASE_TOOL}); run `{rid}`.",
+              f"- Cases with a tool name outside both sets: {v['cases_with_unknown_tool']}. Agent status: "
+              f"{v['agent_status']}."]
     lines += ["", "| tool | cases | calls | error calls |", "|---|---|---|---|"]
     lines += [f"| {t} | {c['cases']} | {c['calls']} | {c['error_calls']} |" for t, c in v["per_tool"].items()]
     lines += ["", "| tool sequence | cases |", "|---|---|"]

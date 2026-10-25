@@ -12,6 +12,9 @@ Sections, and what each reads:
    against the run before it (``runs.flips``).
 5. **Custom eval cases (C6):** ``custom_cases``; marks read from each fixture's ``EXPECTED.md``,
    scored against its expectation files, reported apart from DEV and holdout.
+5b. **Validation set:** ``validation_set``; every fixture folder with an expectation file, per arm
+   of the spec's ``validation`` key, with pass counts per fixture, the run IDs, producer checks
+   and replay misses; apart from DEV and holdout.
 6. **Agent sections:** ``agent_report.build_report`` and ``render_markdown`` on the spec's arms
    (tool-sequence histogram, N and M, arm deltas on DEV, fixtures and differing test rows, the
    intent table, vision). Runs written before G7 have no agent blocks: the section says so.
@@ -42,7 +45,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from . import agent_report, coherence, custom_cases, drift, holdout_run, improvements, runs
+from . import agent_report, coherence, custom_cases, drift, holdout_run, improvements, runs, validation_set
 from .agent_report import CASES_FILE, METRICS_FILE, OUTPUT_FILE, LoadedRun
 from .freeze_check import is_failed_closed
 from .gold import GoldCase, load_gold, load_requests
@@ -360,6 +363,8 @@ def build_evaluation(spec: ReportSpec, loaded: Mapping[str, LoadedRun], ctx: Con
     hist = [*dict.fromkeys([*spec.dev_history, spec.dev_run])]
     data["dev_history"] = dev_history(hist, loaded, gold)
     data["custom"] = custom_cases.score_custom(custom_cases.discover(ctx.fixtures_root), spec.custom_runs, loaded)
+    data["validation"] = validation_set.build_validation(spec.validation, runs_root=ctx.runs_root,
+                                                         fixtures_root=ctx.fixtures_root)
     arms = spec.arms
     if arms.dev or arms.test or arms.fixtures:
         ar = agent_report.build_report(arms, report_id=spec.report_id, runs_root=ctx.runs_root,
@@ -630,6 +635,8 @@ def render_evaluation(data: Mapping[str, Any]) -> str:
     _md_dev(L, data["dev"], data["command"])
     _md_history(L, data["dev_history"])
     _md_custom(L, data["custom"])
+    L += validation_set.render_section(data["validation"], "## 5b. Validation set: rule-derived fixtures, apart from "
+                                                           "DEV and holdout")
     _md_agent(L, data["agent"])
     _md_validator(L, data["validator"])
     _md_coherence_drift(L, data)

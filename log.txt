@@ -6172,3 +6172,221 @@ parent_agent=none
 worktree=main
 branch=main
 repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T14:29:28+05:30] T120: candidate approved and shipped; code-quality round WP1-WP3
+
+User Prompt (verbatim, secrets redacted):
+Review done (record as T120). Rulings:
+
+1. Approve the candidate. The A+ candidate (output.csv sha256 a00ba71a…, run cand-test-Aplus-20261025T1352) is the shipped output. Record it in the approved-output record, write it to the root output.csv, and run the freeze check on it. From now on every change must:
+   - replay this file byte-identical at 0 sends;
+   - keep the engine-only DEV and test hashes (641dbc8d…, cf2a90b0…).
+
+2. Code-quality round, from the cold judge's report on 227a866; its quick fixes are done. No row may change. Three agents in parallel on separate files, directed_by = this turn:
+
+   WP1, orch-builder-core (high): pipeline.py, agent/regression.py, __main__.py, config.py.
+   - The runtime must not read a stored output file. A model-derived change (intent or image) applies only when its condition holds (T101, T117 a–c). Otherwise the row falls back to the engine's model-free row, computed in the same run. That row is what cf2a90b0 already is, so nothing changes.
+   - Move the comparison against stored approved files out of the runtime path, into code/evaluation as a regression check with a test. Remove the approved CSVs from code/ unless a test fixture needs them.
+   - Split pipeline.run into named steps.
+   Done = both suites pass, the candidate replays byte-identical at 0 sends, both engine-only hashes are unchanged, and `python code/main.py --set dev` exits 0.
+
+   WP2, orch-builder (medium): engine.py, agent/tools.py, agent/harness.py, agent/intent.py, identity/resolve.py, policy/rules.py, discovery/accounts.py.
+   - The judge's items 11–16: docstrings that match the code, dead code removed, and the path guard at engine.py:254 and 260.
+   - Split engine.audit_case into the per-resource evaluation and the choice of fail-closed reason.
+   - Accounts: describe the S5 tie pick as what it is, a deterministic tie order flagged on every row it decides, with its count. Not a "coin flip". The timing windows get one docstring giving their basis and run ID.
+   - Core-module docstrings in plain English: the rule first, then its reason. A T-number appears only as a pointer to code/docs/DECISIONS.md, and nothing points to files that don't ship (../CLAUDE.md, research/, notes/).
+   Done = the same criteria as WP1.
+
+   WP3, orch-eval-engineer (high): code/evaluation/ only.
+   - Tool use: report two rates, cases where the model called audit_case and cases with any other read-only tool, instead of one figure that excludes audit_case.
+   - A section for the red-team and custom fixtures as the validation set no sample answer touched, reported apart from DEV and holdout.
+   - Split coherence.check_row.
+
+3. When all three land, in this order:
+   - add to the README's "How it works" a short "Model's role" section: what the model decides, what code decides, and why, with the measured numbers;
+   - freeze;
+   - HOLDOUT EVALUATION RUN (ask me for the phrase);
+   - reports --publish;
+   - one cold orch-judge (xhigh) re-read of exactly the upload set, scored the same way as its last report;
+   - one fix round for its quick items only;
+   - orch-packager builds code.zip, and both files go to ~/Desktop/oct26_final/.
+   Target 17:00. The deadline is 19:00.
+
+Agent Response Summary:
+Developer decision T120: the A+ candidate a00ba71a is the shipped output. Main recorded it in both approved-output records, wrote the root output.csv with a gated --write-root replay at 0 sends (final-test-Aplus-20261025T1428), and the freeze check passed (all 6 blocking counts 0; case_50 and case_61 accepted as identical to cf2a90b0). Two baseline tests that encoded the old record layout were updated, and both suites pass. Orchestration decision (developer): three agents in parallel on separate files, all directed_by 2026-10-25T14:25:24+05:30: WP1 orch-builder-core (high), runtime without stored outputs; WP2 orch-builder (medium), engine and docstrings; WP3 orch-eval-engineer (high), evaluation reporting.
+
+Actions:
+* code/approved/approved_output.json and notes/approved_output.json (approved_output = cand-test-Aplus-20261025T1352, a00ba71a; provisional entry removed); python -m deletion_audit --run-id final-test-Aplus-20261025T1428 --set test --mode A+ --vision-ack pass1-vision-20261025T1323 --write-root; freeze_check.py --run-id final-test-Aplus-20261025T1428 --record-run-id freeze-record-20261025T1428: PASSED.
+* notes/DECISIONS.md T120; commits 8b8f4bc (record, root output.csv) and a test fix, pushed; Agents WP1, WP2, WP3.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T14:32:49+05:30] T121: alias rule for screenshot identifiers; queued; scope question
+
+User Prompt (verbatim, secrets redacted):
+Output addition (record as T121): apply the existing alias rule (T71 Q3: an identifier counts for a resource when a LINK_RESOURCE_IDENTITY row at or before audit_at ties it to that resource) to identifiers read from screenshots, exactly as it applies to text evidence.
+
+Hypothesis and expected signal: the readings name the record by a linked identifier. On our data the catalog links are:
+- evidence_04: user_11 ↔ account_5762 (activity_4000)
+- evidence_19: user_20 ↔ analytics_7438 (activity_4003)
+- evidence_46: delivery_confirmation_19.pdf ↔ object_19 (activity_4007)
+With the rule applied, case_34, case_50 and case_61 should derive the same state from each reading on its own and pass rule (a). Nothing else should move.
+
+Owner: orch-builder-core (high), directed_by = this turn. Put it where the alias rule already lives. If it needs a file a T120 agent holds, run it after that agent lands, so no two agents share a file.
+
+Check: replay from the cache at 0 sends. Show me every row that changes against a00ba71a, with its class and the reading behind it, before anything is approved. If any row outside case_34, case_50 and case_61 changes, stop and show me. The engine-only hashes (641dbc8d…, cf2a90b0…) must not move. Add a test for an image identifier resolved through a timely link row, and one where the link row comes after audit_at, which must not resolve.
+
+Agent Response Summary:
+Developer decision T121 recorded; the builder run waits until WP1 (the same agent type) and WP2 (which holds engine.py, where the alias rule is applied to text evidence at line 337) land. Before it starts, main checked the readings: the alias rule as coded (discovery/catalog.py) takes only the parenthesised token and excludes user IDs and dotted tokens, so it resolves none of the three as written. For case_61 both readings already show delivery_confirmation_19.pdf, which the vision ID check maps to object_19, but neither shows any state, so the T112 visible-cue rule holds the row, not identification. Main asked the developer to rule on a screenshot form that maps a shown user ID to the one resource a timely link row ties to it in the screenshot's system.
+
+Actions:
+* notes/DECISIONS.md T121; read discovery/catalog.py, engine.py alias use, agent/idshapes.py; activity_4000/4003/4007 in dataset/system_activity.csv; the readings of evidence_04, 19 and 46 in runs/pass1-vision-20261025T1323/vision.json.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T14:33:05+05:30] T122: usage limit close; only WP1-WP3 finish; main does the rest
+
+User Prompt (verbatim, secrets redacted):
+Usage limit is close (record as T121). From now on:
+- Start no new agents and no new work. Only the three T120 agents (WP1, WP2, WP3) run to completion.
+- When they land, main alone does the rest. No judge re-read, no fix round, no packager agent:
+  1. check: both suites pass, the candidate replays byte-identical at 0 sends, and both engine-only hashes are unchanged; commit;
+  2. README "Model's role" section;
+  3. freeze, then ask me for the holdout phrase;
+  4. reports --publish;
+  5. code.zip with ORGANISER_README's command, plus a quick secret scan;
+  6. copy code.zip and the root output.csv (a00ba71a…) to ~/Desktop/oct26_final/ with their sha256.
+- If any WP agent's change can't keep the output byte-identical, revert that agent's change rather than fix it.
+- Then stop and send me one short message.
+
+Agent Response Summary:
+Developer decision recorded as T122, because T121 was already the alias ruling; the T121 alias work is new work and is not started. WP1, WP2 and WP3 run to completion, and then main alone does the checks, commit, README section, freeze and phrase request, reports, code.zip and the Desktop copy.
+
+Actions:
+* notes/DECISIONS.md T122.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T14:43:56+05:30] WP3: two tool-use rates, fixture validation set, coherence split
+
+User Prompt (verbatim, secrets redacted):
+[brief written by main; approved in developer turn 2026-10-25T14:25:24+05:30]
+directed_by: 2026-10-25T14:25:24+05:30
+WP3 of the T120 code-quality round, code/evaluation only: two tool-use rates, a fixture validation-set section, and coherence.check_row split. Report by 15:30 IST (it is about 14:31 now).
+(full brief from main)
+
+Agent Response Summary:
+The headline and the agent report now give two tool-use rates per run, counted from cases.jsonl agent blocks: audit_case 508/518 and other read-only tools 1/518 on cand-test-Aplus-20261025T1352. The new section 5b (validation_set.py, spec key `validation`) scores all 24 fixture folders apart from DEV and the holdout, using 48 replay-only fixture runs I made (fx-<F|R>nn-<Aplus|tools_off>-20261025T1435; no --paid, 0 sends). Results: tools_off passes 22/22 scored fixtures (46/46 cases) and A+ passes 19/22 (36/46); every A+ failure is a replay miss that failed closed (39 misses). F11a and R11 are listed as not scored because their planted evidence failures make the producer check refuse them (T60). coherence.check_row is now nine named checks plus check_status_enum; its violations are byte-identical before and after on 338 real-run and 144,042 perturbed-row violations.
+
+Actions:
+* Edited code/evaluation/agent_report.py, headline.py, coherence.py, custom_cases.py, report_spec.py, evaluation_report.py; added code/evaluation/validation_set.py
+* Tests: added test_coherence_checks.py, test_tool_use_rates.py, test_validation_set.py; updated test_improvements.py and test_agent_report.py
+* Ran 50 replay-only pipeline runs (2 trial runs on F01, then 48 = 24 folders x {A+, tools_off})
+* Built reports-wp3-20261025T1505 without --publish (exit 0, no cross-check failures); unittest 365 OK; ruff clean on my files
+* runs/HOLDOUT_ACCESS.log not created; dataset/sample_output.csv not opened
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=orch-eval-engineer
+parent_agent=main
+directed_by=2026-10-25T14:25:24+05:30
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T14:44:01+05:30] WP2: engine split, judge items 11-16, plain docstrings
+
+User Prompt (verbatim, secrets redacted):
+[brief written by main; approved in developer turn 2026-10-25T14:25:24+05:30]
+directed_by: 2026-10-25T14:25:24+05:30
+
+WP2 of the T120 code-quality round: the cold judge's items 11–16, engine.audit_case split, the S5 tie pick and timing windows described as what they are, and plain-English core docstrings. No output row may change. Report by 15:30 IST (it is about 14:31 now).
+(full brief from main)
+
+Agent Response Summary:
+Split engine.audit_case into records_in_scope, evaluate_resource and fail_closed_reason, added the manifest-path containment guard (dataset_path) the evidence parser applies, and removed dead code (categorize's catalog_attachment, the unposed INSTRUCTION_LIKE_TEXT question type, the test-only engine.brief moved into test_tools, two inner re-imports). Rewrote the module docstrings of engine, tools, harness, intent, resolve, rules and accounts plus config.py's timing block in plain English, rule first and then reason, with T-numbers pointing to code/docs/DECISIONS.md and no pointers to notes/, research/ or ../CLAUDE.md. Counted the S5 tie pick from run cand-test-Aplus-20261025T1352 cases.jsonl: 27 of 518 test cases, each flagged D18_TIE_PICK (25 between 2 candidates, 2 among 3). Checked on HEAD plus only these files, in a scratch copy: test A+ replay gives a00ba71a... at 0 model calls and 0 replay misses, cases.jsonl is byte-identical to pristine HEAD, and engine-only DEV and test give 641dbc8d... and cf2a90b0...; 566 and 336 tests pass. In the shared tree the remaining failures are in WP1's in-flight pipeline and regression-gate files; main.py --set dev exits 0.
+
+Actions:
+* Edited code/deletion_audit/engine.py, agent/tools.py, agent/harness.py, agent/intent.py, identity/resolve.py, policy/rules.py, discovery/accounts.py, and config.py's job-timing comment block only
+* Edited code/tests/agent/test_tools.py (local brief helper); added code/tests/pipeline/test_engine_guard.py
+* Ran unittest (code/tests, code/evaluation/tests), scripts/lint.sh on my files, the replay and engine-only runs in scratch copies (HEAD+WP2, pristine HEAD), and code/main.py --set dev
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=orch-builder
+parent_agent=main
+directed_by=2026-10-25T14:25:24+05:30
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T14:44:47+05:30] [auto] WP2 and WP3 landed; waiting for WP1 to commit all three together
+
+User Prompt (verbatim, secrets redacted):
+[auto] Background-agent notifications: "WP2 engine split and docstrings" (orch-builder) and "WP3 evaluation reporting changes" (orch-eval-engineer) finished.
+
+Agent Response Summary:
+WP2 reports that HEAD plus only its files passes both suites, replays the candidate to a00ba71a with 0 model calls and 0 replay misses, keeps 641dbc8d and cf2a90b0, and that python code/main.py --set dev exits 0. The S5 tie order decides 27 of 518 cases in cand-test-Aplus-20261025T1352. WP3 reports 365 evaluation tests OK, a report build (reports-wp3-20261025T1505) with no cross-check failures, two tool-use rates (audit_case 508/518, other read-only tools 1/518), and a validation-set section (tools_off 22/22 scored fixtures; F11a and R11 listed as not scored). Because WP1 has staged renames and config.py carries both WP1's and WP2's edits, main will check and commit all three together when WP1 lands (T122).
+
+Actions:
+* git status; git diff --stat code/deletion_audit/config.py.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T14:48:09+05:30] WP1: runtime without stored outputs; pipeline steps
+
+User Prompt (verbatim, secrets redacted):
+[brief written by main; approved in developer turn 2026-10-25T14:25:24+05:30]
+WP1 of the T120 code-quality round: the runtime reads no stored output file; the comparison against approved files moves into code/evaluation; pipeline.run split into named steps. No output row may change. Report by 15:30 IST (it is about 14:31 now).
+(full brief from main)
+
+Agent Response Summary:
+The pipeline now judges each model-derived change against the engine's model-free row computed in the same run (fail-closed intent, no image observations); a change whose T101/T118/T119 condition fails falls back to that row, and an unexplained change still stops the run (exit 5). The stored-file comparison moved to code/evaluation/regression_check.py with its own tests, the approved CSVs moved to notes/approved/ (the record notes/approved_output.json was updated, code/approved/ removed), and pipeline.run is split into six documented steps. --run-id is optional (run-<YYYYMMDDTHHMMSS>), --write-root is accepted only with --set test and writes only after the run passes, and --regression-gate is kept as a no-op alias. Replays: candidate a00ba71a at 0 sends (wp1-cand-test-Aplus-r1..r3), engine-only DEV 641dbc8d and test cf2a90b0 (wp1-eng-*-r1, r2), freeze check passed; both suites pass (564 and 365 tests).
+
+Actions:
+* git mv code/deletion_audit/agent/regression.py -> agent/model_changes.py; rewrote it (judge_changes, ChangeCheck, verdict fell_back)
+* edited code/deletion_audit/pipeline.py (steps _plan/_vision/_cases/_conditions/_write/_artifacts, model_free_records, _fallback_record, default_run_id), __main__.py, config.py (APPROVED_OUTPUT_RECORD removed; docstring pointers)
+* added code/evaluation/regression_check.py and code/evaluation/tests/test_regression_check.py
+* git mv code/approved/{test,dev}_output.csv -> notes/approved/; git rm code/approved/approved_output.json; edited notes/approved_output.json paths and note
+* updated tests: code/tests/pipeline/test_regression_gate.py, test_fix_round2_wiring.py, test_cli_paid.py, test_approved_baselines.py, test_wiring.py, _wiring.py
+* ran: unittest (code/tests, code/evaluation/tests), scripts/lint.sh on touched files, candidate replays, engine-only replays with empty caches, code/main.py --set dev, freeze_check.py, regression_check.py
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=orch-builder-core
+parent_agent=main
+directed_by=2026-10-25T14:25:24+05:30
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26

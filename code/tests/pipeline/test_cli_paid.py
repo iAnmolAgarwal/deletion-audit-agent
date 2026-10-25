@@ -17,13 +17,12 @@ from typing import Any
 from unittest import mock
 
 from deletion_audit import __main__ as cli
-from deletion_audit.config import APPROVED_OUTPUT_RECORD
 from deletion_audit.model import FakeTransport
 from deletion_audit.pipeline import run_routing_check
 
 from ..agent._support import PNG, answer, dataset, final_reply, tmpdir
 from ..engine_fixtures import Dataset, Person, case
-from ._wiring import paid_setup, read_json, reading, sent, shown
+from ._wiring import paid_setup, plant_model_free, read_json, reading, sent, shown
 
 FAKE_KEY = "fake-test-value-" + "9" * 24  # made up; built so no assignment literal appears in the source
 NAME = cli.API_KEY_NAME
@@ -71,19 +70,6 @@ class Base(unittest.TestCase):
         self.addCleanup(env.stop)
         os.environ.pop(NAME, None)
 
-    def approve_engine_rows(self, dataset_dir: Path) -> None:
-        """Write the temp repo's approved-output record (``config.APPROVED_OUTPUT_RECORD``) for the engine-only rows of
-        ``dataset_dir``: the regression gate is mandatory on a model-on run (T112 item 11), so a paid
-        run passes only when its rows equal these or change in an allowed way."""
-        from deletion_audit.pipeline import ModelSetup, run
-
-        base = run(dataset_dir, run_id="approved-base", cases="test", runs_dir=self.tmp / "baseline-rundirs",
-                   model=ModelSetup.replay(self.tmp / "baseline-replycache"))
-        rec = self.tmp / APPROVED_OUTPUT_RECORD
-        rec.parent.mkdir(parents=True, exist_ok=True)
-        rec.write_text(json.dumps({"approved_output": {
-            "run_id": "approved-base", "path": str(base.output_path), "sha256": base.output_sha256}}), encoding="utf-8")
-
     def env_file(self, *lines: str) -> Path:
         p = self.tmp / "fake_key.envfile"
         p.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -122,15 +108,14 @@ class TestPaidRun(Base):
         nd = final_reply(answer("NOT_DELETION", "Send me a copy of my data"))
         dr = final_reply(answer("DELETION_REQUEST", "delete my account", kind="full_deletion"))
         f = Factory([dr, nd])
-        self.approve_engine_rows(self.root)
         code, out, _ = run_cli(self.base_args("p1") + ["--paid", "--dollar-cap", "0.5", "--call-cap", "2",
                                                        "--mode", "tools_off"], f)
-        # the mandatory gate (T112 item 11) does not allow Bo's NOT_APPLICABLE row (one turn-1 reading, not
-        # two), so the approved row is kept (T118 (2c)) and the run passes
+        # the model-change check does not allow Bo's NOT_APPLICABLE row (one turn-1 reading, not two), so
+        # the row falls back to the model-free row (T118 (2c)) and the run passes
         self.assertEqual((code, f.calls), (0, 1))
         producer = read_json(self.runs / "p1" / "producer.json")
-        self.assertEqual((producer["regression_gate"]["mandatory"], producer["run_passed"]), (True, True))
-        self.assertEqual(len(producer["kept_approved_cases"]), 1)
+        self.assertEqual(producer["run_passed"], True)
+        self.assertEqual(len(producer["fell_back_cases"]), 1)
         self.assertEqual(producer["budget"]["dollar_cap"], 0.5)
         self.assertEqual(producer["budget"]["call_cap"], 2)
         self.assertEqual(producer["budget"]["sends"], 2)
@@ -140,7 +125,6 @@ class TestPaidRun(Base):
     def test_call_cap_holds_across_the_command(self) -> None:
         dr = final_reply(answer("DELETION_REQUEST", "delete my account", kind="full_deletion"))
         f = Factory([dr, dr, dr])
-        self.approve_engine_rows(self.root)
         code, _, _ = run_cli(self.base_args("p2") + ["--paid", "--dollar-cap", "1", "--call-cap", "1",
                                                      "--mode", "tools_off"], f)
         self.assertEqual(code, 0)
@@ -154,7 +138,6 @@ class TestEnvFile(Base):
         dr = final_reply(answer("DELETION_REQUEST", "delete my account", kind="full_deletion"))
         f = Factory([dr, dr])
         envf = self.env_file("# a comment", "OTHER_SETTING=keep-out", f"export {NAME}=\"{FAKE_KEY}\"")
-        self.approve_engine_rows(self.root)
         code, out, err = run_cli(self.base_args("k1") + ["--paid", "--dollar-cap", "1", "--call-cap", "5",
                                                          "--mode", "tools_off", "--env-file", str(envf)], f)
         self.assertEqual(code, 0, err)
@@ -204,13 +187,25 @@ class TestExitCodes(Base):
         self.assertEqual(f.transports[0].calls, 0)
 
     def test_regression_gate_stop_exits_5(self) -> None:
-        rec = self.tmp / APPROVED_OUTPUT_RECORD
-        rec.parent.mkdir(parents=True)
-        rec.write_text(json.dumps(
-            {"approved_output": {"path": "nowhere.csv", "sha256": "0" * 64}}), encoding="utf-8")
-        code, _, err = run_cli(self.base_args("g1") + ["--regression-gate"])
+        """An unexplained model-derived change exits 5; ``--regression-gate`` is accepted as a no-op."""
+        with plant_model_free():
+            code, _, err = run_cli(self.base_args("g1") + ["--regression-gate"])
         self.assertEqual(code, cli.EXIT_GATE_STOP)
         self.assertIn("RUN NOT PASSING", err)
+
+    def test_run_id_is_optional(self) -> None:
+        code, out, _ = run_cli(self.base_args("x")[2:])
+        self.assertEqual(code, 0)
+        made = [d.name for d in self.runs.iterdir()]
+        self.assertEqual(len(made), 1)
+        self.assertRegex(made[0], r"^run-\d{8}T\d{6}$")
+        self.assertIn(made[0], out)
+
+    def test_write_root_needs_the_test_set(self) -> None:
+        code, _, err = run_cli(["--set", "dev", "--write-root", "--runs-dir", str(self.runs)])
+        self.assertEqual(code, 2)
+        self.assertIn("--write-root needs --set test", err)
+        self.assertFalse((self.tmp / "output.csv").exists())
 
 
 class TestRoutingAndVisionCommands(Base):
@@ -269,7 +264,6 @@ class TestRoutingAndVisionCommands(Base):
         run_routing_check(run_id="rc5", sources=["test"], model=paid_setup(self.replies, script), runs_dir=self.runs,
                           repo_root=repo)
         f = Factory([])
-        self.approve_engine_rows(repo / "dataset")
         code, _, _ = run_cli(["--run-id", "full", "--set", "test", "--dataset", str(repo / "dataset"), "--mode",
                               "tools_off", "--cache-dir", str(self.replies), "--runs-dir", str(self.runs)], f)
         self.assertEqual((code, f.calls), (0, 0))

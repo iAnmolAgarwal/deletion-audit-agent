@@ -2,8 +2,8 @@
 
 Full run (the default command)::
 
-    python -m deletion_audit --run-id <id> (--set dev|test | --cases a,b,...) [--mode A+|A|tools_off]
-        [--vision-ack <vision run id>] [--regression-gate] [--write-root] [model options]
+    python -m deletion_audit [--run-id <id>] (--set dev|test | --cases a,b,...) [--mode A+|A|tools_off]
+        [--vision-ack <vision run id>] [--write-root] [model options]
 
 Turn-1 routing check (T70, T92, T97; two replicates in separate cache namespaces)::
 
@@ -23,18 +23,21 @@ Model options: ``--cache-dir`` (default ``cache/``), and for a paid command ``--
 * **``--env-file``** loads only the ``ANTHROPIC_API_KEY`` line of that file into this process's
   environment (the transport reads it from there). The value is never printed, logged or written
   anywhere; an error message never quotes the file.
-* **``--write-root``** also writes the root ``output.csv`` and needs the developer's approval
-  (``../CLAUDE.md`` section 2). It turns the regression gate on, and the root file is written only
-  after the gate passes; a stopped run leaves it untouched (T112 item 10).
+* **``--run-id``** is optional: without it the run is named ``run-<YYYYMMDDTHHMMSS>`` (IST), so
+  ``python code/main.py --set dev`` works. The run directory is ``runs/<run_id>/``.
+* **``--write-root``** also writes the root ``output.csv``, which is the submission, so it needs
+  the developer's approval. It is accepted only with ``--set test``, and the root file is written
+  only after the run's checks pass; a stopped run leaves it untouched (T112 item 10).
 * **``--set dev``** takes the 22 DEV IDs from ``code/evaluation/split.py``. A run that names a
   holdout case is refused by ``pipeline.run`` itself (exit 2). The CLI never passes the unlock.
 * **``--vision-ack``** names the vision run whose readings the developer reviewed; a paid full run
   with images that need review is refused without it (exit 4).
-* **The regression gate** compares the output with the approved file in
-  ``notes/approved_output.json`` (T100, T101); a stop row or a refused baseline exits 5. It is
-  mandatory whenever the model is on (``--paid``, or a replay that used a model reply) and with
-  ``--write-root``, with no opt-out (T112 item 11); ``--regression-gate`` only adds it to an
-  engine-only replay run.
+* **Model-derived changes** are checked on every run against the engine's model-free rows computed
+  in the same run (``agent/model_changes.py``): a change whose condition fails falls back to the
+  model-free row, and an unexplained change exits 5. ``--regression-gate`` is kept as a no-op alias
+  (the check can be neither added nor turned off), so older commands still parse.
+
+T-numbers point to ``code/docs/DECISIONS.md``.
 """
 
 from __future__ import annotations
@@ -53,6 +56,7 @@ from .pipeline import (
     HoldoutRefused,
     ModelSetup,
     VisionReviewRequired,
+    default_run_id,
     dev_ids,
     run,
     run_routing_check,
@@ -181,7 +185,7 @@ def _main_vision(argv: list[str], factory: TransportFactory | None) -> int:
 def _main_run(argv: list[str], factory: TransportFactory | None) -> int:
     ap = argparse.ArgumentParser(prog="deletion_audit", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--run-id", required=True)
+    ap.add_argument("--run-id", help="the run directory's name (default: run-<YYYYMMDDTHHMMSS>, IST)")
     g = ap.add_mutually_exclusive_group(required=True)
     g.add_argument("--set", choices=["dev", "test"])
     g.add_argument("--cases", help="comma-separated case IDs")
@@ -189,10 +193,14 @@ def _main_run(argv: list[str], factory: TransportFactory | None) -> int:
     ap.add_argument("--mode", default="A+", choices=["A+", "A", "tools_off"])
     ap.add_argument("--vision-ack", help="the vision run ID whose readings the developer reviewed")
     ap.add_argument("--regression-gate", action="store_true",
-                    help="also gate an engine-only replay run (always on when the model is on, or with --write-root)")
-    ap.add_argument("--write-root", action="store_true", help="also write the root output.csv (needs approval)")
+                    help="no-op, kept so older commands parse: the model-change check runs on every run")
+    ap.add_argument("--write-root", action="store_true",
+                    help="also write the root output.csv after the run's checks pass (--set test only; needs approval)")
     _add_model_args(ap)
     a = ap.parse_args(argv)
+    if a.write_root and a.set != "test":
+        ap.error("--write-root needs --set test: the root output.csv holds the test set")
+    run_id = a.run_id or default_run_id()
     cases: list[str] | str
     if a.set == "dev":
         cases = sorted(dev_ids())
@@ -204,7 +212,7 @@ def _main_run(argv: list[str], factory: TransportFactory | None) -> int:
     try:
         s = run(
             Path(a.dataset),
-            run_id=a.run_id,
+            run_id=run_id,
             cases=cases,
             mode=a.mode,
             replay_only=not setup.paid,
@@ -213,7 +221,6 @@ def _main_run(argv: list[str], factory: TransportFactory | None) -> int:
             command=_command(argv),
             model=setup,
             vision_ack=a.vision_ack,
-            regression_gate=a.regression_gate,
         )
     except HoldoutRefused as exc:
         print(str(exc), file=sys.stderr)
@@ -229,13 +236,14 @@ def _main_run(argv: list[str], factory: TransportFactory | None) -> int:
     )
     for part, c in m["validator"]["by_part"].items():
         print(f"  validator {part}: {c}")
-    if s.gate is not None:
-        print(f"  regression gate: passed {s.gate['passed']}, changed {s.gate['changed_rows']}, "
-              f"by cause {s.gate['by_cause']}, refusal {s.gate['refusal']}")
-        print(f"  kept as approved (T118): {s.gate.get('kept_approved_cases') or 'none'}; "
-              f"stops: {s.gate.get('stop_cases') or 'none'}")
+    if s.changes is not None:
+        print(f"  model-derived changes: passed {s.changes['passed']}, changed {s.changes['changed_rows']}, "
+              f"by cause {s.changes['by_cause']}")
+        print(f"  fell back to the model-free row (T118): {s.changes.get('fell_back_cases') or 'none'}; "
+              f"stops: {s.changes.get('stop_cases') or 'none'}")
     if not s.passed:
-        print("RUN NOT PASSING: the regression gate stopped it for the developer's review", file=sys.stderr)
+        print("RUN NOT PASSING: an unexplained model-derived change stopped it for the developer's review",
+              file=sys.stderr)
         return EXIT_GATE_STOP
     return 0
 

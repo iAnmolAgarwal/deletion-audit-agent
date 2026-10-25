@@ -75,7 +75,7 @@ def _read_rows(path: Path) -> OutputFile | None:
     return read_output(path) if path.is_file() else None
 
 
-def _expectations(folder: Path, root: Path) -> tuple[dict[str, Expectation], list[str]]:
+def expectations(folder: Path, root: Path) -> tuple[dict[str, Expectation], list[str]]:
     """Every case the folder's expectation files hold, first file wins; plus read problems."""
     out: dict[str, Expectation] = {}
     problems: list[str] = []
@@ -123,7 +123,7 @@ def discover(fixtures_root: Path = FIXTURES_ROOT) -> list[CustomCase]:
         tests = TESTS_RE.search(text)
         statement = st.group(1).strip() if st else (plain or (tests.group(1).strip() if tests else None))
         prov = PROVISIONAL_RE.search(text)
-        expected, problems = _expectations(folder, fixtures_root)
+        expected, problems = expectations(folder, fixtures_root)
         ids = named or sorted(expected)
         rel = _rel(folder, fixtures_root)
         if not ids:
@@ -166,7 +166,7 @@ def check_assertions(assertions: Mapping[str, Any], row: OutputRow | None,
             "passed": all(v is True for v in results.values()) and bool(results)}
 
 
-def _records(run: LoadedRun) -> dict[str, Mapping[str, Any]]:
+def records_by_case(run: LoadedRun) -> dict[str, Mapping[str, Any]]:
     """Raw ``cases.jsonl`` lines by case ID (only row_state and failed_closed are read from them)."""
     out: dict[str, Mapping[str, Any]] = {}
     try:
@@ -219,7 +219,7 @@ def score_custom(cases: Sequence[CustomCase], custom_runs: Mapping[str, str],
                              "field_mismatches": len(sc["diff"]["field_mismatches"])})
         else:
             assert c.expectation.assertions is not None
-            res = check_assertions(c.expectation.assertions, pred, _records(run).get(c.case_id))
+            res = check_assertions(c.expectation.assertions, pred, records_by_case(run).get(c.case_id))
             per_case.append({**base, "run_id": rid, "result": "assertions pass" if res["passed"] else
                              "assertions fail", "pred_status": pred.status if pred else "MISSING", **res})
     scored = [p for p in per_case if p["result"] in ("row exact", "row differs", "assertions pass",

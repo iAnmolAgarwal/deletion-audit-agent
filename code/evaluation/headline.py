@@ -7,10 +7,12 @@ that is not available yet says **"not run yet"** with the reason, never 0:
 * DEV status accuracy, row exact and step F1: the spec's DEV run, scored against DEV gold;
 * test rows by status: the final run's ``output.csv``; FAILED_CLOSED rows: its ``cases.jsonl``,
   cross-checked against its pipeline-written ``metrics.json`` (report section 7);
-* the tool-use rate: cases of the final run whose agent block records a tool call other than
-  ``audit_case``, with the run's mode and whether it was replay-only; not run yet when its records
-  carry no agent block, or when the run used no model reply at all (then the model never ran, so
-  a 0 would be no measurement);
+* two tool-use rates, over the final run's cases: cases whose agent block records an ``audit_case``
+  call (``audit_case_calls`` > 0), and cases with a call to any other read-only tool
+  (``agent_report.READ_ONLY_TOOLS``, from ``tool_calls``); a tool name outside both sets is counted
+  on its own. Each names the run, its mode and whether it was replay-only. Both are not run yet when
+  the records carry no agent block, or when the run used no model reply at all (then the model
+  never ran, so a 0 would be no measurement);
 * tools on vs tools off: the agent report's DEV arm deltas (``A+``/``A`` minus ``tools_off``); not
   run yet without a ``tools_off`` arm;
 * total cost: what the replies the final output used originally cost (usage report part (a)),
@@ -24,7 +26,7 @@ from collections import Counter
 from collections.abc import Mapping
 from typing import Any
 
-from .agent_report import AGENT_KEY, AUDIT_CASE_TOOL, LoadedRun
+from .agent_report import AGENT_KEY, AUDIT_CASE_TOOL, READ_ONLY_TOOLS, LoadedRun, rate_text
 
 NOT_RUN = "not run yet"
 
@@ -36,7 +38,7 @@ def _rate(x: Mapping[str, Any] | None) -> str:
 
 
 def tool_use(final: LoadedRun) -> dict[str, Any]:
-    """The final run's tool-use rate from its agent blocks; or why it is not available."""
+    """The final run's two tool-use rates from its agent blocks; or why they are not available."""
     v = final.view
     p = final.producer
     facts = {"run_id": final.run_id, "mode": p.get("mode"), "replay_only": p.get("replay_only"),
@@ -49,8 +51,11 @@ def tool_use(final: LoadedRun) -> dict[str, Any]:
     agents = [c.agent for c in v.cases.values()]
     if not agents or any(a is None for a in agents):
         return {**facts, "available": False, "why": "the run's cases.jsonl records carry no agent block"}
-    n = sum(1 for a in agents if a is not None and any(t.name != AUDIT_CASE_TOOL for t in a.tool_calls))
-    return {**facts, "available": True, "cases": len(agents), "cases_with_tool_call": n}
+    av = [a for a in agents if a is not None]
+    return {**facts, "available": True, "cases": len(av),
+            "cases_with_audit_case": sum(1 for a in av if a.audit_case_calls > 0),
+            "cases_with_read_only_tool": sum(1 for a in av if any(t.name in READ_ONLY_TOOLS for t in a.tool_calls)),
+            "cases_with_unknown_tool": sum(1 for a in av if any(t.name not in READ_ONLY_TOOLS for t in a.tool_calls))}
 
 
 def build_headline(ev: Mapping[str, Any], us: Mapping[str, Any], final: LoadedRun) -> dict[str, Any]:
@@ -104,12 +109,16 @@ def render_headline(h: Mapping[str, Any]) -> list[str]:
     fc_s = NOT_RUN + " (cases.jsonl unreadable)" if t["failed_closed"] is None else \
         f"{t['failed_closed']} (by reason {t['failed_closed_by_reason'] or {}})"
     if tu["available"]:
-        n, of = tu["cases_with_tool_call"], tu["cases"]
-        tu_s = (f"{n}/{of} ({n / of:.4f}) cases with a tool call other than {AUDIT_CASE_TOOL}; mode {tu['mode']}, "
-                f"{'replay-only' if tu['replay_only'] else 'not replay-only'}, paid model calls "
-                f"{tu['paid_model_calls']}")
+        of = tu["cases"]
+        how = (f"mode {tu['mode']}, {'replay-only' if tu['replay_only'] else 'not replay-only'}, paid model calls "
+               f"{tu['paid_model_calls']}")
+        tu_audit = f"{rate_text(tu['cases_with_audit_case'], of)} cases called {AUDIT_CASE_TOOL}; {how}"
+        tu_other = (f"{rate_text(tu['cases_with_read_only_tool'], of)} cases called another read-only tool "
+                    f"({', '.join(READ_ONLY_TOOLS)}); {how}")
+        if tu["cases_with_unknown_tool"]:
+            tu_other += f"; **{tu['cases_with_unknown_tool']} case(s) called a tool outside both sets**"
     else:
-        tu_s = f"{NOT_RUN}: {tu['why']}"
+        tu_audit = tu_other = f"{NOT_RUN}: {tu['why']}"
     if h["tools_delta"]:
         td_s = "; ".join(f"{k}: status {v['status_n']:+d}, row exact {v['row_exact_n']:+d}, step F1 "
                          f"{'n/a' if v['step_f1'] is None else format(v['step_f1'], '+.4f')} (runs `{v['runs'][0]}` "
@@ -141,7 +150,8 @@ def render_headline(h: Mapping[str, Any]) -> list[str]:
         f"| DEV step F1 | {f1} | `{d['run_id']}` |",
         f"| Test rows by status | {status_s} (of {t['rows']}) | `{t['run_id']}` |",
         f"| Test FAILED_CLOSED rows | {fc_s} | `{t['run_id']}` |",
-        f"| Tool-use rate | {tu_s} | `{tu['run_id']}` |",
+        f"| Tool-use rate: audit_case | {tu_audit} | `{tu['run_id']}` |",
+        f"| Tool-use rate: other read-only tools | {tu_other} | `{tu['run_id']}` |",
         f"| Tools on vs off (DEV) | {td_s} | {td_run} |",
         f"| Total cost: replies the final output used | {total_s} | `{c['usage_run']}` |",
         f"| Cost per case | {per_case} | `{c['usage_run']}` |",

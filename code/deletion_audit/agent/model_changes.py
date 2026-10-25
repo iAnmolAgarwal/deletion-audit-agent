@@ -1,22 +1,16 @@
-"""The model-on regression gate: every row that differs from the approved output needs a cause, and
-only two kinds of change pass (developer rulings T100 and T101).
+"""Model-derived changes: a row the model changed ships only when the change's condition holds;
+otherwise the row falls back to the engine's model-free row, and an unexplained change stops the run.
 
-Basis, rule by rule:
+The comparison is with rows computed in the same run, never with a stored output file. The
+pipeline computes each case's **model-free row**: the engine on the inputs alone, with the
+fail-closed intent (no model intent) and no image observations, which is what an engine-only replay
+writes. Every run row that differs from its model-free row is judged here. Rules, each with its
+reason (T-numbers point to ``code/docs/DECISIONS.md``):
 
-* **The baseline is the approved file** (T101 (1)). Its path and sha256 are read from
-  ``notes/approved_output.json`` at run time, never from a constant, so approving a new file
-  changes only that record. **One baseline per split** (developer ruling T117 B2): ``split="test"``
-  reads ``approved_outputs.test`` (falling back to the legacy ``approved_output`` key, which the
-  freeze check reads), ``split="dev"`` reads ``approved_outputs.dev``; ``split=None`` reads
-  ``approved_output``. A split with no entry is refused, never silently swapped. The file's
-  sha256 is checked before any row is read; a mismatch, a
-  missing file or an unreadable record refuses the gate (:class:`BaselineRefused`), and a refused
-  gate stops the run.
-* **The cause is decided by recompiling, not by guessing** (T100, main's implementation note).
-  For a changed row the pipeline recompiles the case three more times: with the model intent only
-  (no image observations), with the image observations only (intent fail-closed, T71 Q2), and
-  with both. A recompile *reproduces* the change when its row (status and ``steps_json``) is
-  byte-equal to the run's row. Then:
+* **The cause is decided by recompiling, not by guessing.** For a changed row the case is recompiled
+  with the model intent only (no image observations), with the image observations only (fail-closed
+  intent), and with both. A recompile *reproduces* the change when its row (status and
+  ``steps_json``) is byte-equal to the run's row. Then:
 
   - ``intent``: the intent-only row reproduces it and the image-only row does not;
   - ``image``: the image-only row reproduces it and the intent-only row does not;
@@ -24,48 +18,49 @@ Basis, rule by rule:
     put on one input);
   - ``unexplained``: none of these, which includes a changed row where neither input changed for
     the case (no model intent and no image involved), and a cause whose input did not change.
-* **Allowed changes (T101 (2)), and only these:**
+
+  Reason: a cause read off the recompiles is checkable; a guessed one is not (T100).
+* **Allowed changes, and only these:**
 
   1. ``intent``: the new row is NOT_APPLICABLE with ``[]``, every turn-1 reading (at least two:
-     the case's own and each replicate namespace's) answered NOT_DELETION, and the intake
-     cross-check agrees (``intake_non_deletion`` true; the cross-check is code over the inputs,
-     so it is the same in both replicate runs).
+     the case's own and each replicate namespace's) answered NOT_DELETION, the intake cross-check
+     agrees (``intake_non_deletion`` true; it is code over the inputs, so the same in both
+     replicate runs), and the agent loop did not fail.
   2. ``image``: every image involved was read OK and its two readings agree, every extracted
      resource ID involved is well-formed and named by another input, and every record of the case
      that waited on an image (``STATE_NEEDS_IMAGE`` in the image-free compile) got its state from
-     an image (``notes/SYSTEM.md``: a failed read is never "nothing found").
+     an image.
 
-  An image whose two readings disagree counts as agreeing for one case only under rule (a) below.
-* **Candidate assembly by row (developer ruling T118 (2a), (2c)).** A changed row whose cause is
-  ``intent``, ``image`` or ``intent+image`` and whose condition fails is ``kept_approved``: the
-  output carries the approved file's row for that case, byte for byte, and the gate artifacts
-  record it with its reason. It no longer fails the run. Only an ``unexplained`` change is
-  ``stop`` (T100), and the gate passes when no ``stop`` remains. Basis: T118 (2): "otherwise its
-  rows stay as approved"; "NOT_DELETION texts without an intake row stay as approved (T101)".
-  ``intent+image`` is never ``allowed`` (T101 (2) names only the two single-input changes).
-* **Rule (a), a disagreeing image (T118 (2a)):** it is accepted for a case only if each reading on
-  its own gives the same engine derivation for every record of the case: per record
+  Reason: these are the two model-derived changes the developer allows (T101 (2), T109 (b)); a
+  failed read is an explicit failure, never "nothing found".
+* **Fallback.** An ``intent``, ``image`` or ``intent+image`` change whose condition fails is
+  ``fell_back``: the output carries the case's model-free row, and the report records the change and
+  its reason. ``intent+image`` is never ``allowed``. Reason: a model change that fails its condition
+  must not reach the output, and the model-free row is the row the engine supports without it
+  (T118 (2a), (2c)).
+* **Stop.** Only an ``unexplained`` change is ``stop``, and the run passes when no ``stop`` remains.
+  Reason: a change no model input explains is a bug, so the developer decides (T100).
+* **Rule (a), a disagreeing image:** it counts as agreeing for one case only if each reading on its
+  own gives the same engine derivation for every record of the case: per record
   ``(system_id, resource_id)``, its state value and the evidence IDs its steps cite, plus the row's
   FAILED_CLOSED reason. The pipeline recompiles the case once per combination of readings of the
   case's disagreeing images (each image's observations built from one reading alone), with the
-  run's intent. Fields the engine does not derive from (``status_label``, review only) cannot
-  matter, because only the derivation is compared. The merged reading the run used must give the
-  same derivation too, so the shipped row is one each reading supports (a conservative addition:
-  it can only keep more rows as approved). More than :data:`MAX_DISAGREEING` disagreeing images in
-  one case are not enumerated and are not accepted (an explicit failure, never "agree").
-* **Expectation, reported but not enforced** (T100): about the 10 non-deletion requests and the
-  screenshot-dependent cases change, and nothing else. The Markdown puts the counts by cause next
-  to it.
+  run's intent. The merged reading the run used must give the same derivation too, so the shipped
+  row is one each reading supports. More than :data:`MAX_DISAGREEING` disagreeing images in one case
+  are not enumerated and are not accepted (an explicit failure, never "agree"). Reason: fields the
+  engine does not derive from (``status_label``, review only) cannot change a row, so only the
+  derivation is compared (T118 (2a); the merged-reading check is T119 (1)).
+* **Expectation, reported but not enforced:** about the 10 non-deletion requests and the
+  screenshot-dependent cases change, and nothing else (T100). The Markdown puts the counts by cause
+  next to it.
 
-The artifact names case IDs, labels, file IDs, statuses and counts only: no request or evidence
-text (``artifacts.py`` rule).
+The report names case IDs, labels, file IDs, statuses and counts only: no request or evidence text
+(``artifacts.py`` rule). The comparison of a finished run with a stored approved file is a separate
+evaluation check (``code/evaluation/regression_check.py``), outside the runtime.
 """
 
 from __future__ import annotations
 
-import csv
-import hashlib
-import io
 import json
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
@@ -74,18 +69,16 @@ from pathlib import Path
 from typing import Any, Literal
 
 Cause = Literal["intent", "image", "intent+image", "unexplained"]
-Verdict = Literal["allowed", "kept_approved", "stop"]
+Verdict = Literal["allowed", "fell_back", "stop"]
 CAUSES: tuple[Cause, ...] = ("intent", "image", "intent+image", "unexplained")
-GATE_JSON = "regression_vs_engine.json"
-GATE_MD = "regression_vs_engine.md"
+#: The report's file names (kept from the gate it replaces: the evaluation adapter reads the JSON).
+REPORT_JSON = "regression_vs_engine.json"
+REPORT_MD = "regression_vs_engine.md"
+COMPARED_WITH = "the engine's model-free rows, computed in this run (fail-closed intent, no image observations)"
 #: The most disagreeing images in one case that rule (a) enumerates (2**4 = 16 recompiles).
 MAX_DISAGREEING = 4
 EXPECTATION = ("about the 10 non-deletion requests and the screenshot-dependent cases change, and nothing else "
                "(T100; reported, not enforced)")
-
-
-class BaselineRefused(ValueError):
-    """The approved baseline cannot be used: record unreadable, file missing, or sha256 mismatch."""
 
 
 @dataclass(frozen=True)
@@ -103,70 +96,6 @@ class Row:
         except ValueError:
             return None
         return len(value) if isinstance(value, list) else None
-
-
-@dataclass(frozen=True)
-class Baseline:
-    """The approved output, checked against its recorded sha256."""
-
-    record_path: str
-    path: str
-    sha256: str
-    run_id: str | None
-    rows: Mapping[str, Row]
-
-
-def parse_rows(data: bytes) -> dict[str, Row]:
-    """``{case_id: Row}`` from ``output.csv`` bytes; a duplicate case or a short row raises BaselineRefused."""
-    reader = csv.reader(io.StringIO(data.decode("utf-8")))
-    header = next(reader, None)
-    if header != ["case_id", "deletion_status", "steps_json"]:
-        raise BaselineRefused("the output file has an unexpected header")
-    rows: dict[str, Row] = {}
-    for line in reader:
-        if len(line) != 3 or line[0] in rows:
-            raise BaselineRefused("the output file has a short or duplicated row")
-        rows[line[0]] = Row(line[1], line[2])
-    return rows
-
-
-def _approved_entry(record: Mapping[str, Any], split: str | None) -> Mapping[str, Any]:
-    """The record's entry for ``split`` (module docstring: one baseline per split, T117 B2)."""
-    per_split = record.get("approved_outputs") if split is not None else None
-    entry: Any
-    if isinstance(per_split, Mapping) and split in per_split:
-        entry = per_split[split]
-    elif split is None or split == "test":
-        entry = record["approved_output"]
-    else:
-        raise KeyError(f"no approved {split} output in the record")
-    if not isinstance(entry, Mapping):
-        raise TypeError("an approved-output entry is not an object")
-    return entry
-
-
-def load_baseline(record_path: Path, repo_root: Path, split: str | None = None) -> Baseline:
-    """Read the approved-output record, check the file's sha256, and parse its rows (module docstring)."""
-    try:
-        record = json.loads(Path(record_path).read_text(encoding="utf-8"))
-        approved = _approved_entry(record, split)
-        rel, sha = str(approved["path"]), str(approved["sha256"])
-    except (OSError, ValueError, KeyError, TypeError) as exc:
-        raise BaselineRefused(f"the approved-output record is unreadable ({type(exc).__name__})") from exc
-    path = Path(rel) if Path(rel).is_absolute() else Path(repo_root) / rel
-    try:
-        data = path.read_bytes()
-    except OSError as exc:
-        raise BaselineRefused(f"the approved output file {rel} cannot be read ({type(exc).__name__})") from exc
-    actual = hashlib.sha256(data).hexdigest()
-    if actual != sha:
-        raise BaselineRefused(f"the approved output file {rel} has sha256 {actual[:16]}..., the record says "
-                              f"{sha[:16]}...: refused")
-    try:
-        shown = str(Path(record_path).resolve().relative_to(Path(repo_root).resolve()))
-    except ValueError:
-        shown = str(record_path)
-    return Baseline(shown, rel, sha, approved.get("run_id"), parse_rows(data))
 
 
 @dataclass(frozen=True)
@@ -345,28 +274,31 @@ def _image_condition(ev: CaseEvidence) -> tuple[bool, str]:
 
 
 def verdict(cause: Cause, ev: CaseEvidence) -> tuple[Verdict, str]:
-    """``allowed`` only for the two T101 changes whose conditions hold; an explained change whose
-    condition fails is ``kept_approved`` (T118 (2a), (2c)); only an unexplained change is ``stop`` (T100)."""
+    """Rule: ``allowed`` only for an ``intent`` or ``image`` change whose condition holds; any other
+    explained change is ``fell_back`` (the output carries the model-free row); an unexplained change
+    is ``stop``.
+
+    Reason: the two single-input changes are the only model-derived changes the developer allows
+    (T101 (2)); a change that fails its condition keeps the engine's row (T118 (2a), (2c)); a change no
+    model input explains is a bug, so the run stops for the developer (T100)."""
     if cause == "intent":
         ok, why = _intent_condition(ev)
-        return ("allowed" if ok else "kept_approved"), why
+        return ("allowed" if ok else "fell_back"), why
     if cause == "image":
         ok, why = _image_condition(ev)
-        return ("allowed" if ok else "kept_approved"), why
+        return ("allowed" if ok else "fell_back"), why
     if cause == "intent+image":
-        return "kept_approved", "an intent+image change is never allowed (T101 (2)); the approved row is kept (T118)"
+        return "fell_back", "an intent+image change is never allowed (T101 (2)); the model-free row is kept (T118)"
     return "stop", "an unexplained change stops the run (T100)"
 
 
 @dataclass
-class GateResult:
-    """The gate's outcome for one run."""
+class ChangeCheck:
+    """The outcome of :func:`judge_changes` for one run."""
 
-    baseline: dict[str, Any]
     rows_compared: int
     changed: list[dict[str, Any]] = field(default_factory=list)
-    refusal: str | None = None
-    assembled: dict[str, Row] = field(default_factory=dict)  # the output rows: kept-approved rows replaced
+    assembled: dict[str, Row] = field(default_factory=dict)  # the output rows: fallbacks applied
 
     @property
     def stops(self) -> list[dict[str, Any]]:
@@ -374,70 +306,60 @@ class GateResult:
         return [r for r in self.changed if r["verdict"] == "stop"]
 
     @property
-    def kept(self) -> list[dict[str, Any]]:
-        """The changed rows whose approved row is kept (T118)."""
-        return [r for r in self.changed if r["verdict"] == "kept_approved"]
+    def fell_back(self) -> list[dict[str, Any]]:
+        """The changed rows whose output is the model-free row."""
+        return [r for r in self.changed if r["verdict"] == "fell_back"]
 
     @property
     def passed(self) -> bool:
-        """No refusal and no ``stop`` row."""
-        return self.refusal is None and not self.stops
+        """No ``stop`` row."""
+        return not self.stops
 
     def as_json(self) -> dict[str, Any]:
-        """The artifact body (canonical: rows in case order, counts sorted)."""
+        """The report body (canonical: rows in case order, counts sorted)."""
         return {
-            "kind": "regression-vs-engine",
-            "baseline": self.baseline,
+            "kind": "model-derived-changes",
+            "compared_with": COMPARED_WITH,
             "rows_compared": self.rows_compared,
             "changed_rows": len(self.changed),
             "by_cause": {c: sum(1 for r in self.changed if r["cause"] == c) for c in CAUSES},
             "by_verdict": dict(sorted(Counter(r["verdict"] for r in self.changed).items())),
             "passed": self.passed,
-            "refusal": self.refusal,
-            "kept_approved_cases": [r["case_id"] for r in self.kept],
+            "fell_back_cases": [r["case_id"] for r in self.fell_back],
+            "stop_cases": [r["case_id"] for r in self.stops],
             "expectation": EXPECTATION,
             "rows": self.changed,
         }
 
     def summary(self) -> dict[str, Any]:
-        """The producer-record summary."""
-        body = self.as_json()
-        keys = ("baseline", "rows_compared", "changed_rows", "by_cause", "by_verdict", "passed", "refusal",
-                "kept_approved_cases")
-        return {k: body[k] for k in keys} | {"stop_cases": [r["case_id"] for r in self.stops]}
+        """The producer-record summary (the report without its rows)."""
+        return {k: v for k, v in self.as_json().items() if k not in ("rows", "expectation", "kind")}
 
 
-def run_gate(baseline: Baseline | BaselineRefused, after: Mapping[str, Row],
-             evidence_for: Callable[[str], CaseEvidence]) -> GateResult:
-    """Compare ``after`` with the baseline and judge every changed row (module docstring).
+def judge_changes(model_free: Mapping[str, Row], after: Mapping[str, Row],
+                  evidence_for: Callable[[str], CaseEvidence]) -> ChangeCheck:
+    """Rule: judge every row of ``after`` that differs from its model-free row; the assembled output
+    is ``after`` with each ``fell_back`` row replaced by the model-free row (byte for byte).
 
-    ``evidence_for`` is called only for a changed row. A refused baseline, or a run whose case set
-    differs from the baseline's, gives a refused result with no row judged and nothing assembled.
-    Otherwise ``assembled`` is ``after`` with each ``kept_approved`` row replaced by the baseline's
-    row (T118: byte for byte).
-    """
-    if isinstance(baseline, BaselineRefused):
-        return GateResult({"checked": False}, 0, refusal=str(baseline))
-    info = {"checked": True, "record": baseline.record_path, "path": baseline.path, "sha256": baseline.sha256,
-            "run_id": baseline.run_id}
-    if set(after) != set(baseline.rows):
-        extra, lost = len(set(after) - set(baseline.rows)), len(set(baseline.rows) - set(after))
-        return GateResult(info, 0, refusal=f"the run's cases differ from the baseline's ({extra} not in the "
-                                           f"baseline, {lost} missing from the run)")
-    result = GateResult(info, len(after))
+    Reason: see the module docstring. ``evidence_for`` is called only for a changed row. Both
+    mappings come from the same run, so a different case set is a bug and raises ``ValueError``."""
+    if set(after) != set(model_free):
+        raise ValueError(f"the run's rows and its model-free rows name different cases "
+                         f"({len(set(after) ^ set(model_free))} differ)")
+    result = ChangeCheck(len(after))
     for cid in sorted(after, key=_case_order):
-        before, now = baseline.rows[cid], after[cid]
+        before, now = model_free[cid], after[cid]
         result.assembled[cid] = now
         if before == now:
             continue
         ev = evidence_for(cid)
         cause, how = classify(ev)
         decided, condition = verdict(cause, ev)
-        if decided == "kept_approved":
+        if decided == "fell_back":
             result.assembled[cid] = before
         result.changed.append({
             "case_id": cid, "cause": cause, "decided_by": how, "verdict": decided, "condition": condition,
-            "kept_approved": decided == "kept_approved",
+            "fell_back": decided == "fell_back",
             "intent_label": ev.intent_label, "intent_source": ev.intent_source,
             "turn1_labels": list(ev.turn1_labels), "intake_non_deletion": ev.intake_non_deletion,
             "image_file_ids": sorted(i.file_id for i in ev.images),
@@ -455,21 +377,20 @@ def _case_order(case_id: str) -> tuple[int, str]:
     return (int(digits) if digits.isdigit() else -1, case_id)
 
 
-def render_markdown(result: GateResult, run_id: str) -> str:
+def render_markdown(result: ChangeCheck, run_id: str) -> str:
     """A short review page: the verdict, counts by cause next to the expectation, one line per changed row."""
     body = result.as_json()
-    lines = [f"# Model-on regression gate: run {run_id}", "",
-             f"- Baseline: `{body['baseline'].get('path')}` sha256 `{str(body['baseline'].get('sha256'))[:16]}...` "
-             f"(from `{body['baseline'].get('record')}`; checked: {body['baseline'].get('checked')}).",
+    lines = [f"# Model-derived changes: run {run_id}", "",
+             f"- Compared with: {body['compared_with']}.",
              f"- Rows compared: {body['rows_compared']}; changed: {body['changed_rows']}.",
-             f"- **Passed: {body['passed']}**" + (f"; refusal: {body['refusal']}" if body["refusal"] else ""), "",
+             f"- **Passed: {body['passed']}**", "",
              "| cause | changed rows |", "|---|---|"]
     lines += [f"| {c} | {n} |" for c, n in body["by_cause"].items()]
     lines += ["", f"Expected: {EXPECTATION}. Verdicts: {body['by_verdict'] or '{}'}.",
-              f"Kept as approved (T118; the output carries the approved row): {body['kept_approved_cases'] or 'none'}.",
+              f"Fell back (T118; the output carries the model-free row): {body['fell_back_cases'] or 'none'}.",
               ""]
     if result.changed:
-        lines += ["| case | cause | verdict | intent label | images | before | after | condition |",
+        lines += ["| case | cause | verdict | intent label | images | model-free | computed | condition |",
                   "|---|---|---|---|---|---|---|---|"]
         for r in result.changed:
             before, after = r["before"], r["after"]
@@ -492,10 +413,10 @@ def render_markdown(result: GateResult, run_id: str) -> str:
     return "\n".join(lines)
 
 
-def write_gate(run_dir: Path, result: GateResult, run_id: str) -> tuple[Path, Path]:
+def write_report(run_dir: Path, result: ChangeCheck, run_id: str) -> tuple[Path, Path]:
     """Write ``regression_vs_engine.json`` and ``.md`` under ``run_dir``; return both paths."""
     run_dir.mkdir(parents=True, exist_ok=True)
-    js, md = run_dir / GATE_JSON, run_dir / GATE_MD
+    js, md = run_dir / REPORT_JSON, run_dir / REPORT_MD
     js.write_text(json.dumps(result.as_json(), indent=1, sort_keys=True) + "\n", encoding="utf-8")
     md.write_text(render_markdown(result, run_id), encoding="utf-8")
     return js, md

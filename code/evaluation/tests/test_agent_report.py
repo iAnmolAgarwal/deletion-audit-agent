@@ -107,6 +107,8 @@ class TestCounts(Base):
         self.assertEqual(n["run_id"], "t-aplus")
         self.assertEqual(n["cases"], 4)
         self.assertEqual(n["cases_with_tool_call"], 3)
+        # the four tool names in the fixture are all read-only tools; no unknown name
+        self.assertEqual((n["cases_with_read_only_tool"], n["cases_with_unknown_tool"]), (3, 0))
         self.assertEqual(n["tool_calls"], 5)
         self.assertEqual(n["per_tool"], {
             "get_request_context": {"cases": 1, "calls": 1, "error_calls": 0},

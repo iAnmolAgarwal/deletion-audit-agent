@@ -1,25 +1,26 @@
-"""The five read-only tools, bound to one case by the harness (G3 section 5, ``agent/tools.py``).
+"""The five read-only tools the harness binds to one case.
 
-* ``audit_case`` (A+ and A): commits the intent and returns the engine's brief.
+* ``audit_case`` (modes A+ and A): commits the intent and returns the engine's brief.
 * ``get_request_context``, ``inspect_evidence``, ``lookup_identity``, ``list_activity``.
 
-Rules, each with its basis:
+Rules, each rule then its reason:
 
-* **Case-bound** (G3 section 5): the model never names a case; ``audit_case``,
-  ``get_request_context`` and ``inspect_evidence`` read the case the harness bound. Two lookups are
-  not case-scoped: ``lookup_identity`` answers for any identifier, and ``list_activity`` matches its
-  string against every activity row. Both are read-only and cut off at ``audit_at``, and no tool
-  result can change a fact the engine settled.
-* **Cut off at ``audit_at``** (``notes/SYSTEM.md`` "always wins": nothing after ``audit_at`` is
-  cited): a file captured after it is refused; activity, audit-log and identity rows after it
-  are not returned.
-* **Every result names its evidence IDs** (G7a brief item 5), copied from the inputs, never
-  composed (``../CLAUDE.md`` section 3); answer validation accepts only IDs a tool returned.
-* **Read-only and gold-free**: tools read the in-memory :class:`~deletion_audit.engine.World`
-  and the vision results only. No tool opens a file, writes anything or touches gold (a hygiene
-  test scans this module's source).
-* **Arguments are checked** against each tool's input schema with GM's exact checker before the
-  tool runs; a bad call returns an error result, it is not guessed at.
+* **Three tools are bound to the case; two lookups are not.** The model never names a case:
+  ``audit_case``, ``get_request_context`` and ``inspect_evidence`` read the case the harness bound.
+  ``lookup_identity`` answers for any identifier, and ``list_activity`` matches its string (at
+  least 4 characters) against every activity row's resource ID and details. Both are read-only
+  and cut off at ``audit_at``, and no tool result can change a fact the engine settled, so a
+  lookup beyond the case informs the model's answer and nothing else.
+* **Everything is cut off at ``audit_at``:** a file captured after it is refused, and activity,
+  audit-log and identity rows after it are not returned. Reason: nothing after ``audit_at`` may be
+  cited.
+* **Every result names its evidence IDs,** copied from the inputs, never composed. Reason: answer
+  validation accepts only IDs a tool returned.
+* **Read-only and gold-free:** the tools read the in-memory :class:`~deletion_audit.engine.World`
+  and the vision results only. No tool opens a file, writes anything or touches gold; a hygiene
+  test scans this module's source.
+* **Arguments are checked** against each tool's input schema before the tool runs; a bad call
+  returns an error result and is never guessed at.
 """
 
 from __future__ import annotations

@@ -309,12 +309,34 @@ class TestHeadlineAndUsageFields(Base):
             self.assertIn("| Holdout | not run yet (no completed holdout record under runs/) | none |", md)
             self.assertIn("Synthetic caveat for the report tests", md)
         # the run used no model reply and sent nothing: tool use and cost are not run yet, never 0
-        self.assertIn("| Tool-use rate | not run yet: the run used no model reply (0 replies used, 0 sends), so the "
-                      "model never ran |", b["evaluation_md"])
+        for which in ("audit_case", "other read-only tools"):
+            self.assertIn(f"| Tool-use rate: {which} | not run yet: the run used no model reply (0 replies used, 0 "
+                          "sends), so the model never ran |", b["evaluation_md"])
         self.assertIn("| Total cost: replies the final output used | not run yet: the run used no model reply",
                       b["usage_md"])
 
     def test_tool_use_rate_is_measured_once_the_model_ran(self) -> None:
+        rows = rd.dev_rows()
+        cases = [rd.case(c) for c in rows]
+        cases[0] = rd.case("case_01", rd.agent(tool_calls=[rd.tool("inspect_evidence")]))
+        cases[1] = rd.case("case_02", rd.agent(audit_case_calls=0))
+        d = rd.write_run(self.w.runs, "dev-a", rows, cases)
+        (d / "calls.jsonl").write_text("", encoding="utf-8")
+        b = reports.build_all(self.w.spec(), self.w.ctx(), command="test")
+        us = json.loads(json.dumps(b["usage"]))
+        us["a_replies_used"]["replies_used"] = 1  # as if one cached reply had been used
+        h = headline.build_headline(b["evaluation"], us, load_run(self.w.runs, "dev-a"))
+        tu = h["tool_use"]
+        # 21 of the 22 cases call audit_case (case_02 does not); one calls inspect_evidence; none an unknown tool
+        self.assertEqual((tu["cases_with_audit_case"], tu["cases_with_read_only_tool"], tu["cases_with_unknown_tool"],
+                          tu["cases"]), (21, 1, 0, 22))
+        md = "\n".join(headline.render_headline(h))
+        self.assertIn("| Tool-use rate: audit_case | 21/22 (0.9545) cases called audit_case; mode A+", md)
+        self.assertIn("| Tool-use rate: other read-only tools | 1/22 (0.0455) cases called another read-only tool "
+                      "(get_request_context, inspect_evidence, lookup_identity, list_activity); mode A+", md)
+        self.assertIn("| `dev-a` |", md)
+
+    def test_unknown_tool_name_is_counted_apart_from_both_rates(self) -> None:
         rows = rd.dev_rows()
         cases = [rd.case(c) for c in rows]
         cases[0] = rd.case("case_01", rd.agent(tool_calls=[rd.tool("query_evidence")]))
@@ -322,20 +344,20 @@ class TestHeadlineAndUsageFields(Base):
         (d / "calls.jsonl").write_text("", encoding="utf-8")
         b = reports.build_all(self.w.spec(), self.w.ctx(), command="test")
         us = json.loads(json.dumps(b["usage"]))
-        us["a_replies_used"]["replies_used"] = 1  # as if one cached reply had been used
+        us["a_replies_used"]["replies_used"] = 1
         h = headline.build_headline(b["evaluation"], us, load_run(self.w.runs, "dev-a"))
-        # one of the 22 cases calls a tool other than audit_case
-        self.assertEqual((h["tool_use"]["cases_with_tool_call"], h["tool_use"]["cases"]), (1, 22))
-        self.assertIn("| Tool-use rate | 1/22 (0.0455) cases with a tool call other than audit_case; mode A+",
-                      "\n".join(headline.render_headline(h)))
+        # query_evidence is not one of the four read-only tools: 0 read-only cases, 1 unknown
+        self.assertEqual((h["tool_use"]["cases_with_read_only_tool"], h["tool_use"]["cases_with_unknown_tool"]), (0, 1))
+        self.assertIn("**1 case(s) called a tool outside both sets**", "\n".join(headline.render_headline(h)))
 
     def test_unwired_run_tool_use_is_not_run_yet(self) -> None:
         rows = rd.dev_rows()
         d = rd.write_run(self.w.runs, "dev-a", rows, [rd.case(c, rd.ABSENT) for c in rows], vision=rd.ABSENT)
         (d / "calls.jsonl").write_text("", encoding="utf-8")
         b = reports.build_all(self.w.spec(), self.w.ctx(), command="test")
-        self.assertIn("| Tool-use rate | not run yet: the run's cases.jsonl records carry no agent block |",
-                      b["evaluation_md"])
+        for which in ("audit_case", "other read-only tools"):
+            self.assertIn(f"| Tool-use rate: {which} | not run yet: the run's cases.jsonl records carry no agent "
+                          "block |", b["evaluation_md"])
 
     def test_every_organiser_field_is_present_and_filled(self) -> None:
         md = self.build()["usage_md"]

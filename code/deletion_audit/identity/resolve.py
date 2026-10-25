@@ -1,17 +1,23 @@
 """Identity resolution: request email -> the person and their complete identifier set.
 
-Rules (each with its basis):
+Rules, each rule then its reason (T-numbers refer to rulings in code/docs/DECISIONS.md):
 
-* R1: the request email maps to one person through the current email in ``user_identities.csv``
-  or an old email in ``user_audit_log.csv``, case-insensitively. Basis: research/15 R1, DEV 22/22
-  (21 current, 1 historical).
-* T59: the identifier set is complete: ``user_id``, every current and old email and phone, every
-  email hash on file, and sha256 of every email ever held (the identities file's own formula:
-  sha256 of the lower-cased email, 850/850 rows).
-* T49: matching is exact on the normalized value only, so a look-alike never matches.
-* T63: a request whose email resolves to no one is ``UNRESOLVED``: its set holds only the
-  request email and its hash, and a deletion request gets a defined fail-closed outcome
-  downstream (a request read as NOT_DELETION is NOT_APPLICABLE; ``engine`` module docstring).
+* **The request email names one person.** An email that is some person's current email in
+  ``user_identities.csv`` resolves to that person outright (CURRENT), even if someone else held it
+  earlier. Otherwise an old email in ``user_audit_log.csv`` that exactly one person held resolves
+  to that person (HISTORICAL). Matching is on the normalized (lower-cased) value. Reason: the DEV
+  sample answers agree on 22 of 22 cases (21 current, 1 historical).
+* **The identifier set is complete and is not cut at ``audit_at``:** ``user_id``, every current and
+  old email and phone, every email hash on file, and sha256 of every email ever held (the
+  identities file's own formula, sha256 of the lower-cased email, holds on 850 of 850 rows). Reason:
+  the set says which values are the person's; the cut at ``audit_at`` applies to the evidence a
+  link may use (``discovery/links.py``), not to the person's values (T59 in code/docs/DECISIONS.md).
+  The ``lookup_identity`` tool, by contrast, answers only from rows at or before ``audit_at``.
+* **Matching is exact on the normalized value only,** so a look-alike never matches (T49).
+* **An email that resolves to no one, or only as an old email of two or more people, is
+  UNRESOLVED:** its set holds only the request email and its hash, and a deletion request fails
+  closed downstream (a request read as NOT_DELETION is NOT_APPLICABLE; ``engine`` module
+  docstring). Reason: a guessed person would delete someone else's data (T63).
 """
 
 from __future__ import annotations
@@ -143,12 +149,12 @@ def build_people(identities: Sequence[IdentityRow], audit_log: Sequence[AuditLog
 def resolve(
     req: DeletionRequest, identities: Sequence[IdentityRow], audit_log: Sequence[AuditLogRow]
 ) -> IdentityResolution:
-    """Resolve one request (the pinned signature, ``notes/ARCHITECTURE_OPTIONS.md`` section 5)."""
+    """Resolve one request against the two identity files (builds the people index first)."""
     return resolve_with(req, build_people(identities, audit_log))
 
 
 def resolve_with(req: DeletionRequest, people: PeopleIndex) -> IdentityResolution:
-    """Resolve one request's email to a person (R1), current first, then historical.
+    """Resolve one request's email to a person, current first, then historical (module docstring).
 
     A current email wins outright, even if someone else held it earlier. Otherwise an email held
     by two different people is never guessed: it is ``UNRESOLVED`` (0 shared values measured by

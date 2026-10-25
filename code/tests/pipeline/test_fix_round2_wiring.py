@@ -12,8 +12,8 @@ from unittest import mock
 from deletion_audit import pipeline
 from deletion_audit.pipeline import ModelSetup, run, run_vision
 
-from ..agent._support import PNG, answer, dataset, final_reply, tmpdir
-from ._wiring import approve, cases_jsonl, paid_setup, read_json, reading, seed_turn1, shown
+from ..agent._support import C1, PNG, answer, dataset, final_reply, tmpdir
+from ._wiring import paid_setup, plant_model_free, read_json, reading, seed_turn1, shown
 
 
 class Base(unittest.TestCase):
@@ -26,21 +26,19 @@ class Base(unittest.TestCase):
 
 
 class RootWrittenOnlyAfterTheGate(Base):
-    """Item 10 (verifier finding 5): a stopped run leaves the root output.csv untouched."""
+    """Item 10 (verifier finding 5): a stopped run leaves the root output.csv untouched. The stop comes
+    from a planted model-free row (an unexplained difference); the class keeps its name because the
+    improvement ledger cites its test."""
 
     def test_stopped_run_leaves_the_root_file_untouched(self) -> None:
         """Before: the root file was written before the gate ran (``root output.csv written: True``)."""
-        record = approve(
-            self.runs / "base" / "output.csv", plant=(sorted(cases_jsonl(self.runs / "base"))[0], "COMPLETE")
-        )
-        with mock.patch.object(pipeline, "REPO_ROOT", self.tmp):
+        with mock.patch.object(pipeline, "REPO_ROOT", self.tmp), plant_model_free():
             s = run(
                 self.root,
                 run_id="gated",
                 cases="test",
                 runs_dir=self.runs,
                 model=ModelSetup.replay(self.tmp / "c1"),
-                approved_record=record,
                 write_root=True,
             )
         self.assertFalse(s.passed)
@@ -50,23 +48,18 @@ class RootWrittenOnlyAfterTheGate(Base):
 
     def test_an_existing_root_file_is_not_overwritten_by_a_stopped_run(self) -> None:
         (self.tmp / "output.csv").write_text("kept\n", encoding="utf-8")
-        record = approve(
-            self.runs / "base" / "output.csv", plant=(sorted(cases_jsonl(self.runs / "base"))[0], "COMPLETE")
-        )
-        with mock.patch.object(pipeline, "REPO_ROOT", self.tmp):
+        with mock.patch.object(pipeline, "REPO_ROOT", self.tmp), plant_model_free():
             run(
                 self.root,
                 run_id="gated2",
                 cases="test",
                 runs_dir=self.runs,
                 model=ModelSetup.replay(self.tmp / "c1"),
-                approved_record=record,
                 write_root=True,
             )
         self.assertEqual((self.tmp / "output.csv").read_text(encoding="utf-8"), "kept\n")
 
     def test_passing_run_writes_the_root_file(self) -> None:
-        record = approve(self.runs / "base" / "output.csv")
         with mock.patch.object(pipeline, "REPO_ROOT", self.tmp):
             s = run(
                 self.root,
@@ -74,20 +67,30 @@ class RootWrittenOnlyAfterTheGate(Base):
                 cases="test",
                 runs_dir=self.runs,
                 model=ModelSetup.replay(self.tmp / "c1"),
-                approved_record=record,
                 write_root=True,
             )
         self.assertTrue(s.passed)
         self.assertEqual((self.tmp / "output.csv").read_bytes(), s.output_path.read_bytes())
-        self.assertTrue(read_json(self.runs / "ok" / "producer.json")["regression_gate"]["mandatory"])
+        self.assertEqual(read_json(self.runs / "ok" / "producer.json")["root_output"],
+                         {"requested": True, "written": True})
+
+    def test_root_write_is_refused_for_anything_but_the_test_set(self) -> None:
+        """The root output.csv is the submission over deletion_requests.csv: an explicit case list (DEV,
+        a fixture) may never write it, and the refusal comes before any input is read."""
+        with mock.patch.object(pipeline, "REPO_ROOT", self.tmp):
+            with self.assertRaises(ValueError):
+                run(self.root, run_id="dev-root", cases=[C1], runs_dir=self.runs,
+                    model=ModelSetup.replay(self.tmp / "c1"), write_root=True)
+        self.assertFalse((self.tmp / "output.csv").exists())
+        self.assertFalse((self.runs / "dev-root").exists())
 
 
 class GateMandatoryWhenTheModelIsOn(Base):
-    """Item 11 (verifier MINOR 7): no opt-out of the gate for a paid run or a replay with model replies."""
+    """Item 11 (verifier MINOR 7): no opt-out of the model-change check. It now runs on every run, so it
+    can be neither added nor turned off (the class keeps its name: the improvement ledger cites it)."""
 
     def test_replay_with_model_replies_is_gated_without_asking(self) -> None:
         """Before: ``regression_gate`` defaulted to False, so this run had no T101 stop."""
-        record = approve(self.runs / "base" / "output.csv")
         cache = self.tmp / "replies"
         nd = final_reply(answer("NOT_DELETION", "Send me a copy of my data"))
         from ..agent._support import KEEP_TEXT
@@ -99,13 +102,12 @@ class GateMandatoryWhenTheModelIsOn(Base):
             cases="test",
             runs_dir=self.runs,
             model=ModelSetup.replay(cache),
-            approved_record=record,
         )
         producer = read_json(self.runs / "m" / "producer.json")
         self.assertTrue(producer["model_on"])
-        self.assertTrue(producer["regression_gate"]["mandatory"])
+        self.assertEqual(producer["model_changes"]["by_verdict"], {"allowed": 1})
         self.assertTrue((self.runs / "m" / "regression_vs_engine.json").is_file())
-        self.assertIsNotNone(s.gate)
+        self.assertIsNotNone(s.changes)
 
     def test_paid_run_is_gated_and_regression_gate_false_does_not_turn_it_off(self) -> None:
         dr = final_reply(answer("DELETION_REQUEST", "delete my account", kind="full_deletion"))
@@ -117,16 +119,20 @@ class GateMandatoryWhenTheModelIsOn(Base):
             replay_only=False,
             model=paid_setup(self.tmp / "replies2", [dr, dr]),
             mode="tools_off",
-            regression_gate=False,
-            approved_record=approve(self.runs / "base" / "output.csv"),
         )
-        self.assertIsNotNone(s.gate)
-        self.assertTrue(read_json(self.runs / "p" / "producer.json")["regression_gate"]["mandatory"])
+        self.assertIsNotNone(s.changes)
+        self.assertTrue((self.runs / "p" / "regression_vs_engine.json").is_file())
+        self.assertIn("model_changes", read_json(self.runs / "p" / "producer.json"))
+        with self.assertRaises(TypeError):  # the old switch is gone: nothing can turn the check off
+            run(self.root, run_id="p2", cases="test", runs_dir=self.runs, model=ModelSetup.replay(self.tmp / "c3"),
+                regression_gate=False)  # type: ignore[call-arg]
 
-    def test_engine_only_replay_is_not_gated_unless_asked(self) -> None:
+    def test_engine_only_replay_is_checked_and_changes_nothing(self) -> None:
         s = run(self.root, run_id="e", cases="test", runs_dir=self.runs, model=ModelSetup.replay(self.tmp / "c2"))
         producer = read_json(self.runs / "e" / "producer.json")
-        self.assertEqual((s.gate, producer["model_on"], producer["regression_gate"]), (None, False, {"run": False}))
+        self.assertFalse(producer["model_on"])
+        self.assertEqual((producer["model_changes"]["changed_rows"], producer["run_passed"]), (0, True))
+        self.assertEqual(s.output_path.read_bytes(), (self.runs / "base" / "output.csv").read_bytes())
 
 
 class VisionReviewList(unittest.TestCase):
@@ -192,7 +198,8 @@ class VisionReviewList(unittest.TestCase):
         self.assertEqual(review["acknowledged"], [])
 
     def test_listed_exactly_when_the_reading_changes_a_row(self) -> None:
-        """An agreeing, successful reading is on the list exactly when the outputs without and with it differ."""
+        """An agreeing, successful reading is on the list exactly when the computed rows without and with it
+        differ (``output_raw.csv``: before the model-change check, which may fall back to the model-free row)."""
         for value in (reading([]), reading([shown("object_900000004", download_available="yes")])):
             with self.subTest(records=len(value["records"])):
                 tmp = tmpdir()
@@ -212,8 +219,8 @@ class VisionReviewList(unittest.TestCase):
                     model=ModelSetup.replay(cache),
                     vision_ack="vis",
                 )
-                changed = (tmp / "rundirs" / "a" / "output.csv").read_bytes() != (
-                    tmp / "rundirs" / "b" / "output.csv"
+                changed = (tmp / "rundirs" / "a" / "output_raw.csv").read_bytes() != (
+                    tmp / "rundirs" / "b" / "output_raw.csv"
                 ).read_bytes()
                 self.assertEqual("ev_img" in rec["needs_review"], changed)
 

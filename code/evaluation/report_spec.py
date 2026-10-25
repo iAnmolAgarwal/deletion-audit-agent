@@ -11,6 +11,7 @@ A spec is a JSON object (``reports.py --spec <file>``)::
                                                    #   the DEV run's predecessor in metrics.json
       "arms": {"dev": {ARM: run}, "test": {ARM: run}, "fixtures": {ARM: {FIXTURE: run}}},
       "custom_runs": {"<fixture folder>": "<run id>"},   # folder relative to code/tests/fixtures
+      "validation": {ARM: {"<fixture folder>": "<run id>"}},   # the validation set (validation_set.py)
       "usage": {"run": "<run id>", "calls_file": "calls.jsonl"},
       "holdout_run": null,                         # optional: must match a completed record
       "coherence": true,                           # run the coherence checks on final and DEV output
@@ -18,7 +19,13 @@ A spec is a JSON object (``reports.py --spec <file>``)::
                                                    #   refuses a spec without it
     }
 
-``arms`` is :class:`agent_report.Spec`'s mapping (``ARM`` is ``A+``, ``A`` or ``tools_off``).
+``arms`` is :class:`agent_report.Spec`'s mapping (``ARM`` is ``A+``, ``A`` or ``tools_off``); its
+``fixtures`` feed the agent report's per-arm row-exact line (``expected_output.csv`` only).
+``validation`` feeds the validation-set section (``validation_set``): every expectation file of
+every fixture folder, per arm. Its runs are not in :meth:`ReportSpec.scored_runs`: that section
+reads each run's producer check itself and scores only the ``ok`` ones, listing the others as not
+scored, so a robustness fixture whose planted evidence failure refuses its run is shown, never
+scored and never a reason to refuse the whole build.
 ``usage.run`` defaults to ``final_run``. Unknown keys are refused, so a misspelt role never
 silently drops out of a report.
 
@@ -40,7 +47,7 @@ from . import runs
 from .agent_report import LoadedRun, ReportRefused, Spec, load_run, run_path
 
 TOP_KEYS: frozenset[str] = frozenset({"report_id", "final_run", "dev_run", "previous_run", "dev_history", "arms",
-                                      "custom_runs", "usage", "holdout_run", "coherence", "final"})
+                                      "custom_runs", "validation", "usage", "holdout_run", "coherence", "final"})
 USAGE_KEYS: frozenset[str] = frozenset({"run", "calls_file"})
 ARM_KEYS: frozenset[str] = frozenset({"dev", "test", "fixtures"})
 DEFAULT_CALLS_FILE = "calls.jsonl"
@@ -65,6 +72,7 @@ class ReportSpec:
     dev_history: tuple[str, ...] = ()
     arms: Spec = field(default_factory=Spec)
     custom_runs: Mapping[str, str] = field(default_factory=dict)
+    validation: Mapping[str, Mapping[str, str]] = field(default_factory=dict)
     usage: UsageSpec | None = None
     holdout_run: str | None = None
     coherence: bool = True
@@ -82,9 +90,13 @@ class ReportSpec:
             ids.append(self.previous_run)
         return list(dict.fromkeys(ids))
 
+    def validation_runs(self) -> list[str]:
+        """The validation-set runs, in a stable order, without repeats (not scored_runs: module docstring)."""
+        return list(dict.fromkeys(r for m in self.validation.values() for r in m.values()))
+
     def input_runs(self) -> list[str]:
         """Every run the spec names, in a stable order, without repeats."""
-        ids = [*self.scored_runs(), *self.arms.run_ids(), self.usage_spec.run]
+        ids = [*self.scored_runs(), *self.arms.run_ids(), *self.validation_runs(), self.usage_spec.run]
         if self.holdout_run:
             ids.append(self.holdout_run)
         return list(dict.fromkeys(ids))
@@ -126,6 +138,16 @@ def spec_from_mapping(raw: Mapping[str, Any]) -> ReportSpec:
         parts = Path(folder).parts
         if not parts or Path(folder).is_absolute() or any(p in ("..", ".") for p in parts):
             raise ValueError(f"custom_runs folder {folder!r} must be a relative path under code/tests/fixtures")
+    val = raw.get("validation") or {}
+    if not isinstance(val, Mapping) or not all(
+            isinstance(m, Mapping) and all(isinstance(k, str) and isinstance(v, str) for k, v in m.items())
+            for m in val.values()):
+        raise ValueError("spec 'validation' must map arms to {fixture folder: run ID} objects")
+    for m in val.values():
+        for folder in m:
+            parts = Path(folder).parts
+            if not parts or Path(folder).is_absolute() or any(p in ("..", ".") for p in parts):
+                raise ValueError(f"validation folder {folder!r} must be a relative path under code/tests/fixtures")
     usage: UsageSpec | None = None
     u = raw.get("usage")
     if u is not None:
@@ -144,7 +166,9 @@ def spec_from_mapping(raw: Mapping[str, Any]) -> ReportSpec:
     spec = ReportSpec(report_id=report_id, final_run=final_run, dev_run=dev_run,
                       previous_run=_str(raw, "previous_run", required=False),
                       dev_history=tuple(runs.check_run_id(x) for x in hist), arms=arms,
-                      custom_runs={k: runs.check_run_id(v) for k, v in custom.items()}, usage=usage,
+                      custom_runs={k: runs.check_run_id(v) for k, v in custom.items()},
+                      validation={a: {k: runs.check_run_id(v) for k, v in m.items()} for a, m in val.items()},
+                      usage=usage,
                       holdout_run=_str(raw, "holdout_run", required=False), coherence=coherence, final=final)
     for rid in spec.arms.run_ids():
         runs.check_run_id(rid)

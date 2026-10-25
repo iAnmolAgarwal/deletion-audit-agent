@@ -1,76 +1,54 @@
-"""The pipeline: inputs -> vision -> agent per case -> engine rows -> ``runs/<run_id>/output.csv`` plus artifacts.
+"""The pipeline: inputs -> vision -> agent per case -> checked rows -> ``runs/<run_id>/output.csv`` plus artifacts.
 
-* The output goes to ``runs/<run_id>/output.csv``. The root ``output.csv`` is written only when
-  ``write_root=True`` is passed explicitly (``../CLAUDE.md`` section 5; developer approval needed).
-* **Model wiring (G7; G7a's wiring proposals 1-6).** Every model call goes through GM's
-  :class:`~deletion_audit.model.ModelClient`. A :class:`ModelSetup` holds the one transport, the
-  one :class:`~deletion_audit.model.BudgetGuard` and the two reply-cache namespaces
-  (``config.REPLY_NAMESPACES``) of a command run. **Replay-only is the default:** without a paid
-  setup no request is ever sent, every cache miss is an explicit ``REPLAY_MISS`` failure, the
-  intent of such a case fails closed (T71 Q2: the engine's deletion-path row, flagged) and an
-  image with a missing reading stays an unparsed dependency (T8).
-* **What a full run may buy:** only the case conversation (turn 1 and the loop) in the first
-  namespace. The turn-1 replicate and both vision readings are replayed from the cache; they are
-  bought by their own commands (:func:`run_routing_check`, :func:`run_vision`), so a full run
-  never pays for a reading the developer has not seen (T88 (1), T97).
-* **Order of a run:** inputs -> vision (two readings per PNG, ``learn_shapes`` then
-  ``read_images``, ``vision_readings.json``/``.md`` and ``vision.json``) -> the engine's world on
-  ``replace(ctx, image_observations=..., vision_read=...)`` -> per case
-  :func:`~deletion_audit.agent.audit_with_agent` (``result.applied`` is the row; ``result.report``
-  goes under ``"agent"`` in ``cases.jsonl``) -> the pre-write gate (inside the engine) -> output.
-* **Vision review (T88 (1); G7a proposal 2):** a paid full run is refused while any image needs
-  review (a failed or disagreeing reading) unless ``vision_ack`` names the vision run whose
-  readings the developer reviewed, and that run's review list and readings equal this run's. The
-  acknowledgement is recorded in ``producer.json``. A replay-only run is never refused for it.
-* **Image answers (G7a proposal 6):** a validated ``IMAGE_FIELD_UNREADABLE`` answer is applied by
-  compiling the case on a world built from ``patch_image_observations``.
-* **Model-on regression gate (T100, T101; :mod:`deletion_audit.agent.regression`):** the output is
-  compared row by row with the approved file named in ``notes/approved_output.json``; every changed
-  row gets a cause by recompiling. A stop row or a refused baseline marks the run as not passing in
-  ``producer.json`` (``run_passed`` false, with the refusal) and the CLI exits non-zero. **The gate
-  is mandatory** (developer ruling T112 item 11, G7 verifier MINOR 7) whenever the model is on, that
-  is, a paid run or a replay run that used at least one model reply, and whenever the root
-  ``output.csv`` is to be written; ``regression_gate=True`` only adds it to an engine-only run. A run
-  whose case set is not the approved file's (DEV, a fixture) is refused by the gate and so does not
-  pass. **The root ``output.csv`` is written only after the gate passes** (T112 item 10, verifier
-  finding 5): a stopped or refused run leaves it untouched, and ``producer.json`` says so.
-* **Candidate assembly by row (developer ruling T118 (2a), (2c)):** when the gate runs, the rows as
-  computed go to ``output_raw.csv`` and ``output.csv`` carries the gate's assembled rows: each
-  ``kept_approved`` row is the approved file's row, byte for byte. Its ``cases.jsonl`` record is the
-  case recompiled on the world without image readings, with the case's own intent decision (T118
-  step 4 fix: a validated model intent is not shown as fail-closed), when that reproduces the
-  approved row; else the engine-only recompile (fail-closed intent) when that does; else the computed
-  record. It is flagged ``GATE_KEPT_APPROVED`` naming which, so the run's metrics describe ``output.csv``;
-  ``producer.json`` lists the kept cases and both hashes. The assembly runs after every row is computed, so no model
-  request changes. A refused gate assembles nothing (``output.csv`` = the computed rows; not passing).
-* **Baseline per split (developer ruling T117 B2):** ``cases="test"`` is gated against the approved
-  test file, the exact DEV case set against the DEV baseline, anything else against the record's
-  ``approved_output`` (so a fixture dataset needs its own record). The record lives in the package
-  (``config.APPROVED_OUTPUT_RECORD``), so an unzipped ``code/`` finds it.
-* **Vision review list (T112, item 4 (b)):** the images the developer must review before a paid
-  full run (and that ``--vision-ack`` must cover) are the failed or disagreeing ones plus every
-  image whose readings change a row (:func:`row_changing_images`: each case compiled on the world
-  without and with the readings, fail-closed intent, and the images involved in each changed row).
-  ``producer.vision.review.images`` lists, for each, its ``file_id`` and both reading keys, so the
-  freeze check can verify that an acknowledgement covers that exact image and both readings. An
-  acknowledgement never picks a reading.
-* **A failed agent call (developer ruling T109 (a)):** a case whose agent loop status is ``FAILED``
-  (a call failed at any turn) never becomes NOT_APPLICABLE, whatever turn 1 said. Its row is the
-  engine path without model intent (the fail-closed intent of T71 Q2, compiled on the run's world
-  with no model answer applied), flagged ``AGENT_CALL_FAILED``. This is decided here, in the
-  pipeline's intent decision, not only in the regression gate. Nothing is re-sent: the transport's
-  retry ladder stays the one place that gives up (``../CLAUDE.md`` section 5).
-* Every requested case gets exactly one row; a row is never left empty (``FAILED_CLOSED``).
-* **Holdout guard** (``../CLAUDE.md`` section 4): :func:`run` refuses, before it reads any input,
-  an explicit case list that names a holdout case, and, after resolving ``"test"``, any resolved
-  case that is one. It raises :class:`HoldoutRefused` and writes nothing. The holdout cases'
-  request inputs still join the global stages (T32, T47); only running or writing them is
-  refused. **The one unlock (T96):** ``holdout_unlock`` must be the developer's exact phrase,
-  checked by ``evaluation.gold.check_unlock``, which raises ``HoldoutLockedError`` on any other
-  value and logs a granted unlock once per run. Only ``evaluation/holdout_run.py`` passes it
-  (``code/evaluation/tests/test_holdout_static.py``); the CLI never does.
+T-numbers point to ``code/docs/DECISIONS.md``. Each rule is stated first, then its reason.
+
+* **Where output goes.** Rule: a run writes ``runs/<run_id>/output.csv``; the root ``output.csv`` is
+  written only with ``write_root=True``, only for the test set, and only after the run's checks
+  pass. Reason: the root file is the submission; a stopped run leaves it untouched (T112 item 10).
+* **The six steps of :func:`run`.** (1) setup: check the request, refuse holdout cases, read the
+  inputs; (2) vision: replay both readings of every PNG and check the review acknowledgement;
+  (3) cases: the agent per case on the engine's world; (4) conditions and fallback: judge every
+  model-derived change against the engine's model-free row computed in the same run; (5) write:
+  ``output_raw.csv`` (as computed) and ``output.csv`` (as checked); (6) artifacts: ``producer.json``,
+  ``metrics.json``, ``cases.jsonl``, ``usage.json``. Each step's function states its own rule.
+* **Model wiring.** Rule: every model call goes through one :class:`ModelSetup` per command: one
+  transport, one :class:`~deletion_audit.model.BudgetGuard` and the two reply-cache namespaces
+  (``config.REPLY_NAMESPACES``). Replay only is the default: nothing is sent, every cache miss is an
+  explicit ``REPLAY_MISS`` failure, that case's intent fails closed (the engine's deletion-path row,
+  flagged, T71 Q2) and an image with a missing reading stays an unparsed dependency (T8). Reason: a
+  failed call is an explicit failure, never "nothing found", and spend needs a per-run cap.
+* **What a full run may buy.** Rule: only the case conversation (turn 1 and the loop), in the first
+  namespace; the turn-1 replicate and both vision readings are replayed, bought only by
+  :func:`run_routing_check` and :func:`run_vision`. Reason: a full run never pays for a reading the
+  developer has not seen (T88 (1), T97).
+* **Vision review.** Rule: a paid full run is refused while an image needs review (a failed or
+  disagreeing reading, or one whose readings change a row: :func:`row_changing_images`) unless
+  ``vision_ack`` names the vision run whose review list and readings equal this run's;
+  ``producer.vision.review`` records it, listing each image's ``file_id`` and both reading keys. A
+  replay-only run is never refused for it, and an acknowledgement never picks a reading. Reason:
+  the developer must have seen these exact readings (T88 (1), T112 item 4 (b)).
+* **Model-derived changes** (:mod:`deletion_audit.agent.model_changes`). Rule: an intent or image
+  change applies only when its condition holds; otherwise the row is the engine's model-free row (no
+  model intent, no image observations), computed in the same run; an unexplained difference marks
+  the run as not passing and the CLI exits non-zero. Reason: the developer allows only two kinds of
+  model change (T101 (2), T118, T119 (1)), and the runtime reads no stored output file. Comparing a
+  finished run with an approved file is an evaluation check (``code/evaluation/regression_check.py``).
+* **Image answers.** Rule: a validated ``IMAGE_FIELD_UNREADABLE`` answer is applied by compiling the
+  case on a world built from ``patch_image_observations``. Reason: the engine decides every row
+  (G7a proposal 6).
+* **A failed agent call.** Rule: a case whose agent loop status is ``FAILED`` never becomes
+  NOT_APPLICABLE; its row is the engine path without model intent, flagged ``AGENT_CALL_FAILED``.
+  Nothing is re-sent: the transport's retry ladder is the one place that gives up. Reason: a turn-1
+  label from a loop that later failed is not a decision (T109 (a)).
+* **Every requested case gets exactly one row**; a row is never left empty (``FAILED_CLOSED``).
+* **Holdout guard.** Rule: :func:`run` refuses, before it reads any input, an explicit case list that
+  names a holdout case, and, after resolving ``"test"``, any resolved case that is one, raising
+  :class:`HoldoutRefused` and writing nothing. The holdout requests still join the global stages
+  (T32, T47). The one unlock is ``holdout_unlock`` equal to the developer's exact phrase, checked by
+  ``evaluation.gold.check_unlock``; only ``evaluation/holdout_run.py`` passes it, never the CLI.
+  Reason: the holdout split is measured once, after freeze (T96).
 * The producer record carries ``git_head`` (the 40-hex HEAD, or None outside a git checkout), so a
-  freeze run names the commit it ran on (T96: ``holdout_run`` checks it against the freeze tag).
+  freeze run names the commit it ran on (T96).
 """
 
 from __future__ import annotations
@@ -85,6 +63,7 @@ import time
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 
@@ -104,25 +83,23 @@ from .agent import (
 )
 from .agent.answers import patch_image_observations
 from .agent.crosscheck import intake_crosscheck
-from .agent.regression import (
+from .agent.model_changes import (
     MAX_DISAGREEING,
-    Baseline,
-    BaselineRefused,
     CaseEvidence,
+    ChangeCheck,
     Derivation,
     RecordView,
     Row,
     SingleReadingCheck,
     image_facts,
+    judge_changes,
     judge_single_readings,
-    load_baseline,
-    run_gate,
+    write_report,
 )
-from .agent.regression import write_gate as write_regression
 from .agent.routing import text_id
 from .agent.vision import image_files, reading_observations
-from .artifacts import RunArtifacts, now_ist, write_json
-from .config import APPROVED_OUTPUT_RECORD, REPLY_NAMESPACES
+from .artifacts import IST, RunArtifacts, now_ist, write_json
+from .config import REPLY_NAMESPACES
 from .discovery.accounts import Flag
 from .engine import AuditContext, FailClosedIntent, World, audit_case, build_context, build_world, malformed_record
 from .inputs.requests import load_requests_checked
@@ -145,8 +122,8 @@ class VisionReviewRequired(RuntimeError):
 
 
 def holdout_ids() -> frozenset[str]:
-    """The locked holdout case IDs, from ``code/evaluation/split.py`` (the mirror of
-    ``notes/split.json``). An import failure propagates: the guard never runs without its list."""
+    """The locked holdout case IDs, from ``code/evaluation/split.py``. An import failure propagates:
+    the guard never runs without its list."""
     code_dir = str(REPO_ROOT / "code")
     if code_dir not in sys.path:
         sys.path.insert(0, code_dir)
@@ -169,7 +146,7 @@ def refuse_holdout(cases: Iterable[str]) -> None:
     if named:
         raise HoldoutRefused(
             f"refused: {len(named)} holdout case(s) requested; holdout cases are never run or written "
-            "(../CLAUDE.md section 4)"
+            "(holdout lock)"
         )
 
 
@@ -298,7 +275,7 @@ class RunSummary:
     output_sha256: str
     rows: int
     metrics: dict[str, Any]
-    gate: dict[str, Any] | None = None
+    changes: dict[str, Any] | None = None  # the change check's summary (``ChangeCheck.summary``)
     passed: bool = True
 
 
@@ -399,7 +376,7 @@ def check_vision_ack(vision: VisionRun, ack_run_id: str | None, runs_dir: Path,
 
 
 class _PatchedWorlds:
-    """Builds the world for a case's validated image answers, and keeps it for the regression gate."""
+    """Builds the world for a case's validated image answers, and keeps it for the change check."""
 
     def __init__(self, ctx: AuditContext) -> None:
         self.ctx = ctx
@@ -478,8 +455,8 @@ def record_derivation(rec: CaseRecord) -> Derivation:
 
 
 @dataclass
-class _GateInputs:
-    """What the regression gate's recompiles need from one run."""
+class _ChangeInputs:
+    """What the change check's recompiles need from one run."""
 
     world: World
     world_plain: World
@@ -490,7 +467,7 @@ class _GateInputs:
 
     def single_readings(self, cid: str, involved: Sequence[str], intent: Any, validated: Sequence[ValidatedAnswer],
                         merged: CaseRecord) -> dict[str, SingleReadingCheck]:
-        """T118 rule (a) for the case's disagreeing images (``regression`` module docstring): the case
+        """T118 rule (a) for the case's disagreeing images (``model_changes`` module docstring): the case
         recompiled once per combination of their readings, each image's observations built from one
         reading alone, the other images as the run read them, the run's intent and image answers."""
         by_file = self.vision.by_file()
@@ -551,26 +528,31 @@ class _GateInputs:
         )
 
 
-def _split_of(cases: Sequence[str] | Literal["test"], wanted: Sequence[str]) -> str | None:
-    """The baseline split of a run (module docstring, T117 B2): ``"test"`` for the test set, ``"dev"``
-    for exactly the DEV case set, else None (the record's ``approved_output``)."""
-    if cases == "test":
-        return "test"
-    return "dev" if set(wanted) == set(dev_ids()) else None
+def model_free_records(plain: World, wanted: Sequence[str], known: frozenset[str]) -> dict[str, CaseRecord]:
+    """Rule: each case's model-free record is the engine on the inputs alone: the fail-closed intent
+    and ``plain``, the world without image observations (a malformed request gets its malformed row).
+
+    Reason: that is exactly what an engine-only replay writes (every model call missing, T71 Q2), so
+    it is the row a case keeps when a model-derived change fails its condition, and it is computed in
+    the same run instead of being read from a stored output file."""
+    intent = FailClosedIntent()
+    return {cid: audit_case(cid, plain, intent) if cid in known else malformed_record(cid, plain)
+            for cid in sorted(set(wanted))}
 
 
-def _kept_record(rec: CaseRecord, plain: World, approved: Row, cause: str) -> CaseRecord:
-    """The ``cases.jsonl`` record of a kept-approved case (module docstring): the first of (1) the
-    image-free recompile with the case's own intent, (2) the engine-only recompile with the fail-closed
-    intent, that reproduces the approved row byte for byte, else (3) the computed record; flagged."""
+def _fallback_record(rec: CaseRecord, plain: World, free: CaseRecord, cause: str) -> CaseRecord:
+    """Rule: the ``cases.jsonl`` record of a case whose change fell back is the image-free recompile
+    with the case's own intent when that reproduces the model-free row, else the model-free record;
+    it keeps the agent's questions and answers and is flagged ``MODEL_CHANGE_FELL_BACK``.
+
+    Reason: the run's metrics must describe ``output.csv``; a validated model intent (for example
+    DELETION_REQUEST) that does not change the row is shown as it was decided, not as fail-closed
+    (T118 step 4 fix)."""
     own = audit_case(rec.case_id, plain, FixedIntent(rec.intent))
-    base, how = own, "image-free recompile with the case's own intent"
-    if _row(own) != approved:
-        engine_only = audit_case(rec.case_id, plain, FixedIntent(fail_closed_intent(rec.intent.crosscheck)))
-        base, how = ((engine_only, "engine-only recompile (fail-closed intent)") if _row(engine_only) == approved
-                     else (rec, "computed record"))
-    flag = Flag("GATE_KEPT_APPROVED", f"{cause} change whose condition failed: output keeps the approved row "
-                                      f"(T118); this record is the {how}")
+    base, how = (own, "image-free recompile with the case's own intent") if _row(own) == _row(free) else (
+        free, "engine's model-free record")
+    flag = Flag("MODEL_CHANGE_FELL_BACK", f"{cause} change whose condition failed: output keeps the model-free row "
+                                          f"(T118); this record is the {how}")
     return replace(base, flags=tuple(sorted(set(base.flags) | {flag}, key=lambda f: (f.code, f.detail))),
                    open_questions=rec.open_questions, answers=rec.answers, rejected=rec.rejected)
 
@@ -586,10 +568,256 @@ def _setup_for(model: ModelSetup | None, replay_only: bool) -> ModelSetup:
     return model
 
 
+def default_run_id(now: datetime | None = None) -> str:
+    """Rule: a run without an explicit ID is named ``run-<YYYYMMDDTHHMMSS>`` (IST, the build's clock).
+
+    Reason: every run writes its own ``runs/<run_id>/`` and never the root file, so a generated name
+    lets ``python code/main.py --set dev`` run without one; the format matches ``RUN_ID_RE``."""
+    t = now or datetime.now(IST)
+    return "run-" + t.strftime("%Y%m%dT%H%M%S")
+
+
+# ----------------------------------------------------------------------------- the full run, step by step
+@dataclass
+class _RunPlan:
+    """Step 1's result: the checked request of one run and where it writes."""
+
+    run_id: str
+    mode: Mode
+    cases: Sequence[str] | Literal["test"]
+    wanted: list[str]
+    known: frozenset[str]
+    ctx0: AuditContext
+    setup: ModelSetup
+    runs_root: Path
+    run_dir: Path
+    arts: RunArtifacts
+    granted: bool
+    write_root: bool
+    command: str
+    t0: float
+
+
+@dataclass
+class _Computed:
+    """Step 3's result: the run's world and each case's record as computed (model answers applied)."""
+
+    ctx: AuditContext
+    world: World
+    patched: _PatchedWorlds
+    records: dict[str, CaseRecord]
+    results: dict[str, AgentCaseResult]
+
+
+@dataclass(frozen=True)
+class _Clients:
+    """The run's clients: the case conversation (may send on a paid setup), the turn-1 replicate, and
+    the two vision readers (replay only; the second is the replicate client)."""
+
+    primary: ModelClient
+    replica: ModelClient
+    vision: tuple[ModelClient, ModelClient]
+
+    @classmethod
+    def build(cls, plan: _RunPlan) -> _Clients:
+        """Rule: only the case conversation may send; the replicate and both readings replay. Reason: a
+        full run never buys a reading or replicate the developer has not seen (T88 (1), T97)."""
+        s, arts, rid = plan.setup, plan.arts, plan.run_id
+        primary = s.client(0, paid=True, log=arts, run_id=rid)
+        replica = s.client(1, paid=False, log=arts, run_id=rid)
+        return cls(primary, replica, (s.client(0, paid=False, log=arts, run_id=rid), replica))
+
+
+@dataclass(frozen=True)
+class _Written:
+    """Step 5's result: the hashes written and whether the root file was written."""
+
+    sha: str
+    raw_sha: str
+    root_written: bool
+
+
+def _plan(dataset_dir: Path, *, run_id: str, cases: Sequence[str] | Literal["test"], mode: Mode,
+          replay_only: bool, write_root: bool, runs_dir: Path | None, command: str,
+          holdout_unlock: str | None, model: ModelSetup | None) -> _RunPlan:
+    """Step 1, setup. Rule: refuse a bad run ID or mode, a root write for anything but the test set,
+    and any holdout case (an explicit list before any input is read, a resolved ``"test"`` after);
+    then read the inputs and resolve the cases.
+
+    Reason: the root ``output.csv`` is the submission over ``deletion_requests.csv``, so only the test
+    set may write it; holdout cases are never run or written without the developer's unlock (T96)."""
+    if RUN_ID_RE.fullmatch(run_id) is None:
+        raise ValueError("run id must match ^[A-Za-z0-9][A-Za-z0-9._-]*$")
+    if mode not in MODES:
+        raise ValueError(f"unknown mode {mode!r}")
+    if write_root and cases != "test":
+        raise ValueError("only a run of the test set (cases='test') may write the root output.csv")
+    granted = False
+    if cases != "test":
+        granted = guard_holdout(cases, holdout_unlock, run_id, granted)  # before any input is read
+    setup = _setup_for(model, replay_only)
+    t0 = time.monotonic()
+    ctx0 = build_context(dataset_dir)
+    wanted = resolve_cases(ctx0, cases)
+    granted = guard_holdout(wanted, holdout_unlock, run_id, granted)  # also a resolved "test" run
+    known = frozenset(r.case_id for r in ctx0.requests)
+    malformed = {i.case_id for i in ctx0.request_issues if i.case_id}
+    missing = sorted(set(wanted) - known - malformed)
+    if missing:
+        raise KeyError(f"{len(missing)} requested case(s) are in no request file")
+    runs_root = runs_dir or REPO_ROOT / "runs"
+    run_dir = runs_root / run_id
+    arts = RunArtifacts(run_dir, extra_log=setup.extra_log)
+    arts.start_calls()
+    return _RunPlan(run_id, mode, cases, wanted, known, ctx0, setup, runs_root, run_dir, arts, granted,
+                    write_root, command, t0)
+
+
+def _vision(plan: _RunPlan, clients: _Clients, vision_ack: str | None) -> tuple[VisionRun, dict[str, Any]]:
+    """Step 2, vision. Rule: replay both readings of every PNG, write the vision artifacts, and refuse a
+    paid run while an image needs review that ``vision_ack`` does not cover.
+
+    Reason: a full run never pays for a reading the developer has not seen, and an acknowledgement
+    must name these exact readings (T88 (1), T112 item 4 (b))."""
+    setup, run_id = plan.setup, plan.run_id
+    ctx0 = plan.ctx0
+    vision = read_images(ctx0, clients.vision, learn_shapes(ctx0.index.observations(), ctx0.activity))
+    needs = review_list(vision, row_changing_images(ctx0, vision))
+    write_vision_artifacts(plan.run_dir, vision, needs_review=needs)
+    write_json(plan.run_dir / "vision.json", vision_run_report(vision))
+    review = check_vision_ack(vision, vision_ack, plan.runs_root, needs_review=needs)
+    if setup.paid and review["needs_review"] and not review["ack_matches"]:
+        write_json(plan.run_dir / "refused.json", {"run_id": run_id, "refused": "vision review required",
+                                                   "vision_review": review, "created_at": now_ist()})
+        raise VisionReviewRequired(
+            f"refused: {len(review['needs_review'])} image(s) need the developer's review before a paid full "
+            "run; pass the reviewed vision run ID (--vision-ack)")
+    return vision, review
+
+
+def _cases(plan: _RunPlan, clients: _Clients, vision: VisionRun, caps: LoopCaps | None) -> _Computed:
+    """Step 3, cases. Rule: build the world with the image readings, then audit each case in case-ID
+    order with the agent; a malformed request gets its malformed row and no model sees it; a case
+    whose agent loop FAILED gets the engine path without model intent.
+
+    Reason: the model interprets and the code decides (the engine compiles every row), and a failed
+    call is an explicit failure, never "nothing found" (T86 item 2, T109 (a))."""
+    arts = plan.arts
+    ctx = replace(plan.ctx0, image_observations=vision.observations, vision_read=vision.read_ok())
+    world = build_world(ctx)
+    patched = _PatchedWorlds(ctx)
+    records: dict[str, CaseRecord] = {}
+    results: dict[str, AgentCaseResult] = {}
+    for cid in sorted(set(plan.wanted)):
+        if cid not in plan.known:
+            records[cid] = malformed_record(cid, world)
+            arts.case(records[cid], _not_run_report(plan.mode, "MALFORMED_REQUEST"))
+            continue
+        patched.case = cid
+        res = audit_with_agent(cid, world, clients.primary, mode=plan.mode, caps=caps, vision=vision,
+                               replicate_clients=(clients.replica,), world_for_answers=patched)
+        results[cid] = res
+        records[cid] = _agent_failed_record(cid, world, res) if res.outcome.status == "FAILED" else _with_answers(res)
+        arts.case(records[cid], res.report)
+    return _Computed(ctx, world, patched, records, results)
+
+
+def _conditions(plan: _RunPlan, vision: VisionRun, computed: _Computed) -> ChangeCheck:
+    """Step 4, conditions and fallback. Rule: compute every case's model-free row in this run, judge
+    each computed row that differs from it, and replace each change whose condition fails by the
+    model-free row (its ``cases.jsonl`` record too); an unexplained change marks the run as stopped.
+
+    Reason: a model-derived change ships only when its condition holds (T101 (2), T118 (2a)-(2c),
+    T119 (1); ``model_changes`` module docstring), and the comparison never reads a stored output."""
+    ctx = computed.ctx
+    plain = computed.world if not (ctx.image_observations or ctx.vision_read) else build_world(plan.ctx0)
+    free = model_free_records(plain, plan.wanted, plan.known)
+    inputs = _ChangeInputs(computed.world, plain, computed.patched, vision, computed.records, computed.results)
+    check = judge_changes({cid: _row(r) for cid, r in free.items()},
+                          {cid: _row(r) for cid, r in computed.records.items()}, inputs.evidence)
+    write_report(plan.run_dir, check, plan.run_id)
+    fell = {k["case_id"]: k["cause"] for k in check.fell_back}
+    plan.arts.records[:] = [_fallback_record(rec, plain, free[rec.case_id], fell[rec.case_id])
+                            if rec.case_id in fell else rec for rec in plan.arts.records]
+    return check
+
+
+def _write(plan: _RunPlan, computed: _Computed, check: ChangeCheck) -> _Written:
+    """Step 5, write. Rule: the rows as computed go to ``output_raw.csv``, the checked rows to
+    ``output.csv``; the root ``output.csv`` is written, with the same bytes, only when asked and only
+    when the run passed its checks (no stop row).
+
+    Reason: the root file is the submission, so a stopped run leaves it untouched (T112 item 10); the
+    raw file shows what each fallback replaced."""
+    raw_sha = write_output([(r.case_id, r.status, r.steps) for r in computed.records.values()],
+                           plan.run_dir / "output_raw.csv")
+    data = render_text_rows((cid, r.status, r.steps_json) for cid, r in check.assembled.items())
+    sha = write_output_bytes(data, plan.run_dir / "output.csv")
+    root_written = False
+    if plan.write_root and check.passed:
+        if write_output_bytes(data, REPO_ROOT / "output.csv") != sha:
+            raise RuntimeError("root output.csv differs from the run's output.csv")
+        root_written = True
+    return _Written(sha, raw_sha, root_written)
+
+
+def _artifacts(plan: _RunPlan, vision: VisionRun, review: Mapping[str, Any], computed: _Computed,
+               check: ChangeCheck, written: _Written) -> RunSummary:
+    """Step 6, artifacts. Rule: write ``producer.json``, ``metrics.json``, ``cases.jsonl`` and
+    ``usage.json``; the producer record names the output hashes, the change check's summary, whether
+    the run passed and why not, and the commit it ran on.
+
+    Reason: every number must carry its run ID and how it was measured, and the freeze check verifies
+    these records against ``output.csv``."""
+    setup, arts, records = plan.setup, plan.arts, computed.records
+    usage = arts.usage(setup.roots)
+    model_on = setup.paid or any(c.outcome == "ok" and c.event in ("cache_hit", "send") for c in arts.calls)
+    summary = check.summary()
+    producer = {
+        "tool": "code/deletion_audit (pipeline.run)",
+        "command": plan.command,
+        "description": (
+            f"G7 pipeline on {len(records)} case(s), mode {plan.mode}, "
+            f"{'paid' if setup.paid else 'replay-only'}: vision, then the agent per case on the G5 engine; "
+            f"{usage['replies_used']['count']} model replies used, {usage['model_calls']} sent by this run"
+        ),
+        "mode": plan.mode,
+        "replay_only": not setup.paid,
+        "rows_written": len(records),
+        "output_sha256": written.sha,
+        "output_raw_sha256": written.raw_sha,
+        "fell_back_cases": summary["fell_back_cases"],
+        "model_ids": usage["model_ids"],
+        "paid_model_calls": usage["model_calls"],
+        "budget": setup.budget_record(),
+        "created_at": now_ist(),
+        "code_sha256": code_hash(),
+        "git_head": git_head(),
+        "holdout_unlocked": plan.granted,
+        **evidence_record(computed.ctx, computed.world),
+        "vision": {"images": len(vision.records), "read_ok": sorted(vision.read_ok()),
+                   "observations": len(vision.observations), "review": dict(review)},
+        "intent_sources": dict(sorted(Counter(r.intent.source for r in records.values()).items())),
+        "model_changes": summary,
+        "model_on": model_on,
+        "root_output": {"requested": plan.write_root, "written": written.root_written},
+        "run_passed": check.passed,
+        "request_issues": [
+            {"file": i.file, "line": i.line, "case_id": i.case_id, "reason": i.reason}
+            for i in computed.ctx.request_issues
+        ],
+    }
+    if not check.passed:
+        producer["refusal"] = f"model-derived changes: {len(check.stops)} changed row(s) marked stop (unexplained)"
+    metrics = arts.finish(written.sha, producer, time.monotonic() - plan.t0, usage)
+    return RunSummary(plan.run_id, plan.run_dir / "output.csv", written.sha, len(records), metrics, summary,
+                      check.passed)
+
+
 def run(
     dataset_dir: Path,
     *,
-    run_id: str,
+    run_id: str | None = None,
     cases: Sequence[str] | Literal["test"],
     mode: Mode = "A+",
     replay_only: bool = True,
@@ -599,147 +827,23 @@ def run(
     holdout_unlock: str | None = None,
     model: ModelSetup | None = None,
     vision_ack: str | None = None,
-    regression_gate: bool = False,
-    approved_record: Path | None = None,
     caps: LoopCaps | None = None,
 ) -> RunSummary:
-    """Run the pipeline on ``cases`` and write the run directory (module docstring).
+    """Run the pipeline on ``cases`` and write the run directory, in six steps (module docstring):
+    setup, vision, cases, conditions and fallback, write, artifacts.
 
-    ``model`` is the command's :class:`ModelSetup` (default: replay only over ``cache/``);
-    ``vision_ack`` the reviewed vision run ID; ``regression_gate`` turns on the T100/T101 gate
-    against ``approved_record`` (default ``notes/approved_output.json``).
-    """
-    if RUN_ID_RE.fullmatch(run_id) is None:
-        raise ValueError("run id must match ^[A-Za-z0-9][A-Za-z0-9._-]*$")
-    if mode not in MODES:
-        raise ValueError(f"unknown mode {mode!r}")
-    granted = False
-    if cases != "test":
-        granted = guard_holdout(cases, holdout_unlock, run_id, granted)  # before any input is read
-    setup = _setup_for(model, replay_only)
-    t0 = time.monotonic()
-    ctx0 = build_context(dataset_dir)
-    wanted = resolve_cases(ctx0, cases)
-    granted = guard_holdout(wanted, holdout_unlock, run_id, granted)  # also a resolved "test" run
-    known = {r.case_id for r in ctx0.requests}
-    malformed = {i.case_id for i in ctx0.request_issues if i.case_id}
-    missing = sorted(set(wanted) - known - malformed)
-    if missing:
-        raise KeyError(f"{len(missing)} requested case(s) are in no request file")
-    runs_root = runs_dir or REPO_ROOT / "runs"
-    run_dir = runs_root / run_id
-    arts = RunArtifacts(run_dir, extra_log=setup.extra_log)
-    arts.start_calls()
-    with _RunLock(setup):
-        primary = setup.client(0, paid=True, log=arts, run_id=run_id)
-        replica = setup.client(1, paid=False, log=arts, run_id=run_id)
-        vision_clients = (setup.client(0, paid=False, log=arts, run_id=run_id), replica)
-        vision = read_images(ctx0, vision_clients, learn_shapes(ctx0.index.observations(), ctx0.activity))
-        needs = review_list(vision, row_changing_images(ctx0, vision))
-        write_vision_artifacts(run_dir, vision, needs_review=needs)
-        write_json(run_dir / "vision.json", vision_run_report(vision))
-        review = check_vision_ack(vision, vision_ack, runs_root, needs_review=needs)
-        if setup.paid and review["needs_review"] and not review["ack_matches"]:
-            write_json(run_dir / "refused.json", {"run_id": run_id, "refused": "vision review required",
-                                                  "vision_review": review, "created_at": now_ist()})
-            raise VisionReviewRequired(
-                f"refused: {len(review['needs_review'])} image(s) need the developer's review before a paid full "
-                "run; pass the reviewed vision run ID (--vision-ack)")
-        ctx = replace(ctx0, image_observations=vision.observations, vision_read=vision.read_ok())
-        world = build_world(ctx)
-        patched = _PatchedWorlds(ctx)
-        records: dict[str, CaseRecord] = {}
-        results: dict[str, AgentCaseResult] = {}
-        for cid in sorted(set(wanted)):
-            if cid not in known:
-                records[cid] = malformed_record(cid, world)
-                arts.case(records[cid], _not_run_report(mode, "MALFORMED_REQUEST"))
-                continue
-            patched.case = cid
-            res = audit_with_agent(cid, world, primary, mode=mode, caps=caps, vision=vision,
-                                   replicate_clients=(replica,), world_for_answers=patched)
-            failed_loop = res.outcome.status == "FAILED"
-            results[cid] = res
-            records[cid] = _agent_failed_record(cid, world, res) if failed_loop else _with_answers(res)
-            arts.case(records[cid], res.report)
-    out_path = run_dir / "output.csv"
-    rows = [(r.case_id, r.status, r.steps) for r in records.values()]
-    gate: dict[str, Any] | None = None
-    passed = True
-    raw_sha: str | None = None
-    kept_cases: list[str] = []
-    model_on = setup.paid or any(c.outcome == "ok" and c.event in ("cache_hit", "send") for c in arts.calls)
-    if not (regression_gate or model_on or write_root):
-        sha = write_output(rows, out_path)
-        data = out_path.read_bytes()
-    else:  # T112 items 10-11: mandatory when the model is on
-        raw_sha = write_output(rows, run_dir / "output_raw.csv")
-        baseline: Baseline | BaselineRefused
-        try:
-            baseline = load_baseline(approved_record or REPO_ROOT / APPROVED_OUTPUT_RECORD, REPO_ROOT,
-                                     split=_split_of(cases, wanted))
-        except BaselineRefused as exc:
-            baseline = exc
-        plain = world if not (ctx.image_observations or ctx.vision_read) else build_world(ctx0)
-        inputs = _GateInputs(world, plain, patched, vision, records, results)
-        result = run_gate(baseline, {cid: _row(r) for cid, r in records.items()}, inputs.evidence)
-        write_regression(run_dir, result, run_id)
-        gate, passed = result.summary(), result.passed
-        gate["mandatory"] = bool(model_on or write_root)
-        if result.refusal is None:  # T118: the assembled rows; kept-approved rows are the approved bytes
-            data = render_text_rows((cid, r.status, r.steps_json) for cid, r in result.assembled.items())
-            for k in result.kept:
-                kept_cases.append(k["case_id"])
-                arts.records[:] = [_kept_record(rec, plain, result.assembled[rec.case_id], k["cause"])
-                                   if rec.case_id == k["case_id"] else rec for rec in arts.records]
-        else:
-            data = (run_dir / "output_raw.csv").read_bytes()
-        sha = write_output_bytes(data, out_path)
-    root_written = False
-    if write_root and passed:  # T112 item 10: only after the gate passes; a stopped run leaves it untouched
-        root_sha = write_output_bytes(data, REPO_ROOT / "output.csv")
-        if root_sha != sha:
-            raise RuntimeError("root output.csv differs from the run's output.csv")
-        root_written = True
-    usage = arts.usage(setup.roots)
-    producer = {
-        "tool": "code/deletion_audit (pipeline.run)",
-        "command": command,
-        "description": (
-            f"G7 pipeline on {len(records)} case(s), mode {mode}, "
-            f"{'paid' if setup.paid else 'replay-only'}: vision, then the agent per case on the G5 engine; "
-            f"{usage['replies_used']['count']} model replies used, {usage['model_calls']} sent by this run"
-        ),
-        "mode": mode,
-        "replay_only": not setup.paid,
-        "rows_written": len(records),
-        "output_sha256": sha,
-        "output_raw_sha256": raw_sha,
-        "kept_approved_cases": kept_cases,
-        "model_ids": usage["model_ids"],
-        "paid_model_calls": usage["model_calls"],
-        "budget": setup.budget_record(),
-        "created_at": now_ist(),
-        "code_sha256": code_hash(),
-        "git_head": git_head(),
-        "holdout_unlocked": granted,
-        **evidence_record(ctx, world),
-        "vision": {"images": len(vision.records), "read_ok": sorted(vision.read_ok()),
-                   "observations": len(vision.observations), "review": review},
-        "intent_sources": dict(sorted(Counter(r.intent.source for r in records.values()).items())),
-        "regression_gate": gate if gate is not None else {"run": False},
-        "model_on": model_on,
-        "root_output": {"requested": write_root, "written": root_written},
-        "run_passed": passed,
-        "request_issues": [
-            {"file": i.file, "line": i.line, "case_id": i.case_id, "reason": i.reason} for i in ctx.request_issues
-        ],
-    }
-    if not passed and gate is not None:
-        producer["refusal"] = (f"regression gate: {gate['refusal']}" if gate.get("refusal")
-                               else f"regression gate: {len(gate['stop_cases'])} changed row(s) marked stop")
-    metrics = arts.finish(sha, producer, time.monotonic() - t0, usage)
-    return RunSummary(run_id, out_path, sha, len(records), metrics, gate, passed)
+    ``run_id`` defaults to :func:`default_run_id`; ``model`` is the command's :class:`ModelSetup`
+    (default: replay only over ``cache/``); ``vision_ack`` the reviewed vision run ID."""
+    plan = _plan(dataset_dir, run_id=run_id or default_run_id(), cases=cases, mode=mode, replay_only=replay_only,
+                 write_root=write_root, runs_dir=runs_dir, command=command, holdout_unlock=holdout_unlock,
+                 model=model)
+    with _RunLock(plan.setup):
+        clients = _Clients.build(plan)
+        vision, review = _vision(plan, clients, vision_ack)
+        computed = _cases(plan, clients, vision, caps)
+    check = _conditions(plan, vision, computed)
+    written = _write(plan, computed, check)
+    return _artifacts(plan, vision, review, computed, check, written)
 
 
 # ----------------------------------------------------------------------------- the paid entry points
