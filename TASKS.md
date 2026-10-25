@@ -36,7 +36,21 @@ Rebuilt at the developer's direction (turn 2026-10-25T00:08:45+05:30). Updated a
 - **Interview prep:** removed from the plan (T37). The developer will say how to prepare once the deliverables are ready.
 
 ## Agent queue (cap: 3 at once, T79; never two of the same type)
-- **PAUSED (T98) until the developer resumes at about 10:00.** All three agents are finished and checked. G8 is committed as `5f4d2f6` and the holdout build as `73c2309`; the G5 fix round is uncommitted. **Start from `notes/HANDOFF.md`** (the queue and decisions A–F).
+- **Resumed at 11:28 (T99).**
+  - The agent-test patch is applied: code/tests 413 OK.
+  - **Running:** the G5 fix-round verifier (`orch-verifier`, high, directed_by 2026-10-25T11:28:05+05:30, brief `g5fix1_verifier_brief.md`).
+  - **Next:**
+    1. the G5 commit (T93), then the suite on the committed tree;
+    2. main's pipeline unlock, with the `read_output` unlock route removed (C);
+    3. G7 wiring (brief `g7wiring_brief.md`);
+    4. the G7 verifier;
+    5. stage 1 plus vision ($5, 170 sends);
+    6. **stop** and show stage 1's results, the vision readings, the A+ re-projection and the R06 count.
+- **R06 count (T99 D), done at 11:40:**
+  - **DEV gold:** all 29 FINDINGs cite a file captured at or before `audit_at` that holds the resource. 0 of 52 cited steps cite a post-audit file. Only 4 steps have the R06 shape, all VERIFICATION steps with `""` in INCOMPLETE rows.
+  - **Test, the engine `g5fix1-test`:** 712 of 713 FINDINGs have a pre-audit holder and cite a holder. The one exception (case_33 `export_1842`) is the known PDF-without-ID case, not R06.
+  - Scratch: `r06_dev_count.txt`.
+- **R12 `reported_status` (T99 E):** a rule reads it. `discovery/accounts.py:136` maps it to the account-delete result, and with an unmapped value no account row can match. So it is not applied as "audit as normal"; it goes back to the developer. Real data holds only the 3 enum values.
 - **Running:** none. (The G5 fix round finished at about 06:57: checked, uncommitted, report at `notes/agent_reports/g5_fix1.md`.)
 - **Done: G8 red team** (about 06:42): 12 fixtures and 31 cases (case_93001–93114), committed before any engine run; report at `notes/agent_reports/g8_redteam.md`. Its open rule questions go to the developer: R06 (a pre-audit line in a post-audit file, and which file to cite; the forensics count is 179 test cases of this shape), R08 (T66 against one file per case), R11 ("depends on" for a missing file), R12 (a duplicated case_id; an out-of-enum `reported_status`), and R01 93003/93007 (NOT_APPLICABLE resting only on the organisers' list).
 - **Done:** G7a (about 06:50; checked by main: agent 108, `code/tests` 381 and evaluation 187 tests OK; lint clean; no G5 or `model/` file touched; uncommitted until the G7 verifier).
