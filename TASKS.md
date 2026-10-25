@@ -52,6 +52,10 @@ Rebuilt at the developer's direction (turn 2026-10-25T00:08:45+05:30). Updated a
   7. **G10:** the README, then `code.zip` (packager, low, directed_by 2026-10-25T13:00:29+05:30), check_log, then the developer submits.
 
   **CUT:** the fix-round-2 verifier; G9's clean-cache verifier and fix loops; the A+ full test run; the stage stops.
+- **Vision adapter: done** (about 13:08). It is uncommitted until fix round 2, which it depends on. Six blocking counts, plus a STOP-FOR-DEVELOPER on repeat failures.
+  - The acknowledgement shape `{file_id, reply_keys, reading_sha256}` was sent to fix round 2.
+  - Noted for later: on a replay-only run a `CacheMiss` can't be fixed by a re-run (the reply must be bought), and the refusal text doesn't say so.
+- **Running:** reports part 2 (`orch-eval-engineer`, directed_by 2026-10-25T12:52:06+05:30; brief `reports2_brief.md`) and fix round 2.
 - **Stage 1 routing: done** (`stage1-routing-20261025T1255`). 122 sends, $1.31, 0 failed. Replicates agree 61/61. The 11 NOT_DELETION are exactly the 11 expected NA fixtures; only case_90101 has a confirming intake row. Measured turn 1: about 4,547 input and 163 output tokens.
 - **Resumed at 11:28 (T99).**
   - The agent-test patch is applied: code/tests 413 OK.
