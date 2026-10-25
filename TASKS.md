@@ -47,6 +47,8 @@ Rebuilt at the developer's direction (turn 2026-10-25T00:08:45+05:30). Updated a
     5. stage 1 plus vision ($5, 170 sends);
     - (T100: the wiring builds the model-on regression gate; main runs it on the mode-A run after stage 2. A row changed with no cause stops the run.)
     6. **stop** and show stage 1's results, the vision readings and the A+ re-projection (T101: the R06 count is no longer needed).
+  - **Running in parallel (T102):** the G7 wiring (`orch-builder-core`, high, since about 11:58); the G8 engine run (`orch-redteam`, high, on an export of 64e203f); the README draft (`orch-packager`, low). Briefs `g7wiring_brief.md`, `g8run_brief.md`, `readme_brief.md`.
+  - **At the stage-1 stop (T102):** the seven showcase cases. For each: what its screenshot shows for the linked resource, the capture time, and the state with the reading applied (latest observation wins). A resource present or active before `audit_at` means a finding citing the screenshot. The map, from main's pre-check, is case_34→evidence_04 (account_5762; its row is COMPLETE today), 35→09 (search_428), 39→14 (data_flow_1121), 50→19 (analytics_7438), 52→23 (export_1260), 53→28 (support_1034), 55→32 (backup_9287).
   - **Output lock (T101):** the approved file is in `notes/approved_output.json` (`g5-test-20261025T0530`, `cf2a90b0…`). Any change to the test output needs re-approval; at freeze, print the sha256 and compare.
 - **R06 count (T99 D), done at 11:40:**
   - **DEV gold:** all 29 FINDINGs cite a file captured at or before `audit_at` that holds the resource. 0 of 52 cited steps cite a post-audit file. Only 4 steps have the R06 shape, all VERIFICATION steps with `""` in INCOMPLETE rows.
