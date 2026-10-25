@@ -6494,3 +6494,77 @@ parent_agent=none
 worktree=main
 branch=main
 repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T16:37:20+05:30] Late entry: developer turn at 12:53:48 IST was not logged when sent
+
+User Prompt (verbatim, secrets redacted):
+G7 verifier rulings:
+
+1. Finding 1: approved, as fix round 2 item 9. It lands before any paid vision call. An image observation sets a state only from what is visibly on screen:
+   - subjects transcribed → IDENTIFIABLE or PRESENT, by the system's rule;
+   - REDACTED or ANONYMIZED only from a visible marker, the same kind the text rules use, such as "[REDACTED]", recorded verbatim in new reading fields;
+   - nothing transcribed and no marker → no state. The support and analytics defaults in state/observe.py never apply to image observations.
+   The reading also records each record's visible status label verbatim, such as a badge. Store it for review only; it maps to no state.
+   Test: the verifier's p4 "agree" repro gives no COMPLETE row for case_53, case_50 or case_46.
+
+2. Finding 3: option (ii). Runs without vision keep the approved behaviour, and the final run reads all 11 images with 0 skips.
+
+3. Items 9–12 go to the running fix round 2:
+   - 9 = finding 1, as above;
+   - 10 = write the root output.csv only after the gate passes;
+   - 11 = the regression gate is mandatory whenever the model is on;
+   - 12 = an end-to-end test of R03's evidence-side injection flag.
+   Also widen item 7 for finding 6: any record that waited on an image (STATE_NEEDS_IMAGE) and that no successful reading mentions fails its row closed, with item 7's reason. Not only catalog-only records. The case_55 backup rule (F) I'll decide at the stop, with the readings.
+   The same stop rule applies: DEV 641dbc8d… and test cf2a90b0… must not move.
+
+4. To the vision-adapter agent:
+   (a) A disagreement counts as resolved only when a recorded acknowledgement from a developer turn covers that exact image and both reading keys. An acknowledgement never picks a reading: that image's rows stay as they would be without it.
+   (b) The vision review list holds every image whose reading changes a row, not only failed or disagreeing ones, so allowed image changes get reviewed too.
+
+5. Stage 1: option A. Run the routing check now (122 sends, $3.50 cap, retries counted in the send cap) from an export of the committed code, with the repo's reply cache, writing to runs/ only. Then show me (c) and (e). Vision runs after fix round 2 and its verifier pass, and then you show me (a), (b) and (d).
+
+Time is not a factor.
+
+Agent Response Summary:
+The developer's G7 verifier rulings were recorded as T112: image states only from visible cues and the fix-round items went to G5 fix round 2 (items 9-12, the widened item 7 and 4(b)), the vision adapter got 4(a), and stage 1 ran as option A (the routing check first, vision after fix round 2). The turn (sent 2026-10-25T12:53:48+05:30, IST) arrived while main was handling the G7 verdict and its log entry was missed; this late entry (T125) is appended without editing any earlier text.
+
+Actions:
+* At the time: notes/DECISIONS.md T112; SendMessage to fix round 2 and the vision adapter; TASKS.md. Now: User Prompt copied verbatim from the session transcript (07:23:48Z).
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T16:37:20+05:30] Late entry: developer turn at 12:54:23 IST was not logged when sent
+
+User Prompt (verbatim, secrets redacted):
+notes/improvements.json: approved, with four changes.
+
+1. Evidence is a run metric or a test. Entries whose fix moves no run metric (for example the write-root order, or a COMPLETE row with a REMEDIATION step) name a test instead: "evidence": {"test": "<path>::<name>"}. The generator checks that the test exists and passes in the freeze run's suite. "Before" is the cited failure itself. Verifier probes aren't producer-checked runs, so no metric may take its value from a probe.
+2. No typed description. The generator quotes the failure's heading or first line from the anchored file.
+3. kind also allows "review" and "judge". A review entry cites the log.txt timestamp of my checkpoint turn as its anchor. Checkpoints 1–2 (T104) are the first: the silent NO_STEP for an unmapped category, fixed in fix round 2.
+4. A metric that didn't move, or got worse, is shown as such, never refused or dropped.
+
+Keep your refusals (missing path, unknown commit, an unchecked run, an unknown metric name) and the ORGANISER_README.md:97 check on usage_report.md.
+
+Time is not a factor.
+
+Agent Response Summary:
+The developer approved notes/improvements.json with four changes, recorded as T113 (evidence is a run metric or a test, no typed descriptions, refusals stay, review entries anchor to the developer's checkpoint turn) and folded into the reports-part-2 brief. The message (sent 2026-10-25T12:54:23+05:30, IST) arrived as a queued mid-turn message and its log entry was missed; this late entry (T125) is appended without editing any earlier text.
+
+Actions:
+* At the time: notes/DECISIONS.md T113; the reports-part-2 brief for orch-eval-engineer. Now: User Prompt copied verbatim from the session transcript (queued message, 07:24:23Z).
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26

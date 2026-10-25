@@ -1,4 +1,4 @@
-# Evaluation report `reports-final-20261025T1632`
+# Evaluation report `reports-final-20261025T1640`
 
 ## Headline
 
@@ -21,9 +21,9 @@ Generated from the same run artifacts as the sections below (code/evaluation/hea
 
 > **Holdout caveat (verbatim from `notes/split.json 'created'`):** 2026-10-24 prep session. Made AFTER the prep forensics agent had read all 32 sample answers; stratification used gold status, step count and operations. Rules are re-derived on DEV only; holdout scores are an optimistic estimate.
 
-Generated 2026-10-25T16:32:05+05:30 by `python3 -B code/evaluation/reports.py --spec /private/tmp/claude-501/-Users-anmolagarwal-hackerrank-orchestrate-october26-hackerrank-orchestrate-october26/a5e12cbe-b80b-4f4f-8569-6ab18d22f35c/scratchpad/reports_spec_final.json --publish` from the named runs' artifacts only (code/evaluation/evaluation_report.py). Every number names its run. Nothing is typed by hand.
+Generated 2026-10-25T16:37:43+05:30 by `python3 -B code/evaluation/reports.py --spec code/evaluation/specs/reports_final.json --publish` from the named runs' artifacts only (code/evaluation/evaluation_report.py). Every number names its run. Nothing is typed by hand.
 
-Gold: DEV only (evaluation.gold.load_gold defaults), hash `d05501012bad1529`; scorer code `7e59a533a4ebec59`; git HEAD `bca55eb3800b`.
+Gold: DEV only (evaluation.gold.load_gold defaults), hash `d05501012bad1529`; scorer code `c7f626d2884d8765`; git HEAD `07b7a7c36c90`.
 
 ## 1. Inputs
 
@@ -54,7 +54,7 @@ Every input run passed the producer check (`evidence_guard.check_producer` again
 
 ## 3. DEV accuracy (run `cand-dev-A-20261025T1352`)
 
-Measured by `evaluation.scorer.score_predictions` on `runs/cand-dev-A-20261025T1352/output.csv` (sha256 `641dbc8d921186ef`) against DEV gold only (`evaluation.gold.load_gold` defaults; 22 cases), inside `python3 -B code/evaluation/reports.py --spec /private/tmp/claude-501/-Users-anmolagarwal-hackerrank-orchestrate-october26-hackerrank-orchestrate-october26/a5e12cbe-b80b-4f4f-8569-6ab18d22f35c/scratchpad/reports_spec_final.json --publish`. The output was produced by `python -m deletion_audit --run-id cand-dev-A-20261025T1352 --set dev --mode A --vision-ack pass1-vision-20261025T1323`. Metric definitions: `code/evaluation/scorer.py` docstring.
+Measured by `evaluation.scorer.score_predictions` on `runs/cand-dev-A-20261025T1352/output.csv` (sha256 `641dbc8d921186ef`) against DEV gold only (`evaluation.gold.load_gold` defaults; 22 cases), inside `python3 -B code/evaluation/reports.py --spec code/evaluation/specs/reports_final.json --publish`. The output was produced by `python -m deletion_audit --run-id cand-dev-A-20261025T1352 --set dev --mode A --vision-ack pass1-vision-20261025T1323`. Metric definitions: `code/evaluation/scorer.py` docstring.
 
 | level | metric | value |
 |---|---|---|
@@ -207,9 +207,9 @@ Fixtures passed 22/22 scored (24 listed, 24 run, 2 not scored); cases passed 46/
 
 Embedded from `agent_report.render_markdown` (headings demoted):
 
-### Agent report `reports-final-20261025T1632`
+### Agent report `reports-final-20261025T1640`
 
-Generated 2026-10-25T16:32:05+05:30 by `python3 -B code/evaluation/reports.py --spec /private/tmp/claude-501/-Users-anmolagarwal-hackerrank-orchestrate-october26-hackerrank-orchestrate-october26/a5e12cbe-b80b-4f4f-8569-6ab18d22f35c/scratchpad/reports_spec_final.json --publish` from run artifacts only (code/evaluation/agent_report.py). Every number names its run.
+Generated 2026-10-25T16:37:43+05:30 by `python3 -B code/evaluation/reports.py --spec code/evaluation/specs/reports_final.json --publish` from run artifacts only (code/evaluation/agent_report.py). Every number names its run.
 
 | run | producer check | output sha256 | producer mode |
 |---|---|---|---|
@@ -819,6 +819,8 @@ Drift of run `freeze-test-Aplus-20261025T1629` against DEV gold (`drift.drift_ta
 
 > **Caveat (verbatim from `notes/split.json 'created'`):** 2026-10-24 prep session. Made AFTER the prep forensics agent had read all 32 sample answers; stratification used gold status, step count and operations. Rules are re-derived on DEV only; holdout scores are an optimistic estimate.
 
+**Pre-change:** the code has changed since this run (HEAD `07b7a7c36c90`, frozen `bca55eb3800b`). These numbers describe the frozen commit only.
+
 - Frozen code: tag `freeze-20261025` at commit `bca55eb3800b9e9ab79366285bffae025595eaf6`; freeze run `freeze-test-Aplus-20261025T1629`.
 - Unlocked: engine at 2026-10-25T10:59:39+00:00, gold at 2026-10-25T11:00:19+00:00; completed at 2026-10-25T11:00:19+00:00; attempts: 2.
 - Holdout cases: 10. Output sha256 `42b51e83397d3b20b4784388eb3647f80f7182ac70abf588c23c89b33d2267ce`, score sha256 `56e96fe2b67196a7ff513019d1395e9595f5dfb8e451eea5871181c5bd6fc339`.
@@ -852,7 +854,7 @@ Lock incident T48 (notes/DECISIONS.md): before this run, a G4 verification probe
 
 ## 11. Failures found and improvements made
 
-Generated from the ledger `notes/improvements.json` (sha256 `044cdd1a617edca6`), which holds paths, anchors, T-numbers, commits, run IDs and test names only. Each failure is quoted from its anchored file ("before" is the failure itself); each fix names its ruling (quoted from `notes/DECISIONS.md`) and its commit (checked with `git cat-file -e`); each piece of evidence is a test run here or a metric computed here from two producer-checked runs. Tests: each test run by name at build time in code/ (`python -B -c <runner> <unittest id>`, evaluation/improvements.py RUNNER); git HEAD `bca55eb3800b`.
+Generated from the ledger `code/evaluation/improvements.json` (sha256 `044cdd1a617edca6`), which holds paths, anchors, T-numbers, commits, run IDs and test names only. Each failure is quoted from its anchored file ("before" is the failure itself); each fix names its ruling (quoted from `notes/DECISIONS.md`) and its commit (checked with `git cat-file -e`); each piece of evidence is a test run here or a metric computed here from two producer-checked runs. Tests: each test run by name at build time in code/ (`python -B -c <runner> <unittest id>`, evaluation/improvements.py RUNNER); git HEAD `07b7a7c36c90`.
 
 Entries: 19; improvements made (fix committed, evidence checked): 19; fix not yet committed (PENDING): 0; refused: 0.
 
@@ -911,7 +913,7 @@ Entries: 19; improvements made (fix committed, evidence checked): 19; fix not ye
 ### I07 (ok)
 - **Failure (before)**, review, quoted from `log.txt` line 5246: "[2026-10-25T12:38:50+05:30] T107: calls_only dropped; DEV-row and NUMBERS notes for G10; verifier on" / "1. …[cut]"
 - **Fix:** T107 "(1) `calls_only`: drop it. …[cut]"; commit `2e7af6cf2dce` "fix(eval): drop the calls_only exception; a usage run without output.csv is refused (T107)".
-- **Evidence (after):** test `code/evaluation/tests/test_reports.py::test_usage_run_without_output_is_refused` (`evaluation.tests.test_reports.TestRefusals.test_usage_run_without_output_is_refused`): **passed**, checked by running this one test at build time (file sha256 `a5c12eadb41b`; this file differs from HEAD).
+- **Evidence (after):** test `code/evaluation/tests/test_reports.py::test_usage_run_without_output_is_refused` (`evaluation.tests.test_reports.TestRefusals.test_usage_run_without_output_is_refused`): **passed**, checked by running this one test at build time (file sha256 `a5c12eadb41b`).
 
 ### I08 (ok)
 - **Failure (before)**, redteam case_93051, quoted from `code/tests/fixtures/redteam/R06_preaudit_line_in_postaudit_file/EXPECTED.md` line 53: "R06: a pre-audit record that only a post-audit file holds (UNSETTLED citation)" / "case_93051's row is FAILED_CLOSED. …[cut]"

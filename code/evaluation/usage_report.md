@@ -1,4 +1,4 @@
-# Usage report `reports-final-20261025T1632`
+# Usage report `reports-final-20261025T1640`
 
 ## Headline
 
@@ -21,7 +21,7 @@ Generated from the same run artifacts as the sections below (code/evaluation/hea
 
 > **Holdout caveat (verbatim from `notes/split.json 'created'`):** 2026-10-24 prep session. Made AFTER the prep forensics agent had read all 32 sample answers; stratification used gold status, step count and operations. Rules are re-derived on DEV only; holdout scores are an optimistic estimate.
 
-Generated 2026-10-25T16:32:05+05:30 by `python3 -B code/evaluation/reports.py --spec /private/tmp/claude-501/-Users-anmolagarwal-hackerrank-orchestrate-october26-hackerrank-orchestrate-october26/a5e12cbe-b80b-4f4f-8569-6ab18d22f35c/scratchpad/reports_spec_final.json --publish` from `runs/freeze-test-Aplus-20261025T1629/calls.jsonl`, the reply cache entries it names, the buying runs' call logs and `cache/ledger.jsonl` (code/evaluation/usage_report.py). Every figure names its run. Nothing is typed by hand. Total tokens = input + output + cache read + cache write tokens.
+Generated 2026-10-25T16:37:43+05:30 by `python3 -B code/evaluation/reports.py --spec code/evaluation/specs/reports_final.json --publish` from `runs/freeze-test-Aplus-20261025T1629/calls.jsonl`, the reply cache entries it names, the buying runs' call logs and `cache/ledger.jsonl` (code/evaluation/usage_report.py). Every figure names its run. Nothing is typed by hand. Total tokens = input + output + cache read + cache write tokens.
 
 ## Required fields (notes/ORGANISER_README.md:97, read as data)
 

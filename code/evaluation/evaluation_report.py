@@ -28,7 +28,7 @@ Sections, and what each reads:
 10. **Limitations already ruled:** each quoted from its ruling in ``notes/DECISIONS.md`` (or the
     holdout proposal), with the count the final run's artifacts give where one applies.
 11. **Failures found and improvements made** (T111, T113): ``improvements.check_ledger`` on
-    ``notes/improvements.json``; every quote read from the anchored file, every test run, every
+    ``code/evaluation/improvements.json``; every quote read from the anchored file, every test run, every
     metric computed from two producer-checked runs (``improvements`` docstring).
 
 The **headline block** (``headline``) is built by ``reports.build_all`` from this data and the
@@ -71,7 +71,7 @@ class Context:
     cache_root: Path = REPO_ROOT / "cache"
     access_log: Path = HOLDOUT_ACCESS_LOG
     test_ids: frozenset[str] | None = None
-    improvements_json: Path = REPO_ROOT / "notes" / "improvements.json"
+    improvements_json: Path = REPO_ROOT / "code" / "evaluation" / "improvements.json"
     repo_root: Path = REPO_ROOT
     publish_dir: Path = REPO_ROOT / "code" / "evaluation"
     test_runner: improvements.TestRunner | None = None   # None: run each ledger test in a subprocess

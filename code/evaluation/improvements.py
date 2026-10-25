@@ -1,6 +1,6 @@
 """The "failures found and improvements made" section, generated from the ledger (T111, T113).
 
-The ledger is ``notes/improvements.json``: paths, anchors, T-numbers, commits, run IDs and test
+The ledger is ``code/evaluation/improvements.json`` (shipped in code.zip): paths, anchors, T-numbers, commits, run IDs and test
 names only. **It holds no typed description and no number.** Every quoted line is read from the
 anchored file; every metric is computed here from two producer-checked runs; every test is run
 here. The format::

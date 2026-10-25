@@ -1,0 +1,91 @@
+{
+ "report_id": "reports-final-20261025T1640",
+ "final_run": "freeze-test-Aplus-20261025T1629",
+ "dev_run": "cand-dev-A-20261025T1352",
+ "previous_run": "g5-test-20261025T0530",
+ "dev_history": [
+  "g5-dev22-20261025T0530"
+ ],
+ "arms": {
+  "dev": {
+   "A": "cand-dev-A-20261025T1352",
+   "tools_off": "cand-dev-toolsoff-20261025T1352"
+  },
+  "test": {
+   "A+": "freeze-test-Aplus-20261025T1629",
+   "A": "cand-test-A-20261025T1352",
+   "tools_off": "cand-test-toolsoff-20261025T1352"
+  }
+ },
+ "usage": {
+  "run": "freeze-test-Aplus-20261025T1629"
+ },
+ "holdout_run": "holdout-20261025T1628",
+ "coherence": true,
+ "final": true,
+ "validation": {
+  "A+": {
+   "F01_non_deletion_negation_traps": "fx-F01-Aplus-20261025T1435",
+   "F02_korean_deletion_syslog_export": "fx-F02-Aplus-20261025T1435",
+   "F03_historical_uppercase_email": "fx-F03-Aplus-20261025T1435",
+   "F04_lookalike_jr_and_duplicate_name": "fx-F04-Aplus-20261025T1435",
+   "F05_post_audit_recreation": "fx-F05-Aplus-20261025T1435",
+   "F06_regional_replica_and_active_connector": "fx-F06-Aplus-20261025T1435",
+   "F07_open_restore_path": "fx-F07-Aplus-20261025T1435",
+   "F08_tombstone_with_email_hash": "fx-F08-Aplus-20261025T1435",
+   "F09_injection_and_free_text_pii": "fx-F09-Aplus-20261025T1435",
+   "F10_legal_hold_and_attachment": "fx-F10-Aplus-20261025T1435",
+   "F11a_missing_evidence_file": "fx-F11a-Aplus-20261025T1435",
+   "F11b_malformed_request_rows": "fx-F11b-Aplus-20261025T1435",
+   "redteam/R01_negation_and_nondeletion": "fx-R01-Aplus-20261025T1435",
+   "redteam/R02_multilingual_requests": "fx-R02-Aplus-20261025T1435",
+   "redteam/R03_injection_request_and_evidence": "fx-R03-Aplus-20261025T1435",
+   "redteam/R04_lookalike_sharing_trace": "fx-R04-Aplus-20261025T1435",
+   "redteam/R05_post_audit_boundary": "fx-R05-Aplus-20261025T1435",
+   "redteam/R06_preaudit_line_in_postaudit_file": "fx-R06-Aplus-20261025T1435",
+   "redteam/R07_replica_copy_after_inventory": "fx-R07-Aplus-20261025T1435",
+   "redteam/R08_inventory_after_replica_copy": "fx-R08-Aplus-20261025T1435",
+   "redteam/R09_restore_and_sync_paths": "fx-R09-Aplus-20261025T1435",
+   "redteam/R10_tombstone_pii_variants": "fx-R10-Aplus-20261025T1435",
+   "redteam/R11_unreadable_evidence_beside_readable": "fx-R11-Aplus-20261025T1435",
+   "redteam/R12_malformed_request_rows_v2": "fx-R12-Aplus-20261025T1435"
+  },
+  "tools_off": {
+   "F01_non_deletion_negation_traps": "fx-F01-tools_off-20261025T1435",
+   "F02_korean_deletion_syslog_export": "fx-F02-tools_off-20261025T1435",
+   "F03_historical_uppercase_email": "fx-F03-tools_off-20261025T1435",
+   "F04_lookalike_jr_and_duplicate_name": "fx-F04-tools_off-20261025T1435",
+   "F05_post_audit_recreation": "fx-F05-tools_off-20261025T1435",
+   "F06_regional_replica_and_active_connector": "fx-F06-tools_off-20261025T1435",
+   "F07_open_restore_path": "fx-F07-tools_off-20261025T1435",
+   "F08_tombstone_with_email_hash": "fx-F08-tools_off-20261025T1435",
+   "F09_injection_and_free_text_pii": "fx-F09-tools_off-20261025T1435",
+   "F10_legal_hold_and_attachment": "fx-F10-tools_off-20261025T1435",
+   "F11a_missing_evidence_file": "fx-F11a-tools_off-20261025T1435",
+   "F11b_malformed_request_rows": "fx-F11b-tools_off-20261025T1435",
+   "redteam/R01_negation_and_nondeletion": "fx-R01-tools_off-20261025T1435",
+   "redteam/R02_multilingual_requests": "fx-R02-tools_off-20261025T1435",
+   "redteam/R03_injection_request_and_evidence": "fx-R03-tools_off-20261025T1435",
+   "redteam/R04_lookalike_sharing_trace": "fx-R04-tools_off-20261025T1435",
+   "redteam/R05_post_audit_boundary": "fx-R05-tools_off-20261025T1435",
+   "redteam/R06_preaudit_line_in_postaudit_file": "fx-R06-tools_off-20261025T1435",
+   "redteam/R07_replica_copy_after_inventory": "fx-R07-tools_off-20261025T1435",
+   "redteam/R08_inventory_after_replica_copy": "fx-R08-tools_off-20261025T1435",
+   "redteam/R09_restore_and_sync_paths": "fx-R09-tools_off-20261025T1435",
+   "redteam/R10_tombstone_pii_variants": "fx-R10-tools_off-20261025T1435",
+   "redteam/R11_unreadable_evidence_beside_readable": "fx-R11-tools_off-20261025T1435",
+   "redteam/R12_malformed_request_rows_v2": "fx-R12-tools_off-20261025T1435"
+  }
+ },
+ "custom_runs": {
+  "F01_non_deletion_negation_traps": "fx-F01-tools_off-20261025T1435",
+  "F06_regional_replica_and_active_connector": "fx-F06-tools_off-20261025T1435",
+  "F08_tombstone_with_email_hash": "fx-F08-tools_off-20261025T1435",
+  "F10_legal_hold_and_attachment": "fx-F10-tools_off-20261025T1435",
+  "redteam/R03_injection_request_and_evidence": "fx-R03-tools_off-20261025T1435",
+  "redteam/R04_lookalike_sharing_trace": "fx-R04-tools_off-20261025T1435",
+  "redteam/R05_post_audit_boundary": "fx-R05-tools_off-20261025T1435",
+  "redteam/R07_replica_copy_after_inventory": "fx-R07-tools_off-20261025T1435",
+  "redteam/R09_restore_and_sync_paths": "fx-R09-tools_off-20261025T1435"
+ }
+}
