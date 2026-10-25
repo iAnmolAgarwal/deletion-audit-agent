@@ -2,8 +2,13 @@
 
 **Tests:** a failed read is an explicit failure state, never "nothing found" (`../CLAUDE.md` §3; T8; T42 "an unreadable or unparsed file fails closed and is never COMPLETE").
 
-**Provisional:** n/a. **No expected row: DECISION NEEDED.** The dataset has 0 such inputs (`research/16` §5), and no rule or DEV case defines the row. There is deliberately **no `expected_output.csv`** in this folder.
+**Ruling:** T86 (1), applying G3's Q5 (accepted in T71 Q5). The row is **FAILED_CLOSED**: INCOMPLETE with whatever steps the remaining inputs still give (possibly none), its reason recorded in the run artifacts, and coherence reporting H03 as hard. The fixture asserts the reason and that the row is never COMPLETE; it does **not** assert a "correct" row. Real data must have 0 such rows at freeze (T60).
+**Provisional:** n/a (robustness).
 **G8 custom eval case:** no.
+**Files:**
+- `expected_assertions.json` holds the machine-readable assertions;
+- there is deliberately no `expected_output.csv`.
+
 **Parse:** `evidence_11001` **ERROR**, "file not found" (GP `parse_all`). This is the intended input.
 
 ## Inputs (all fictional)
@@ -12,15 +17,16 @@
 - `evidence_files.csv` lists `evidence_11001` (`evidence/logs/resource_lookup_trace_20260610_114000.log`, captured 11:40). The file does not exist.
 - No activity rows, so no input names an account for this person.
 
-## Invariants the engine's row must meet (each with its basis)
-1. **A row is written** for `case_91101`. It is never skipped, and the output has one row per request (CD invariant 16).
-2. **Not COMPLETE** (T8, T40, T42).
-3. **Not NOT_APPLICABLE:** the request is a plain deletion request, so the intent does not change because a file is missing.
-4. **Never cites `evidence_11001`:** an unread file cannot prove anything. The manifest ID exists, so a citation would pass a manifest-only check; that is why this invariant is listed.
-5. **No invented account ID:** no input names one (T28: omitted and flagged, never invented).
-6. **The failure is recorded** in the run artifacts with the file ID and the reason.
+## Assertions (`expected_assertions.json`), each with its basis
+| # | Assertion | Basis |
+|---|---|---|
+| 1 | The output has exactly one row, for `case_91101`; it is never skipped | CD invariant 16 |
+| 2 | Row state is `FAILED_CLOSED`, with `deletion_status` INCOMPLETE | T86 (1), Q5 |
+| 3 | `deletion_status` is never COMPLETE or NOT_APPLICABLE (the request is a plain deletion request) | T8, T42, T63 |
+| 4 | Steps: any list the remaining readable inputs still give, possibly `[]` | T86 (1) |
+| 5 | No step cites `evidence_11001`: an unread file proves nothing. Its ID is in the manifest, so a manifest-only check would pass it | T8; CD invariant 10 |
+| 6 | Every `resource_id` in a step occurs in a readable input: no invented account | T28; `../CLAUDE.md` §3 |
+| 7 | The FAILED_CLOSED reason in the run artifacts names `evidence_11001` and states the file could not be read (parse status ERROR) | T86 (1) |
+| 8 | Coherence reports H03 as hard for this row | T86 (1) |
 
-## Why the row is not settled
-- G3's `FAILED_CLOSED` row class (`notes/ARCHITECTURE_OPTIONS.md` §6, accepted as T71 Q5) gives the status: INCOMPLETE, with "the validated subset" of steps and the reason logged. Here that subset is empty.
-- INCOMPLETE with `[]` breaks the DEV-confirmed shape "INCOMPLETE ⇒ at least one FINDING, REMEDIATION and VERIFICATION" (CD invariant 3). A synthetic finding would break "findings cite evidence" (CD-F18).
-- So the exact `steps_json` (`[]`, or something else) is a developer decision. T71 Q5 already requires 0 such rows at freeze, or the developer's acknowledgement.
+By hand, the remaining inputs give no step (no other evidence, no activity row, no account ID anywhere), so assertion 4 should come out as `[]`. This note is not asserted, per T86.

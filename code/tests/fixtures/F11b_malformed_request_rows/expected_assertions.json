@@ -1,0 +1,100 @@
+{
+  "fixture": "F11b_malformed_request_rows",
+  "rulings": [
+    "T86 (1)",
+    "T71 Q5",
+    "T63",
+    "T51 (2)"
+  ],
+  "note": "Row isolation: one bad request row never affects another row (T86).",
+  "input_rows_in_file_order": [
+    "case_91201",
+    "case_91202",
+    "<empty case_id>",
+    "case_91203",
+    "case_91204",
+    "case_91205"
+  ],
+  "output": {
+    "row_count": 5,
+    "case_ids": [
+      "case_91201",
+      "case_91202",
+      "case_91203",
+      "case_91204",
+      "case_91205"
+    ],
+    "no_row_for_unreadable_case_id": true
+  },
+  "valid_rows": {
+    "case_91201": "equals its row in expected_partial.csv",
+    "case_91205": "equals its row in expected_partial.csv"
+  },
+  "cases": {
+    "case_91202": {
+      "row_state": "FAILED_CLOSED",
+      "deletion_status": "INCOMPLETE",
+      "deletion_status_never": [
+        "COMPLETE",
+        "NOT_APPLICABLE"
+      ],
+      "steps": "any validated list, possibly []",
+      "failed_closed_reason": {
+        "recorded_in": "run artifacts",
+        "must_name_case_id": true,
+        "must_name_column": "audit_at",
+        "must_state": "the timestamp does not parse (month 13, day 40, hour 99)",
+        "must_not_contain_cell_value": true
+      },
+      "coherence": {
+        "H03": "reported as hard"
+      }
+    },
+    "case_91203": {
+      "row_state": "FAILED_CLOSED",
+      "deletion_status": "INCOMPLETE",
+      "deletion_status_never": [
+        "COMPLETE",
+        "NOT_APPLICABLE"
+      ],
+      "steps": "any validated list, possibly []",
+      "failed_closed_reason": {
+        "recorded_in": "run artifacts",
+        "must_name_case_id": true,
+        "must_name_column": "email",
+        "must_state": "the email field is empty, so no identity can be resolved",
+        "must_not_contain_cell_value": true
+      },
+      "coherence": {
+        "H03": "reported as hard"
+      }
+    },
+    "case_91204": {
+      "row_state": "FAILED_CLOSED",
+      "deletion_status": "INCOMPLETE",
+      "deletion_status_never": [
+        "COMPLETE",
+        "NOT_APPLICABLE"
+      ],
+      "steps": "any validated list, possibly []",
+      "failed_closed_reason": {
+        "recorded_in": "run artifacts",
+        "must_name_case_id": true,
+        "must_name_column": "(row)",
+        "must_state": "the row has 5 fields where 7 are required",
+        "must_not_contain_cell_value": true
+      },
+      "coherence": {
+        "H03": "reported as hard"
+      }
+    }
+  },
+  "unreadable_case_id_rows": [
+    {
+      "file_line": 4,
+      "reported_in": "run artifacts",
+      "must_state": "the case_id field is empty, so no output row can be written for it",
+      "must_not_contain_cell_value": true
+    }
+  ]
+}

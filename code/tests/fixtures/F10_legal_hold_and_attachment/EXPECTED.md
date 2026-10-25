@@ -4,7 +4,11 @@
 - a `legal_hold_*` record (legal_service, `retained_order_records`, retained until 2033) for the person. Policy says retain it; it must **never** get a DELETE. Test has 8 cases; DEV has 0;
 - a ticket attachment uploaded by the person (`storage_class: ticket_attachment`) in text evidence. It is rule_06 DELETE, not rule_05 REDACT, although its prefix is `support_`. Test has 20 cases; DEV has 1, via a PDF.
 
-**Provisional:** yes. The legal-hold step (rule_13 RETAIN → `VERIFY_RECORD_PRESENT` on `legal_service`) is **SPEC-ONLY**: the T9 default "a legal hold is never deleted", CD A13 (UNSETTLED, leaning (a)), `notes/gold_forensics.md` Q6 "No DEV evidence". The attachment steps are DEV-confirmed (case_07's F/R/V shape).
+**Provisional:** yes. The legal-hold step (rule_13 RETAIN → `VERIFY_RECORD_PRESENT` on `legal_service`) is **SPEC-ONLY**: the T9 default "a legal hold is never deleted", CD A13 (UNSETTLED, leaning (a)), `notes/gold_forensics.md` Q6 "No DEV evidence". The developer **confirmed this reading in T86 (2)**:
+- `legal_service` stands, copied from the line that names the record, never from a file's manifest system;
+- a hold appears like DEV's retained audit records: a VERIFY_RECORD_PRESENT step with an empty citation in an INCOMPLETE row, and cited in a COMPLETE one (T74).
+
+It stays provisional because no sample answer confirms it. The attachment steps are DEV-confirmed (case_07's F/R/V shape).
 **G8 custom eval case:** yes.
 **Parse:**
 - `evidence_10001` OK (`sql_replica_topology`, 6 observations; system IDs `legal_service`, `support_platform`, `security_service`);
@@ -42,5 +46,5 @@ Rule keys as in F02; `R15-P2` is `research/15`'s provisional legal-hold rule.
 - `support_` prefix → rule_05 → EXPOSED_PII / REDACT / REDACTED: three wrong operations.
 
 ## Not settled by the rules
-- The legal hold's `system_id`. `legal_service` is the record's own origin and the activity `target_system` of the dataset's RETAIN rows, but no DEV gold shows it (A13).
-- Whether gold lists a retained legal hold in an INCOMPLETE row's verification at all. If it does not, the expected row drops step 5 and has 5 steps.
+- **Ruled by T86 (2):** `system_id` is `legal_service`, taken from the record's own `origin_system` (here `evidence_10001`'s `origin_system` column), and the hold is listed in INCOMPLETE verification with `""`. The row above stands.
+- Still open: whether the hidden answer key agrees (no sample answer). If it omits retained holds from INCOMPLETE verification, step 5 is dropped and the row has 5 steps.

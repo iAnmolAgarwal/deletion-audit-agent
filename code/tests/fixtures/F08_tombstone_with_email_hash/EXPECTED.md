@@ -4,7 +4,7 @@
 
 The request text also says "you may keep an internal reference number". That describes exactly what the tombstone may keep (`subject_reference`), and it does not cover the hash.
 
-**Provisional:** yes. **SPEC-ONLY** (T9 default "a tombstone still holding personal data is a finding"; `notes/gold_forensics.md` Q6: no DEV evidence either way).
+**Provisional:** yes. **SPEC-ONLY** (T9 default "a tombstone still holding personal data is a finding"; `notes/gold_forensics.md` Q6: no DEV evidence either way). The developer **confirmed this reading in T86 (2)**: an email hash is personal data, because `user_identities.csv` uses `email_hash` as a key back to the person, which is why T59 counts it. It stays provisional because no sample answer confirms it.
 **G8 custom eval case:** yes.
 **Parse:**
 - `evidence_9801` OK (`snapshot_bundle`, 2 observations, 3 declared scopes, including the empty `account_service/customer_profiles`). The tombstone observation's identifiers are `email_hash` and `user_id: user_900801`;
@@ -40,4 +40,5 @@ Rule keys as in F02; `R15-P3` is `research/15`'s provisional tombstone rule.
 - The tombstone deleted (rule_01-style) instead of redacted: the stable reference must stay (PS:13).
 
 ## Not settled by the rules
-- Whether gold treats a hash-only tombstone as exposed rests on PS:13 alone. If DEV or the developer rules otherwise, the expected row becomes COMPLETE with `VERIFY_RECORD_ABSENT account_900811`, `VERIFY_RECORD_PRESENT audit_record_900812` and `VERIFY_RECORD_REDACTED tombstone_900810`, all citing `evidence_9801`.
+- **Ruled by T86 (2):** a hash-only tombstone is exposed. The row above stands.
+- What remains open is whether the hidden answer key agrees, since no sample answer shows it. If it does not, the row becomes COMPLETE with `VERIFY_RECORD_ABSENT account_900811`, `VERIFY_RECORD_PRESENT audit_record_900812` and `VERIFY_RECORD_REDACTED tombstone_900810`, all citing `evidence_9801`.

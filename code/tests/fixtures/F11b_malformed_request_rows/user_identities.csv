@@ -1,3 +1,6 @@
 user_id,name,email,phone,email_hash,updated_at
 user_901201,Fenwick Brindle,fenwick.brindle@example.net,+44 7700 901201,8ab9268d2586cb3bb7823b4efdd22fd367a7304d66cdd2cb20b91a269c252dd8,2026-03-01T10:00:00Z
 user_901202,Kestrel Imrie,kestrel.imrie@example.net,+44 7700 901202,98d9d008755f3f7529e14aea883cc6152715aa3d04cecbb666dd88dd2e1b7b0d,2026-03-01T10:00:00Z
+user_901203,Bram Tillet,bram.tillet@example.net,+44 7700 901203,d71faade06faf7254a9b327db119ee55af4bbc2a1706e342b27bfd3a22811578,2026-03-01T10:00:00Z
+user_901204,Sable Quint,sable.quint@example.org,+44 7700 901204,7f63bd2d9363fdae879e430f9c296170e40a87d3b1f25c587422d69f6c244b76,2026-03-01T10:00:00Z
+user_901205,Orla Fenmore,orla.fenmore@example.org,+44 7700 901205,0dea1be1e92e1ed2b06d4bcf515c4d6c6270957e054cf76685da7dc9cdf02e14,2026-03-01T10:00:00Z

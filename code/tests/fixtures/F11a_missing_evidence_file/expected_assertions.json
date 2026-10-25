@@ -1,0 +1,41 @@
+{
+  "fixture": "F11a_missing_evidence_file",
+  "rulings": [
+    "T86 (1)",
+    "T71 Q5",
+    "T8",
+    "T42",
+    "T28"
+  ],
+  "note": "Asserts properties of the row, not a 'correct' row (T86).",
+  "output": {
+    "row_count": 1,
+    "case_ids": [
+      "case_91101"
+    ]
+  },
+  "cases": {
+    "case_91101": {
+      "row_state": "FAILED_CLOSED",
+      "deletion_status": "INCOMPLETE",
+      "deletion_status_never": [
+        "COMPLETE",
+        "NOT_APPLICABLE"
+      ],
+      "steps": "any list the remaining readable inputs still give, possibly []",
+      "steps_never_cite": [
+        "evidence_11001"
+      ],
+      "step_resource_ids_must_occur_in_readable_inputs": true,
+      "failed_closed_reason": {
+        "recorded_in": "run artifacts",
+        "must_name_file_id": "evidence_11001",
+        "must_state": "the evidence file could not be read (missing on disk)",
+        "parse_status_of_file": "ERROR"
+      },
+      "coherence": {
+        "H03": "reported as hard"
+      }
+    }
+  }
+}
