@@ -38,7 +38,7 @@ Rebuilt at the developer's direction (turn 2026-10-25T00:08:45+05:30). Updated a
 ## Agent queue (cap: 3 at once, T79; never two of the same type)
 - **Resumed at 11:28 (T99).**
   - The agent-test patch is applied: code/tests 413 OK.
-  - **Running:** the G5 fix-round verifier (`orch-verifier`, high, directed_by 2026-10-25T11:28:05+05:30, brief `g5fix1_verifier_brief.md`).
+  - **Done:** the G5 fix-round verifier, PASS with 2 MINOR (T93), and G5 committed.
   - **Next:**
     1. the G5 commit (T93), then the suite on the committed tree;
     2. main's pipeline unlock, with the `read_output` unlock route removed (C);
@@ -84,6 +84,13 @@ Rebuilt at the developer's direction (turn 2026-10-25T00:08:45+05:30). Updated a
   2. A support image with no identifiers is read as REDACTED.
   3. `backup_9291` is named by no other input, so it is flagged and kept (T88).
 - **T95 at the G7 wiring:** `evaluation_report.md`'s generator embeds `agent_report.py`'s tool-sequence histogram and its tools on vs off sections for the fixtures (G8 included) and for the test rows that differ between arms, not only DEV (C2). The G7 verifier checks that a G8 injection fixture exercises both the code flag and the model flag (C4), and checks the prompt and tool-description parts (C1). Items (1) and (2) were sent to G7a at 06:24.
+- **G9 list, from the G5 fix-round verifier** (`notes/verify/g5fix1_verify.md`, PASS):
+  - **MINOR 1:** `engine.py:518-520` counts an observation as seen by its line time only, not by its file's `captured_at`. A record whose only stateless line sits in a post-audit file then fails closed with UNINTERPRETED_RECORD where R8 gives no step. It errs toward failing closed and hits 0 real rows. It ties to the R06 ruling.
+  - **MINOR 2:** §7.1 lacked the fix round's interface changes. Fixed in the G5 commit (§7.1.1).
+  - **Notes:**
+    - state reconstruction also reads lines from post-audit files, and the validator then refuses the row, so it fails closed;
+    - G7a's `tests/agent/test_properties.py:108` still checks order with the production `step_sort_key` (T63 pin 5), which goes to the G7 wiring;
+    - T99 E's `reported_status` is unchanged, pending the developer.
 - **G7b items to settle at the G7 wiring:**
   1. the vision file name (`VISION_ARTIFACT`, assumed `vision.json`);
   2. whether `committed_key`/`final_key` are labels or reply keys (if keys, add `committed_label`/`final_label`);

@@ -641,6 +641,24 @@ def sort_key(value: str) -> dt.datetime
 def main(argv: list[str] | None=None) -> int
 ```
 
+#### 7.1.1 Changes from G5 fix round 1 (T90; verifier PASS in `notes/verify/g5fix1_verify.md`, which also found these missing here)
+```
+# ---- pipeline.py (added)
+class HoldoutRefused(...)                       # a run naming a holdout case is refused before any input is read
+def holdout_ids() -> frozenset[str]
+def refuse_holdout(cases: Iterable[str]) -> None
+# run(...) signature unchanged; it calls refuse_holdout on an explicit case list and again after resolving "test"
+# ---- record.py
+FailedClosedReason += UNINTERPRETED_RECORD      # a record that exists (observations at or before audit_at) but gets no state or category
+# ---- inputs/requests.py
+CASE_ID_RE = case_[0-9]+                        # full match, no trimming (T87(5)); an unreadable case_id is reported only, with no row
+# ---- validate/prewrite.py
+VALIDATOR_PARTS += COMPLETE_VERIFICATION_ONLY   # hard: a COMPLETE row holds VERIFICATION steps only
+# ---- __main__.py
+_split -> _dev_ids (private); a HoldoutRefused run exits 2
+```
+The private `_load_file` return type also changed. The verifier's AST diff shows no other public change.
+
 ## 8. GM model client (pinned for the GM proposal, developer decision T70)
 - **The interface is `notes/ARCHITECTURE_OPTIONS.md` §5, the `model/` block:** `ModelRequest` (key = sha256 of the canonical body plus the API version; no case ID, no row index), `ModelReply`, `ModelCallFailed`, `Transport` (`AnthropicTransport` with the SDK's `max_retries=0`, plus `FakeTransport`), `ModelClient.call` (cache → budget → send/ladder → cache.put → log), `RetryPolicy` (the one place that decides retry, repair or give up), `ReplyCache` (atomic, never overwrites, raw replies only), `BudgetGuard` (per-run dollar and call caps; project ledger stop at $110). §8 (caching, determinism, retries) also applies.
 - **Requirements from `../CLAUDE.md` §5 and T63:**
