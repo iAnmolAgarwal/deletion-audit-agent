@@ -37,9 +37,11 @@
 * **Candidate assembly by row (developer ruling T118 (2a), (2c)):** when the gate runs, the rows as
   computed go to ``output_raw.csv`` and ``output.csv`` carries the gate's assembled rows: each
   ``kept_approved`` row is the approved file's row, byte for byte. Its ``cases.jsonl`` record is the
-  engine-only recompile (fail-closed intent, no image readings) when that reproduces the approved row,
-  flagged ``GATE_KEPT_APPROVED``, so the run's metrics describe ``output.csv``; ``producer.json``
-  lists the kept cases and both hashes. The assembly runs after every row is computed, so no model
+  case recompiled on the world without image readings, with the case's own intent decision (T118
+  step 4 fix: a validated model intent is not shown as fail-closed), when that reproduces the
+  approved row; else the engine-only recompile (fail-closed intent) when that does; else the computed
+  record. It is flagged ``GATE_KEPT_APPROVED`` naming which, so the run's metrics describe ``output.csv``;
+  ``producer.json`` lists the kept cases and both hashes. The assembly runs after every row is computed, so no model
   request changes. A refused gate assembles nothing (``output.csv`` = the computed rows; not passing).
 * **Baseline per split (developer ruling T117 B2):** ``cases="test"`` is gated against the approved
   test file, the exact DEV case set against the DEV baseline, anything else against the record's
@@ -558,10 +560,15 @@ def _split_of(cases: Sequence[str] | Literal["test"], wanted: Sequence[str]) -> 
 
 
 def _kept_record(rec: CaseRecord, plain: World, approved: Row, cause: str) -> CaseRecord:
-    """The ``cases.jsonl`` record of a kept-approved case (module docstring): the engine-only
-    recompile when it reproduces the approved row, else the computed record; flagged either way."""
-    engine_only = audit_case(rec.case_id, plain, FixedIntent(fail_closed_intent(rec.intent.crosscheck)))
-    base, how = (engine_only, "engine-only recompile") if _row(engine_only) == approved else (rec, "computed record")
+    """The ``cases.jsonl`` record of a kept-approved case (module docstring): the first of (1) the
+    image-free recompile with the case's own intent, (2) the engine-only recompile with the fail-closed
+    intent, that reproduces the approved row byte for byte, else (3) the computed record; flagged."""
+    own = audit_case(rec.case_id, plain, FixedIntent(rec.intent))
+    base, how = own, "image-free recompile with the case's own intent"
+    if _row(own) != approved:
+        engine_only = audit_case(rec.case_id, plain, FixedIntent(fail_closed_intent(rec.intent.crosscheck)))
+        base, how = ((engine_only, "engine-only recompile (fail-closed intent)") if _row(engine_only) == approved
+                     else (rec, "computed record"))
     flag = Flag("GATE_KEPT_APPROVED", f"{cause} change whose condition failed: output keeps the approved row "
                                       f"(T118); this record is the {how}")
     return replace(base, flags=tuple(sorted(set(base.flags) | {flag}, key=lambda f: (f.code, f.detail))),

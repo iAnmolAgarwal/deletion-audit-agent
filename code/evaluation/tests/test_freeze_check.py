@@ -295,7 +295,7 @@ class TestFreezeCheck(unittest.TestCase):
         with self.patched(), contextlib.redirect_stdout(out):
             self.assertEqual(fc_mod.main(["--run-id", "r1"]), 0)
         self.assertIn(f"output sha256:   {sha}", out.getvalue())
-        self.assertIn(f"approved sha256: {sha} (match)", out.getvalue())
+        self.assertIn(f"approved sha256: {sha} (match: approved_output)", out.getvalue())
 
     def test_approved_output_mismatch_refuses_only_on_that_check(self) -> None:
         d = write_run(self.runs, "r1", rows(), [case(c) for c in IDS], vision=[AGREE])
@@ -313,6 +313,77 @@ class TestFreezeCheck(unittest.TestCase):
         with self.patched(), contextlib.redirect_stdout(out):
             self.assertEqual(fc_mod.main(["--run-id", "r1"]), 1)
         self.assertIn("MISMATCH", out.getvalue())
+
+    # ---- T119: a provisional approval for the freeze check and the holdout run ----
+    def record(self, approved_sha: str, **extra: Any) -> None:
+        self.approved.write_text(json.dumps({"approved_output": {"run_id": "a", "sha256": approved_sha,
+                                                                 "path": "x.csv"}, **extra}), encoding="utf-8")
+
+    def test_provisional_freeze_sha_passes_and_says_which_matched(self) -> None:
+        d = write_run(self.runs, "r1", rows(), [case(c) for c in IDS], vision=[AGREE])
+        sha = hashlib.sha256((d / "output.csv").read_bytes()).hexdigest()
+        self.record("f" * 64, provisional_freeze={"run_id": "r1", "sha256": sha, "ruling": "T119", "scope": "freeze"})
+        res = freeze_check("r1", runs_root=self.runs, approved_record=self.approved)
+        self.assertTrue(res["passed"], res["refusals"])
+        self.assertEqual(res["approved_output"]["matched"], "provisional_freeze (T119)")
+        out = io.StringIO()
+        with self.patched(), contextlib.redirect_stdout(out):
+            self.assertEqual(fc_mod.main(["--run-id", "r1"]), 0)
+        self.assertIn("match: provisional_freeze (T119)", out.getvalue())
+        self.assertIn(f"provisional sha256: {sha} (run r1, T119", out.getvalue())
+        self.record("f" * 64, provisional_freeze={"run_id": "r1", "sha256": "e" * 64})
+        res = freeze_check("r1", runs_root=self.runs, approved_record=self.approved)
+        self.assertFalse(res["passed"])
+        self.assertIn("e" * 64, res["refusals"][-1])
+
+    # ---- T118 step 4: FAILED_CLOSED rows identical to the approved file are listed, not counted ----
+    def fc_run(self) -> tuple[Path, str]:
+        cases = [case(c) for c in IDS]
+        cases[1] = case("case_902", row_state="FAILED_CLOSED", failed_closed="NOTHING_FOUND")
+        d = write_run(self.runs, "r1", rows(), cases, vision=[AGREE])
+        return d, hashlib.sha256((d / "output.csv").read_bytes()).hexdigest()
+
+    def test_failed_closed_row_identical_to_the_approved_file_is_accepted(self) -> None:
+        d, sha = self.fc_run()
+        base = Path(self._tmp.name) / "approved_test.csv"
+        base.write_bytes((d / "output.csv").read_bytes())
+        self.approved.write_text(json.dumps({
+            "approved_output": {"sha256": sha, "path": str(base)},
+            "freeze_accepts_failed_closed_identical_to": {"sha256": sha, "ruling": "T118 step 4"}}), encoding="utf-8")
+        res = freeze_check("r1", runs_root=self.runs, approved_record=self.approved)
+        self.assertTrue(res["passed"], res["refusals"])
+        self.assertEqual(res["counts"]["failed_closed_rows"], 0)
+        self.assertEqual(res["failed_closed_accepted"]["cases"], ["case_902"])
+        out = io.StringIO()
+        with self.patched(), contextlib.redirect_stdout(out):
+            self.assertEqual(fc_mod.main(["--run-id", "r1"]), 0)
+        self.assertIn("FAILED_CLOSED rows accepted (T118 step 4", out.getvalue())
+
+    def test_failed_closed_row_that_differs_from_the_approved_file_still_blocks(self) -> None:
+        d, sha = self.fc_run()
+        text = (d / "output.csv").read_text(encoding="utf-8").splitlines(keepends=True)
+        changed = [line.replace("COMPLETE", "INCOMPLETE", 1) if line.startswith("case_902,") else line for line in text]
+        base = Path(self._tmp.name) / "approved_test.csv"
+        base.write_text("".join(changed), encoding="utf-8")
+        bsha = hashlib.sha256(base.read_bytes()).hexdigest()
+        self.approved.write_text(json.dumps({
+            "approved_output": {"sha256": sha, "path": "x.csv"},
+            "approved_outputs": {"test": {"sha256": bsha, "path": str(base)}},
+            "freeze_accepts_failed_closed_identical_to": {"sha256": bsha, "ruling": "T118 step 4"}}), encoding="utf-8")
+        res = freeze_check("r1", runs_root=self.runs, approved_record=self.approved)
+        self.assertEqual((res["counts"]["failed_closed_rows"], res["failed_closed_accepted"]["cases"]), (1, []))
+        self.assertFalse(res["passed"])
+        base.write_text("tampered", encoding="utf-8")  # the named file no longer has the recorded sha256
+        res = freeze_check("r1", runs_root=self.runs, approved_record=self.approved)
+        self.assertEqual(res["counts"]["failed_closed_rows"], 1)
+        self.assertTrue(any("does not have the recorded sha256" in e for e in res["errors"]))
+
+    def test_without_the_ruling_key_no_failed_closed_row_is_accepted(self) -> None:
+        d, sha = self.fc_run()
+        self.approve(sha)
+        res = freeze_check("r1", runs_root=self.runs, approved_record=self.approved)
+        self.assertEqual((res["counts"]["failed_closed_rows"], res["failed_closed_accepted"]), (1, {"cases": [],
+                                                                                                    "rule": None}))
 
     def test_unreadable_approved_record_refuses(self) -> None:
         write_run(self.runs, "r1", rows(), [case(c) for c in IDS], vision=[AGREE])

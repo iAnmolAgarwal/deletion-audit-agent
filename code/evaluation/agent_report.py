@@ -811,7 +811,10 @@ def _adapt_vision(view: RunView) -> None:
 
 
 def _check_review_file(view: RunView, raw: list[Any], images: Sequence[ImageView]) -> None:
-    """``vision_readings.json`` (the developer's review file) must hold the same images and review list."""
+    """``vision_readings.json`` (the developer's review file) must hold the same images, and a review list
+    that is a sorted list of distinct file IDs of those images containing every failed and disagreeing
+    one. Since T112 4(b) the writer lists every image whose reading changes a row as well (a superset),
+    so only a missing failed or disagreeing image, or an image not in the artifact, is refused."""
     k = VISION_KEYS
     where = VISION_READINGS_FILE
     body = _read_json(view.run_dir / where)
@@ -821,9 +824,17 @@ def _check_review_file(view: RunView, raw: list[Any], images: Sequence[ImageView
         return
     if body.get(k["images"]) != raw:
         view.vision_errors.append(AdapterError(where, k["images"], f"differs from {VISION_ARTIFACT}"))
-    if not view.vision_errors and body.get(k["needs_review"]) != needs_review(images):
-        view.vision_errors.append(AdapterError(where, k["needs_review"], "differs from the failed and disagreeing "
-                                                                         f"images of {VISION_ARTIFACT}"))
+    if view.vision_errors:
+        return
+    listed = body.get(k["needs_review"])
+    if not (isinstance(listed, list) and all(isinstance(x, str) for x in listed) and listed == sorted(set(listed))):
+        view.vision_errors.append(AdapterError(where, k["needs_review"], "not a sorted list of distinct file IDs"))
+        return
+    if set(needs_review(images)) - set(listed):
+        view.vision_errors.append(AdapterError(where, k["needs_review"], "omits a failed or disagreeing image of "
+                                                                         f"{VISION_ARTIFACT}"))
+    if set(listed) - {i.file_id for i in images}:
+        view.vision_errors.append(AdapterError(where, k["needs_review"], f"names an image not in {VISION_ARTIFACT}"))
 
 
 def read_run_artifacts(run_dir: Path) -> RunView:

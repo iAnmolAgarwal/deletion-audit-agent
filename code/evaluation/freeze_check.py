@@ -37,7 +37,17 @@ and the blocking counts are all 0:
   acknowledgement from a developer turn). An acknowledged image is listed, not counted; the
   acknowledgement never picks a reading. A malformed acknowledgement list leaves the count not computed;
 * **the approved output** (T101 (1) and (3)): the sha256 of the run's ``output.csv`` equals the
-  ``approved_output.sha256`` of ``notes/approved_output.json``, read at check time. Both are printed.
+  ``approved_output.sha256`` of ``notes/approved_output.json``, read at check time, or its
+  ``provisional_freeze.sha256`` (developer ruling T119: a candidate approved provisionally, for the
+  freeze check and the holdout run only; it does not become the shipped output or the gate's
+  baseline). Both hashes are printed, with which one matched.
+
+**FAILED_CLOSED rows identical to the approved file (developer ruling T118 step 4).** When the
+record holds ``freeze_accepts_failed_closed_identical_to`` (``{sha256, ruling}``), the approved file
+with that sha256 (an entry of ``approved_outputs`` or ``approved_output``, sha256-checked at check
+time) is read, and a FAILED_CLOSED row whose ``output.csv`` row equals that file's row for the same
+case (status and ``steps_json`` text) is listed as accepted, not counted. Any other FAILED_CLOSED
+row still blocks; an unreadable or mismatched file is an error, so nothing is accepted.
 
 Listed but not blocking: ``vision_unmapped_labels``, screenshot labels that map to no resource ID
 (such as a support-ticket label with no system). A label is not a resource ID, so it gives no step
@@ -57,6 +67,9 @@ count from being computed. A count that cannot be computed is never reported as 
 from __future__ import annotations
 
 import argparse
+import csv
+import hashlib
+import io
 import json
 import sys
 from collections.abc import Mapping, Sequence
@@ -101,20 +114,73 @@ SAMPLE = 10  # case IDs shown per failing count
 APPROVED_RECORD: Path = REPO_ROOT / "notes" / "approved_output.json"  # T101 (1): the developer-approved output
 
 
+def _sha64(value: Any) -> str:
+    if not isinstance(value, str) or len(value) != 64:
+        raise ValueError("an approved sha256 is not 64 hex characters")
+    return value
+
+
 def approved_output_check(output_sha256: str | None, record: Path) -> dict[str, Any]:
-    """Compare a run's output sha256 with the approved one (T101); ``error`` is set when it cannot be read."""
+    """Compare a run's output sha256 with the approved one (T101) or the provisional one (T119);
+    ``matched`` names which; ``error`` is set when the record cannot be read."""
     out: dict[str, Any] = {"record": str(record), "output_sha256": output_sha256, "approved_sha256": None,
-                           "approved_run_id": None, "matches": False, "error": None}
+                           "approved_run_id": None, "provisional_sha256": None, "provisional": None,
+                           "matched": None, "matches": False, "error": None}
     try:
-        approved = json.loads(record.read_text(encoding="utf-8"))["approved_output"]
-        sha = approved["sha256"]
-        if not isinstance(sha, str) or len(sha) != 64:
-            raise ValueError("approved sha256 is not 64 hex characters")
+        body = json.loads(record.read_text(encoding="utf-8"))
+        approved = body["approved_output"]
+        sha = _sha64(approved["sha256"])
+        prov = body.get("provisional_freeze")
+        prov_sha = _sha64(prov["sha256"]) if prov is not None else None
     except (OSError, UnicodeDecodeError, ValueError, KeyError, TypeError) as exc:
         out["error"] = f"approved-output record unreadable ({type(exc).__name__})"
         return out
-    out.update(approved_sha256=sha, approved_run_id=approved.get("run_id"), matches=output_sha256 == sha)
+    matched = ("approved_output" if output_sha256 == sha else
+               "provisional_freeze (T119)" if prov_sha is not None and output_sha256 == prov_sha else None)
+    out.update(approved_sha256=sha, approved_run_id=approved.get("run_id"), provisional_sha256=prov_sha,
+               provisional=dict(prov) if prov is not None else None, matched=matched, matches=matched is not None)
     return out
+
+
+def _csv_rows(data: bytes) -> dict[str, tuple[str, ...]]:
+    """``{case_id: (status, steps_json)}`` from output.csv bytes (the text as written, unparsed JSON)."""
+    rows: dict[str, tuple[str, ...]] = {}
+    for line in list(csv.reader(io.StringIO(data.decode("utf-8"))))[1:]:
+        if line:
+            rows[line[0]] = tuple(line[1:])
+    return rows
+
+
+def accepted_failed_closed(record: Path, output: bytes | None, fc_cases: Sequence[str],
+                           repo_root: Path = REPO_ROOT) -> tuple[list[str], dict[str, Any] | None, list[str]]:
+    """T118 step 4 (module docstring): the FAILED_CLOSED cases whose row equals the named approved
+    file's row; the acceptance as recorded (None when the record has none); and any errors."""
+    try:
+        body = json.loads(record.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, ValueError):
+        return [], None, []  # the approved-output check reports an unreadable record
+    rule = body.get("freeze_accepts_failed_closed_identical_to") if isinstance(body, Mapping) else None
+    if rule is None:
+        return [], None, []
+    try:
+        want = _sha64(rule["sha256"])
+        per_split = body.get("approved_outputs") or {}
+        entries = [*(per_split.values() if isinstance(per_split, Mapping) else []), body["approved_output"]]
+        rel = next(str(e["path"]) for e in entries if isinstance(e, Mapping) and e.get("sha256") == want)
+    except (KeyError, TypeError, ValueError, StopIteration) as exc:
+        return [], dict(rule) if isinstance(rule, Mapping) else None, [
+            f"freeze_accepts_failed_closed_identical_to: no approved file with that sha256 ({type(exc).__name__})"]
+    path = Path(rel) if Path(rel).is_absolute() else repo_root / rel
+    try:
+        data = path.read_bytes()
+    except OSError as exc:
+        return [], dict(rule), [f"freeze_accepts_failed_closed_identical_to: {rel} unreadable ({type(exc).__name__})"]
+    if hashlib.sha256(data).hexdigest() != want:
+        return [], dict(rule), [f"freeze_accepts_failed_closed_identical_to: {rel} does not have the recorded sha256"]
+    if output is None:
+        return [], dict(rule), []
+    base, mine = _csv_rows(data), _csv_rows(output)
+    return [c for c in fc_cases if c in base and c in mine and base[c] == mine[c]], dict(rule), []
 
 
 def is_failed_closed(c: CaseView) -> bool:
@@ -254,9 +320,16 @@ def freeze_check(run_id: str, *, runs_root: Path = RUNS, approved_record: Path |
     fc_cases = [c.case_id for c in cases if is_failed_closed(c)]
     counts: dict[str, int | None] = {k: None for k in COUNTS}
     case_lists: dict[str, list[str]] = {}
+    record_path = approved_record or APPROVED_RECORD
+    try:
+        out_bytes: bytes | None = (run.run_dir / OUTPUT_FILE).read_bytes()
+    except OSError:
+        out_bytes = None
+    fc_accepted, fc_rule, fc_errors = accepted_failed_closed(record_path, out_bytes, fc_cases)
+    errors += fc_errors
     if record_ok:
-        counts["failed_closed_rows"] = len(fc_cases)
-        case_lists["failed_closed_rows"] = fc_cases
+        counts["failed_closed_rows"] = len([c for c in fc_cases if c not in fc_accepted])
+        case_lists["failed_closed_rows"] = [c for c in fc_cases if c not in fc_accepted]
         mfc = (metrics or {}).get("failed_closed", {})
         if metrics is not None and (not isinstance(mfc, Mapping) or mfc.get("count") != len(fc_cases)):
             errors.append(f"{METRICS_FILE} failed_closed.count disagrees with {CASES_FILE} ({len(fc_cases)})")
@@ -300,17 +373,19 @@ def freeze_check(run_id: str, *, runs_root: Path = RUNS, approved_record: Path |
                         f"{REPEAT_RUNS} runs in a row; do not re-run again until the developer rules (T110 (2))")
     refusals += [f"{k}: not computed (see errors)" for k, n in counts.items() if n is None]
     refusals += [f"error: {e}" for e in errors]
-    approved = approved_output_check(run.producer_check["pred_sha256"], approved_record or APPROVED_RECORD)
+    approved = approved_output_check(run.producer_check["pred_sha256"], record_path)
     if approved["error"]:
         refusals.append(f"approved output: {approved['error']}")
     elif not approved["matches"]:
         refusals.append(f"approved output: the run's output sha256 {approved['output_sha256']} differs from the "
-                        f"approved {approved['approved_sha256']} (T101)")
+                        f"approved {approved['approved_sha256']} (T101) and from the provisional "
+                        f"{approved['provisional_sha256']} (T119)")
     return {"run_id": run_id, "kind": "freeze-check", "checked_at": runs.now_ist(), "producer_check": pstatus,
             "output_sha256": run.producer_check["pred_sha256"], "approved_output": approved, "counts": counts,
             "lower_bounds_when_not_computed": lower_bounds,
             "ids": {k: v for k, v in case_lists.items() if v}, "agent_failed": list((fails or {}).values()),
             "vision_unmapped_labels": unmapped, "vision_acknowledged_disagreements": acked,
+            "failed_closed_accepted": {"cases": fc_accepted, "rule": fc_rule},
             "prior_run_ids": list(prior_run_ids),
             "stop_for_developer": stops, "result": STOP if stops else ("REFUSED" if refusals else "PASSED"),
             "errors": errors, "refusals": refusals, "passed": not refusals and not stops}
@@ -336,10 +411,18 @@ def main(argv: list[str] | None = None) -> int:
     um = res["vision_unmapped_labels"]
     print(f"  vision_unmapped_labels (listed, not blocking): {'not computed' if um is None else um['count']}"
           + (f" ({', '.join(um['labels'][:SAMPLE])})" if um and um["labels"] else ""))
+    acc = res["failed_closed_accepted"]
+    if acc["cases"]:
+        print(f"  FAILED_CLOSED rows accepted ({(acc['rule'] or {}).get('ruling')}; identical to the approved "
+              f"{str((acc['rule'] or {}).get('sha256'))[:16]}...; not counted): {', '.join(acc['cases'])}")
     ap_out = res["approved_output"]
     print(f"  output sha256:   {ap_out['output_sha256']}")
-    verdict = ap_out["error"] or ("match" if ap_out["matches"] else "MISMATCH")
+    verdict = ap_out["error"] or (f"match: {ap_out['matched']}" if ap_out["matches"] else "MISMATCH")
     print(f"  approved sha256: {ap_out['approved_sha256']} ({verdict})")
+    if ap_out.get("provisional"):
+        prov = ap_out["provisional"]
+        print(f"  provisional sha256: {ap_out['provisional_sha256']} (run {prov.get('run_id')}, {prov.get('ruling')}; "
+              f"scope: {prov.get('scope')})")
     if a.record_run_id:
         d = run_path(RUNS, a.record_run_id)
         if d == run_path(RUNS, a.run_id) or (d / OUTPUT_FILE).exists():
@@ -360,7 +443,7 @@ def main(argv: list[str] | None = None) -> int:
         return EXIT_STOP
     if res["passed"]:
         print(f"FREEZE CHECK PASSED: all {len(COUNTS)} blocking counts are 0 on a checked run whose output is the "
-              "approved file")
+              f"approved file ({res['approved_output']['matched']})")
         return 0
     print("FREEZE CHECK REFUSED:")
     for r in res["refusals"]:

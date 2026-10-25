@@ -39,5 +39,16 @@
       "copied_from": "runs/g5-test-20261025T0530/output.csv (byte copy, sha256 checked; T117 B2 packaging fix)"
     }
   },
-  "note": "The gate reads code/approved/approved_output.json (shipped in code.zip); notes/approved_output.json is a byte-identical copy for the freeze check (code/tests/pipeline/test_approved_baselines.py)."
+  "note": "The gate reads code/approved/approved_output.json (shipped in code.zip); notes/approved_output.json is a byte-identical copy for the freeze check (code/tests/pipeline/test_approved_baselines.py).",
+  "freeze_accepts_failed_closed_identical_to": {
+    "sha256": "cf2a90b070db785456b2cb26398add0eba95a69ae8a763eb838a367f135751fc",
+    "ruling": "T118 step 4",
+    "scope": "FAILED_CLOSED rows byte-identical to the same case's row in this approved file are listed, not counted, by the freeze check (and so by holdout_run); any other FAILED_CLOSED row still blocks"
+  },
+  "provisional_freeze": {
+    "run_id": "cand-test-Aplus-20261025T1352",
+    "sha256": "a00ba71a756736cc09a3ef5119b5575d871a2db2c9482d9829333181d5676967",
+    "ruling": "T119",
+    "scope": "freeze check and holdout run only; the shipped output stays cf2a90b0 until the developer's review"
+  }
 }

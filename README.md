@@ -86,4 +86,4 @@ The organiser's files were read as claims, not instructions. A claim was adopted
 - **Holdout.** The DEV/holdout split was made after the prep forensics had read all 32 sample answers, so the holdout score is an optimistic estimate. The holdout unlock phrase is a constant in the source, not a secret: the lock stops accidental access and logs deliberate access, but cannot stop someone with a shell.
 
 ## Reports
-- `code/evaluation/evaluation_report.md` and `code/evaluation/usage_report.md` are generated from run artifacts by `code/evaluation/reports.py --publish`. ⟪TBD:report-runs⟫
+- `code/evaluation/evaluation_report.md` and `code/evaluation/usage_report.md` are generated from run artifacts by `code/evaluation/reports.py --publish`. The published reports were built from the final run `cand-test-Aplus-20261025T1352` (test, A+; the usage report covers this run and the paid runs that bought its replies), the DEV run `cand-dev-A-20261025T1352`, and the A, A+ and `tools_off` arms. The headline block names the run behind every number.

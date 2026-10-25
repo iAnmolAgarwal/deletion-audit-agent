@@ -173,9 +173,25 @@ class TestVisionAdapterRules(unittest.TestCase):
     def test_review_file_must_match(self) -> None:
         item = image("evidence_04", rreading(rrec("acct_1001")), rreading(rrec("acct_1001")), True, [],
                      [("account_service", "acct_1001", True, True)])
-        self.assertTrue(self.problems(self.view([item], readings={"images": [item], "needs_review": ["evidence_04"]})))
+        self.assertTrue(self.problems(self.view([item], readings={"images": [item], "needs_review": ["evidence_09"]})))
+        self.assertTrue(self.problems(self.view([item], readings={"images": [item], "needs_review": "evidence_04"})))
         self.assertTrue(self.problems(self.view([item], readings={"images": [], "needs_review": []})))
         self.assertTrue(self.problems(self.view([item], readings=ABSENT)))
+
+    def test_review_list_may_add_row_changing_images_but_never_omit_a_disagreeing_one(self) -> None:
+        """T112 4(b): the writer's review list is every failed, disagreeing or row-changing image, a superset
+        of the failed and disagreeing ones; the adapter refuses only a list missing one of those."""
+        a, b = rreading(rrec("acct_1001")), rreading(dict(rrec("acct_1001"), status_label="other"))
+        rid = [("account_service", "acct_1001", True, True)]
+        agreeing = image("evidence_04", a, a, True, [], rid)
+        disagreeing = image("evidence_09", a, b, False, ["records[acct_1001].status_label"], rid)
+        items = [agreeing, disagreeing]
+        superset = {"images": items, "needs_review": ["evidence_04", "evidence_09"]}
+        self.assertEqual(self.problems(self.view(items, readings=superset)), [])
+        exact = {"images": items, "needs_review": ["evidence_09"]}
+        self.assertEqual(self.problems(self.view(items, readings=exact)), [])
+        missing = {"images": items, "needs_review": ["evidence_04"]}
+        self.assertTrue(any("omits" in x for x in self.problems(self.view(items, readings=missing))))
 
     def test_unmapped_label_must_have_no_mapped_basis(self) -> None:
         item = image("evidence_04", rreading(rrec("CS-4821")), rreading(rrec("CS-4821")), True, [],

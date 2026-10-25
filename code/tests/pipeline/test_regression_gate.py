@@ -440,6 +440,27 @@ class TestEndToEnd(unittest.TestCase):
         base_line = cases_jsonl(self.runs / "base")[C1]
         self.assertEqual(line["status"], base_line["status"])
 
+    def test_kept_record_carries_the_case_s_own_validated_intent(self) -> None:
+        """T118 step 4 fix: a kept image row whose model intent was validated (DELETION_REQUEST) is shown
+        in cases.jsonl with that intent, recompiled without the image readings, not as fail-closed; the
+        output row stays the approved row byte for byte."""
+        root, record = self.baseline(image=PNG)
+        self.vision(root, self.both_records("yes"), self.both_records("no"))
+        dr = final_reply(answer("DELETION_REQUEST", "delete my account", kind="full_deletion"))
+        seed_turn1(self.replies, DELETE_TEXT, [dr, dr])
+        s = run(root, run_id="gated", cases="test", runs_dir=self.runs, model=ModelSetup.replay(self.replies),
+                regression_gate=True, approved_record=record, mode="tools_off")  # turn 1 only: the loop is OK
+        gate = read_json(self.runs / "gated" / "regression_vs_engine.json")
+        self.assertEqual([(r["case_id"], r["verdict"]) for r in gate["rows"]], [(C1, "kept_approved")])
+        self.assertTrue(s.passed)
+        d = self.runs / "gated"
+        self.assertEqual((d / "output.csv").read_bytes(), (self.runs / "base" / "output.csv").read_bytes())
+        line = cases_jsonl(d)[C1]
+        self.assertEqual((line["intent_source"], line["agent"]["intent"]["source"]), ("MODEL", "MODEL"))
+        kept = [f["detail"] for f in line["flags"] if f["code"] == "GATE_KEPT_APPROVED"]
+        self.assertEqual(len(kept), 1)
+        self.assertIn("own intent", kept[0])
+
     def test_disagreement_only_in_a_review_field_is_accepted_by_rule_a(self) -> None:
         """T118 (2a): the readings differ only in ``status_label`` (review only), so each reading alone
         derives the same state and cited IDs for every record: the image counts as agreeing."""
