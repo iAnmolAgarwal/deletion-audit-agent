@@ -64,6 +64,8 @@ Rebuilt at the developer's direction (turn 2026-10-25T00:08:45+05:30). Updated a
     - **Docs:** T58 says "the lost row" (case_08), but DEV has 3 rows that are not row-exact (case_08, case_18, case_20). README and G10 must say three.
     - **G10 (T107):** cite the freeze run's DEV figure, using a G5 number only if the freeze run reproduces it; state each non-exact row's cause from that run's diff; resolve which run and metric each NUMBERS.md section that lists only case_18/case_20 is before quoting it.
     - `calls_only` was dropped (T107).
+  - **Running (T108):** the vision-adapter fix (`orch-eval-engineer`, high; brief `visionadapter_brief.md`), the G7 verifier (export of 4dcd719; given T108 (3) for item 14c), and fix round 2 (given T108 (2) as its item 7).
+  - **Stage 1, approved in advance (T108):** if the G7 verifier returns PASS or only MINOR findings, run the routing check (122 sends, $3.50) and vision (22 sends, $1.50) from an export of the committed code, with the repo cache, writing to `runs/`. Then stop and show (a)–(e).
   - **T105 ruled.** The plan:
     1. the wiring is checked and committed;
     2. the G7 verifier (export of that commit), in parallel with G5 fix round 2 (`orch-builder-core`, high; brief `g5fix2_brief.md`) and stage 1 plus vision (main, export);

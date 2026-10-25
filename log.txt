@@ -5273,3 +5273,51 @@ parent_agent=none
 worktree=main
 branch=main
 repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T12:42:22+05:30] T108: vision-adapter fix launched; two rulings sent; stage 1 pre-approved
+
+User Prompt (verbatim, secrets redacted):
+Wiring and T107: good. Rulings on the three open points:
+
+  1. Vision artifacts in G7b's report code: approved. orch-eval-engineer (high), directed_by = this turn, in the free slot, on the working tree. Scope: the vision part of code/evaluation/agent_report.py and freeze_check.py and their tests. Nothing under code/deletion_audit/, which is fix round 2's territory. Each case must be reported, never dropped:
+     - a failed image counts as a failed reading, with its reason, never as empty or zero;
+     - a screenshot label with no system (CS-…) is listed and counted as unmapped;
+     - a disagreement on a nested field is counted as a disagreement and names the field path.
+     Done = both suites pass, and the report and freeze check run on a vision-shaped fixture with all three cases.
+
+  2. A catalog-only record that a screenshot reading doesn't show: fail the row closed, in fix round 2. Give it its own FAILED_CLOSED reason, in line with fix-round item (c), so the freeze check names it. The DEV and test hashes must stay at 641dbc8d and cf2a90b0.
+
+  3. A failed later call: a replicate that ended in a failed call does not count as agreeing. Re-send its failed call once, within the caps; the cache replays the rest. If it still fails, the row stays as in the approved file. NOT_APPLICABLE needs two replicates that completed without a failed call, both NOT_DELETION, plus the intake cross-check. Give this ruling to the verifier for item 14c.
+
+  Stage 1 approved in advance: if the G7 verifier returns PASS, or only MINOR findings, run the routing check (122 sends, $3.50 cap) and vision (22 sends, $1.50 cap). If it has any BLOCKER or MAJOR finding, stop and show me. Run them:
+   - from an export of the committed code (4dcd719 plus any verifier-fix commit), never the working tree fix round 2 is editing;
+   - with the repo's reply cache;
+   - writing to runs/ only.
+
+Then stop and show me:
+   (a) for each of the seven showcase cases (34, 35, 39, 50, 52, 53, 55) and for 46, 61 and 63: both readings, the capture time, the state derived for the linked record, and the row the engine would write, next to the approved row;
+   (b) case_55's backup, with the restore-path rule you applied;
+   (c) routing: replicate agreement and intent vs the intake cross-check on each non-deletion text, with every failed call listed;
+   (d) every test row that would change against cf2a90b0, each classed as intent, image or other;
+   (e) actual spend and sends against the caps, and the full A+ cost re-projected. If it's above $80, reconsider caching.
+
+Time is not a factor.
+
+(The developer's message repeated the start of the stage-1 paragraph once; the text is logged as received, without the repeated fragment.)
+
+Agent Response Summary:
+Orchestration decisions (developer): orch-eval-engineer (high) fixes the vision part of G7b's report code, directed_by 2026-10-25T12:41:01+05:30. The catalog-only fail-closed rule goes to fix round 2 as item 7, and the failed-replicate ruling goes to the G7 verifier for item 14c. Stage 1 is approved in advance on a PASS or MINOR-only verdict, from an export of committed code, and stops for (a)–(e) afterwards. I recorded T108 and launched the agent with both messages delivered.
+
+Actions:
+* scratchpad visionadapter_brief.md (0 lines starting with "## ["); agent orch-eval-engineer launched; 3 agents running (verifier, fix round 2, vision adapter).
+* SendMessage to fix round 2 (item 7, with DEV and test candidate counts: DEV 0; test tombstone_17/case_46, object_19/case_61, marketing_001/case_63) and to the G7 verifier (T108 (3) for 14c).
+* notes/DECISIONS.md T108; TASKS.md.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
