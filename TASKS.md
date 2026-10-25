@@ -36,6 +36,22 @@ Rebuilt at the developer's direction (turn 2026-10-25T00:08:45+05:30). Updated a
 - **Interview prep:** removed from the plan (T37). The developer will say how to prepare once the deliverables are ready.
 
 ## Agent queue (cap: 3 at once, T79; never two of the same type)
+- **T114 SCOPE CUT (13:00): two goals only, the best output.csv and the best code.zip.** Order:
+  1. **Fix round 2 and the vision adapter finish.** Done = both suites pass and the hashes are unchanged; no verifier. Then the commit.
+  2. **The paid pass** (export, repo cache, `runs/`, gate on, caps $30 and 1,000 sends, no stops except a cap, a case failing twice, or the gate):
+     1. the DEV routing check (cached);
+     2. vision, 11 images × 2;
+     3. stage 2 on the test texts;
+     4. the mode-A test run.
+     Backup rule F applies to image-derived backups.
+  3. **One message:** the changed rows by class, the 10 readings, case_55, the spend. The developer rules on the candidate; cf2a90b0 stays approved until then.
+  4. **Reports** from these runs, with T111/T113: the eval engineer, after the vision adapter.
+  5. **The judge** (xhigh, directed_by 2026-10-25T13:00:29+05:30) over the upload set, then one fix round, checked by tests and hashes.
+  6. The freeze, then the HOLDOUT EVALUATION RUN ($1; ask for the phrase), then the reports regenerated.
+  7. **G10:** the README, then `code.zip` (packager, low, directed_by 2026-10-25T13:00:29+05:30), check_log, then the developer submits.
+
+  **CUT:** the fix-round-2 verifier; G9's clean-cache verifier and fix loops; the A+ full test run; the stage stops.
+- **Stage 1 routing: done** (`stage1-routing-20261025T1255`). 122 sends, $1.31, 0 failed. Replicates agree 61/61. The 11 NOT_DELETION are exactly the 11 expected NA fixtures; only case_90101 has a confirming intake row. Measured turn 1: about 4,547 input and 163 output tokens.
 - **Resumed at 11:28 (T99).**
   - The agent-test patch is applied: code/tests 413 OK.
   - **Done:** the G5 fix-round verifier, PASS with 2 MINOR (T93), and G5 committed.
@@ -67,7 +83,11 @@ Rebuilt at the developer's direction (turn 2026-10-25T00:08:45+05:30). Updated a
   - **Running (T108):** the vision-adapter fix (`orch-eval-engineer`, high; brief `visionadapter_brief.md`), the G7 verifier (export of 4dcd719; given T108 (3) for item 14c), and fix round 2 (given T108 (2) as its item 7).
   - **T109:** a FAILED agent outcome is never NOT_APPLICABLE (flagged AGENT_CALL_FAILED), and there is no agent re-send. Fix round 2 item 8 covers (a) and (b), in `pipeline.py` and `regression.py`; the vision-adapter agent covers (c), the freeze check listing FAILED cases. The verifier has the amended 14c. A 14c finding alone does not block stage 1.
   - **T110:** a FAILED case blocks the freeze (T87(2)); the remedy is a re-run. The same case failing with the same error class on two re-runs in a row stops for the developer (case, error class, request size), with no override. Sent to the vision-adapter agent for `freeze_check.py`.
-  - **Queued for `orch-eval-engineer` after the vision-adapter fix (T111):**
+  - **T112:**
+    - fix round 2 gets items 9–12, the widened item 7 and 4(b);
+    - the vision adapter gets 4(a);
+    - stage 1 is option A: the routing check now, vision after fix round 2 and its verifier.
+  - **Queued for `orch-eval-engineer` after the vision-adapter fix (T111, with T113's ledger format):**
     1. the "failures found and improvements made" section from a ledger, with the format proposed first;
     2. a generated headline block in both reports;
     3. `usage_report.md` checked against the organiser's field list.
