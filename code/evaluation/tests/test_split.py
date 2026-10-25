@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import unittest
+from typing import Any
 
 from evaluation.paths import SPLIT_JSON
 from evaluation.split import DEV_IDS, HOLDOUT_IDS, SPLIT_SEED
@@ -10,19 +11,27 @@ from evaluation.split import DEV_IDS, HOLDOUT_IDS, SPLIT_SEED
 
 class TestSplit(unittest.TestCase):
     def setUp(self) -> None:
-        self.js = json.loads(SPLIT_JSON.read_text(encoding="utf-8"))
+        # notes/ belongs to the build workspace and is not shipped in code.zip (README).
+        self.js: dict[str, Any] | None = (json.loads(SPLIT_JSON.read_text(encoding="utf-8"))
+                                         if SPLIT_JSON.exists() else None)
+
+    @property
+    def split(self) -> dict[str, Any]:
+        if self.js is None:
+            self.skipTest("notes/split.json is not shipped (code.zip holds README.md and code/ only)")
+        return self.js
 
     def test_dev_equals_json(self) -> None:
-        self.assertEqual(DEV_IDS, frozenset(self.js["dev"]))
-        self.assertEqual(len(self.js["dev"]), len(set(self.js["dev"])))
+        self.assertEqual(DEV_IDS, frozenset(self.split["dev"]))
+        self.assertEqual(len(self.split["dev"]), len(set(self.split["dev"])))
 
     def test_holdout_equals_json(self) -> None:
-        self.assertEqual(HOLDOUT_IDS, frozenset(self.js["holdout"]))
+        self.assertEqual(HOLDOUT_IDS, frozenset(self.split["holdout"]))
 
     def test_seed_and_sizes(self) -> None:
-        self.assertEqual(SPLIT_SEED, self.js["seed"])
-        self.assertEqual(len(DEV_IDS), self.js["dev_size"])
-        self.assertEqual(len(HOLDOUT_IDS), self.js["holdout_size"])
+        self.assertEqual(SPLIT_SEED, self.split["seed"])
+        self.assertEqual(len(DEV_IDS), self.split["dev_size"])
+        self.assertEqual(len(HOLDOUT_IDS), self.split["holdout_size"])
 
     def test_disjoint_and_cover_32(self) -> None:
         self.assertFalse(DEV_IDS & HOLDOUT_IDS)

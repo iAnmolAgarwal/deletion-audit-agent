@@ -6022,3 +6022,112 @@ directed_by=2026-10-25T13:29:59+05:30
 worktree=main
 branch=main
 repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T14:01:27+05:30] T119: rule (a) extra condition kept; provisional approval; message items
+
+User Prompt (verbatim, secrets redacted):
+1. Builder's extra condition (the combined reading must derive the same as each reading alone): keep it.
+
+2. Provisional approval, so the holdout fits inside 14:45: for the freeze and the holdout run only, I approve the rule-(d) candidate provisionally. It does not replace cf2a90b0 as the shipped output until my review.
+   If I reject it later:
+   - the approved record goes back to cf2a90b0;
+   - the reports are regenerated;
+   - the holdout number stands, because it measures the frozen code on the holdout split and no test row enters it.
+   Ask me for the phrase as soon as the packager's fresh-export test passes. If running the holdout would push the files past 14:45, deliver them without it.
+
+3. In the 14:45 message:
+   (a) The changed rows against cf2a90b0 by class. I expect 10 intent rows (case_533–542) plus the 7 image rows. Say so if it's different.
+   (b) case_61: evidence_46's two readings agree, yet the row didn't change. Name the ID and the condition that held it.
+   (c) The README states which command and run produced the shipped output. It also says that reproducing it exactly needs the reply cache, which isn't shipped, and that without an API key the replay-only engine path reproduces cf2a90b0.
+
+Deadline unchanged: ~/Desktop/oct26_candidate/ by 14:45.
+
+Agent Response Summary:
+Developer decision T119 recorded: the extra rule-(a) condition stays, and the rule-(d) candidate is provisionally approved for the freeze and the holdout run only. The 4 A+ shards finished (511 sends, about $5.66, 0 failed calls); main merged them into the repo cache (511 added, 0 conflicts) and replayed five runs at 0 sends: test A+, A and tools_off all give a00ba71a..., and DEV A and tools_off give 641dbc8d. The candidate is runs/cand-test-Aplus-20261025T1352/output.csv: 17 rows change against cf2a90b0 (10 intent, case_533-542; 7 image, case_35, 39, 46, 52, 53, 55, 63), as the developer expected, and case_61 is held by object_19 (IMAGE_STATE_NOT_SHOWN). Orchestration: main sent orch-builder-core (high, directed_by 2026-10-25T13:29:59+05:30) four freeze-check fixes, which pass on a fresh replay; main fixed the usage report's namespace attribution itself and committed both (63bf88e, dc5c2cb). Then orch-packager (low, same directed_by) was launched on dc5c2cb.
+
+Actions:
+* notes/DECISIONS.md T119; scratchpad shards/merge_shards.py and after_shards.sh (runs cand-*-20261025T1352); freeze_check on the candidate (refused for 4 reasons, sent to the builder).
+* SendMessage to orch-builder-core (kept-row intent, FAILED_CLOSED acceptance, review list, provisional approval); code/evaluation/usage_report.py (both reply namespaces, costs per key) with a parity test; notes/improvements.json I15 test name; README candidate, limitations, DEV and reports sections; holdout wrapper in the scratchpad (key loaded in-process).
+* reports.py --publish (reports-snap-20261025T1359); commits 63bf88e and dc5c2cb, pushed; ~/Desktop/oct26_candidate/output.csv (a00ba71a...); Agent orch-packager.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T14:01:27+05:30] ETA asked: output.csv on the Desktop now; code.zip about 14:25
+
+User Prompt (verbatim, secrets redacted):
+eta for code zip and output.csv?
+
+Agent Response Summary:
+The candidate output.csv went to ~/Desktop/oct26_candidate/ immediately, with its sha256 (a00ba71a...) in output.csv.sha256. Main gave about 14:25 for code.zip, or about 14:40 with the holdout, after the usage-report fix, the builder's freeze-check fixes, the commit and the packager's build and fresh-unzip test.
+
+Actions:
+* cp runs/cand-test-Aplus-20261025T1352/output.csv to ~/Desktop/oct26_candidate/output.csv; shasum -a 256.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T14:01:27+05:30] Snapshot code.zip from HEAD 63bf88e on the Desktop
+
+User Prompt (verbatim, secrets redacted):
+Quick snapshot, without stopping the current work: package code.zip from what is committed right now and put it on my Desktop. This is a snapshot, not the final.
+
+1. If evaluation_report.md and usage_report.md can be published into code/evaluation/ from the runs already checked in 5 minutes or less, do that first and commit it. If not, skip it.
+2. Build from an export of HEAD, not the working tree, using ORGANISER_README's command (README.md plus code/; no __pycache__, .venv, dataset/ or nested archives). Run a quick secret scan, with .env and any API key absent.
+3. Put it at ~/Desktop/oct26_candidate/code_snapshot.zip and reply in one short message with:
+   - its sha256 and the commit it was built from;
+   - whether both reports are inside;
+   - anything the final zip will add (holdout section, candidate command, etc.).
+Then continue with T118 as planned. The 14:45 deliverables are unchanged.
+
+Agent Response Summary:
+Both reports were published into code/evaluation/ from the checked candidate runs and committed as 63bf88e, with both suites OK on an index export. The snapshot was built from git archive HEAD (63bf88e) with the organiser's zip command: 523 files, both reports inside, no forbidden paths or nested archives, and 0 files matching the key patterns. It is ~/Desktop/oct26_candidate/code_snapshot.zip, sha256 7aa8c88ab71283e2978a82339eb6d5021a315112a84e1dd59385a123f6ad1357.
+
+Actions:
+* reports.py --spec reports_spec_snap.json --publish; commit 63bf88e; git archive HEAD | tar; zip -qr code_snapshot.zip README.md code -x ...; unzip and checks; cp to the Desktop with code_snapshot.zip.sha256.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+## [2026-10-25T14:03:07+05:30] code.zip built and checked: 2 FAILs (tests need notes/, case_61)
+
+User Prompt (verbatim, secrets redacted):
+[brief written by main; approved in developer turn 2026-10-25T13:29:59+05:30]
+directed_by: 2026-10-25T13:29:59+05:30
+Build code.zip from the committed HEAD per the organiser's packaging rules, check it, and test the README's run command from a fresh unzip. Hard stop: report by 14:20 IST at the latest (it is 14:01 now).
+(full brief from main)
+
+Agent Response Summary:
+I built code.zip from git archive of HEAD dc5c2cb: 953629 bytes, 523 files, sha256 46c087c36bb890f9aad466d8cb5ccbe342a7f53efce5f1d7bd66759752232a12. Contents, archives, secrets and README checks pass; the two ANTHROPIC_API_KEY= hits are placeholders. The fresh-unzip gated run exits 0, the gate passes and the sha256 is cf2a90b0...51fc as expected. FAIL: 7 unittest errors (1 of 561 in code/tests, 6 of 336 in code/evaluation/tests), all FileNotFoundError on notes/split.json or notes/approved_output.json, which are not shipped. FAIL: the candidate output has case_61 INCOMPLETE with steps_json [], which breaks the rule that INCOMPLETE needs at least one FINDING. No repo files were edited.
+
+Actions:
+* git archive HEAD into scratchpad pack/src; ran the organiser zip command; ran unzip -Z1 listing checks and grep secret scans (file names only)
+* fresh unzip + copied dataset; ran main.py --run-id demo --set test --regression-gate, then both unittest discovers, using the repo .venv to avoid a network install
+* validated /Users/anmolagarwal/Desktop/oct26_candidate/output.csv read-only (sha256 a00ba71a...6967 matches)
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=orch-packager
+parent_agent=main
+directed_by=2026-10-25T13:29:59+05:30
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26

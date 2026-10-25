@@ -392,6 +392,8 @@ class TestRealPathsUntouched(unittest.TestCase):
 
     def test_default_caveat_is_split_json_created(self) -> None:
         """The record's caveat is read from the real notes/split.json, never retyped (T96 (5))."""
+        if not paths.SPLIT_JSON.exists():
+            self.skipTest("notes/split.json is not shipped (code.zip holds README.md and code/ only)")
         created = json.loads(paths.SPLIT_JSON.read_text(encoding="utf-8"))["created"]
         self.assertEqual(hr.read_caveat(hr.default_settings()), created)
 
