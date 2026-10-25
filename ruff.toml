@@ -1,0 +1,21 @@
+# Ruff configuration for the whole repo (GM gate). Run through scripts/lint.sh.
+target-version = "py314"
+line-length = 120
+src = ["code"]
+extend-exclude = [".venv", "runs", "cache", "dataset"]
+
+[lint]
+# pycodestyle errors and warnings, pyflakes, import order, bugbear, pyupgrade,
+# missing docstrings (D1xx).
+select = ["E", "W", "F", "I", "B", "UP", "D1"]
+ignore = [
+    "D105",  # magic methods
+    "D107",  # __init__ docstrings are required by the project test, not by ruff
+]
+
+[lint.per-file-ignores]
+"code/tests/**" = ["D1"]
+"code/evaluation/tests/**" = ["D1"]
+
+[lint.isort]
+known-first-party = ["deletion_audit", "evaluation", "tests"]
