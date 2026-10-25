@@ -20,7 +20,8 @@ from __future__ import annotations
 import copy
 import json
 from collections import Counter
-from typing import Any, Callable, Mapping
+from collections.abc import Callable, Mapping
+from typing import Any
 
 from .contract import STATES
 from .gold import GoldCase

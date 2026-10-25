@@ -63,8 +63,10 @@ PREP_TO_REFERENCE: dict[str, tuple[tuple[str, ...], str]] = {
 
 
 def _command() -> str:
-    return "python3 -B " + " ".join(shlex.quote(a) for a in [str(Path(sys.argv[0]).resolve().relative_to(REPO_ROOT))] + sys.argv[1:]) \
-        if Path(sys.argv[0]).resolve().is_relative_to(REPO_ROOT) else " ".join(map(shlex.quote, sys.argv))
+    script = Path(sys.argv[0]).resolve()
+    if not script.is_relative_to(REPO_ROOT):
+        return " ".join(map(shlex.quote, sys.argv))
+    return "python3 -B " + " ".join(shlex.quote(a) for a in [str(script.relative_to(REPO_ROOT))] + sys.argv[1:])
 
 
 def _rel(p: Path) -> str:
@@ -101,6 +103,7 @@ def reconcile(prep: dict[str, Any], spec: str) -> dict[str, Any]:
 
 
 def cmd_score(a: argparse.Namespace) -> int:
+    """``score``: check the producer record, score against DEV gold, run coherence, write run files."""
     pred_path = Path(a.pred).resolve()
     if a.prev:
         runs.check_run_id(a.prev)  # T80 M2: a bad --prev fails before anything is written
@@ -187,7 +190,8 @@ def _readme(config: dict[str, Any], score: dict[str, Any]) -> str:
         f"  model ids: {config['model_ids'] or 'none'}; paid model calls: {config['paid_model_calls']}",
         "",
         "Headline (DEV):",
-        f"  status {p['status_accuracy']['n']}/{p['status_accuracy']['of']}, row exact {p['row_exact']['n']}/{p['row_exact']['of']},"
+        f"  status {p['status_accuracy']['n']}/{p['status_accuracy']['of']},"
+        f" row exact {p['row_exact']['n']}/{p['row_exact']['of']},"
         f" step F1 {_f4(p['step']['f1'])}, sequence exact {p['sequence_exact']['n']}/{p['sequence_exact']['of']}",
         f"  status with an unparseable row counted wrong (reading c): {p['status_accuracy_unparseable_wrong']['n']}/"
         f"{p['status_accuracy_unparseable_wrong']['of']}",
@@ -217,13 +221,15 @@ def _print_summary(score: dict[str, Any]) -> None:
           f"steps exact {p['steps_exact']['n']}")
     print(f"  step P/R/F1 {_f4(p['step']['precision'])}/{_f4(p['step']['recall'])}/{_f4(p['step']['f1'])} "
           f"(tp {p['step']['tp']}, pred {p['step']['pred']}, gold {p['step']['gold']})")
-    print(f"  fields on matched: state {f['state']['n']}/{f['state']['of']}  evidence {f['evidence_id']['n']}/{f['evidence_id']['of']}"
+    print(f"  fields on matched: state {f['state']['n']}/{f['state']['of']}"
+          f"  evidence {f['evidence_id']['n']}/{f['evidence_id']['of']}"
           f"  step_no {f['step_no']['n']}/{f['step_no']['of']}")
     so = p["sequence_pairwise_order"]
     print(f"  sequence exact {p['sequence_exact']['n']}  pairwise order {so['n']}/{so['of']}  "
           f"citation set exact {p['citation_set_exact']['n']}")
     print(f"  prep: tuple tp {q['step_tuple']['tp']}/{q['step_tuple']['gold']}  positional fields "
-          f"{q['field_positional']['n']}/{q['field_positional']['of']}  resources {q['resources']['tp']}/{q['resources']['gold']}")
+          f"{q['field_positional']['n']}/{q['field_positional']['of']}"
+          f"  resources {q['resources']['tp']}/{q['resources']['gold']}")
     if "reconciliation" in score:
         r = score["reconciliation"]
         bad = [x for x in r["rows"] if not x["equal"]]
@@ -233,6 +239,7 @@ def _print_summary(score: dict[str, Any]) -> None:
 
 
 def cmd_coherence(a: argparse.Namespace) -> int:
+    """``coherence``: the coherence checks alone (no gold); exit 2 on a hard violation."""
     out = read_output(Path(a.pred).resolve())
     violations = coherence.check_file(out, audit_at=_audit_times(), evidence=coherence.load_evidence_index(),
                                       expected_ids=_expected(a.expect, set(out.rows)))
@@ -262,6 +269,7 @@ def cmd_drift(a: argparse.Namespace) -> int:
 
 
 def cmd_discriminate(a: argparse.Namespace) -> int:
+    """``discriminate``: score the majority baseline and perturbed DEV gold, in memory."""
     gold = load_gold()
     res = discrimination.run(gold, sorted(coherence.load_evidence_index().files))
     d = runs.run_dir(a.run_id)
@@ -277,12 +285,14 @@ def cmd_discriminate(a: argparse.Namespace) -> int:
 
 
 def cmd_numbers(a: argparse.Namespace) -> int:
+    """``numbers``: regenerate the generated block of NUMBERS.md from run artifacts."""
     path = numbers_md.regenerate()
     print(f"regenerated the generated block of {path}")
     return 0
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Parse the command line and run one subcommand; return its exit status."""
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("score", help="score a prediction file against DEV gold")
@@ -309,7 +319,8 @@ def main(argv: list[str] | None = None) -> int:
     n = sub.add_parser("numbers", help="regenerate the generated block of NUMBERS.md")
     n.set_defaults(fn=cmd_numbers)
     a = ap.parse_args(argv)
-    return a.fn(a)
+    status: int = a.fn(a)
+    return status
 
 
 if __name__ == "__main__":

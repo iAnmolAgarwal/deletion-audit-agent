@@ -29,7 +29,8 @@ class TestSplit(unittest.TestCase):
         self.assertEqual(DEV_IDS | HOLDOUT_IDS, {f"case_{i:02d}" for i in range(1, 33)})
 
     def test_holdout_is_the_briefed_ten(self) -> None:
-        self.assertEqual(HOLDOUT_IDS, {f"case_{i}" for i in ("04", "06", "10", "13", "14", "23", "25", "28", "29", "32")})
+        holdout_numbers = ("04", "06", "10", "13", "14", "23", "25", "28", "29", "32")
+        self.assertEqual(HOLDOUT_IDS, {f"case_{i}" for i in holdout_numbers})
 
 
 if __name__ == "__main__":

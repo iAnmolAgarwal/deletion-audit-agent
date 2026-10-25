@@ -8,7 +8,6 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from evaluation import gold as gold_mod
 from evaluation.gold import UNLOCK_PHRASE, HoldoutLockedError, load_gold, load_requests
 from evaluation.outputs import read_output
 from evaluation.paths import SAMPLE_OUTPUT
@@ -50,7 +49,7 @@ class TestDevGoldLoader(unittest.TestCase):
             seen.append(s)
             return real(s, *a, **k)
 
-        with mock.patch.object(gold_mod.json, "loads", side_effect=spy):
+        with mock.patch.object(json, "loads", side_effect=spy):  # the json module gold.py uses
             load_gold(self.fixture)
         self.assertEqual(len(seen), len(DEV_IDS))
         self.assertFalse([s for s in seen if "SENTINEL" in s])
@@ -68,7 +67,7 @@ class TestDevGoldLoader(unittest.TestCase):
 
     def test_incomplete_dev_rejected(self) -> None:
         lines = self.fixture.read_text(encoding="utf-8").splitlines(keepends=True)
-        self.fixture.write_text("".join(l for l in lines if not l.startswith("case_01,")), encoding="utf-8")
+        self.fixture.write_text("".join(line for line in lines if not line.startswith("case_01,")), encoding="utf-8")
         with self.assertRaises(ValueError):
             load_gold(self.fixture)
 

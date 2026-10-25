@@ -14,6 +14,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 from unittest import mock
 
 from evaluation import evaluate, runs
@@ -62,7 +63,8 @@ class TestM1DecodeErrors(unittest.TestCase):
 
     def test_bom_still_stripped(self) -> None:
         with tempfile.TemporaryDirectory() as t:
-            out = read_output(write(Path(t) / "o.csv", b"\xef\xbb\xbfcase_id,deletion_status,steps_json\ncase_01,COMPLETE,[]\n"))
+            body = b"\xef\xbb\xbfcase_id,deletion_status,steps_json\ncase_01,COMPLETE,[]\n"
+            out = read_output(write(Path(t) / "o.csv", body))
         self.assertEqual(out.header, ["case_id", "deletion_status", "steps_json"])
         self.assertIn("UTF-8 BOM present", out.issues)
 
@@ -124,7 +126,7 @@ class TestOneReadForHashAndParse(CliCase):
                     f.write(later)
             return data
 
-        def open_(path: Path, mode: str = "r", *a: object, **k: object):  # type: ignore[no-untyped-def]
+        def open_(path: Path, mode: str = "r", *a: Any, **k: Any) -> Any:
             if path.resolve() == pred and mode.startswith("r") and not inside["read_bytes"]:
                 reads.append(f"open-{mode}")
             return real_open(path, mode, *a, **k)
@@ -249,25 +251,29 @@ class TestG9NumbersRunIds(unittest.TestCase):
             (Path(t) / "outside" / "config.json").write_text("{}", encoding="utf-8")
             ok = {"status": "ok", "reasons": []}
             cases = {"../outside": "not a valid run ID", "other": "differs from the directory"}
+            reads: list[str] = []
+            real = Path.read_text
+
+            def spy(path: Path, *a: Any, **k: Any) -> str:
+                reads.append(str(path))
+                return real(path, *a, **k)
+
             for rid, why in cases.items():
                 (R / "legit" / "score.json").write_text(json.dumps(
                     {"run_id": rid, "kind": "score", "created_at": "x", "producer_check": ok}), encoding="utf-8")
-                reads: list[str] = []
-                real = Path.read_text
-
-                def spy(path: Path, *a: object, **k: object) -> str:
-                    reads.append(str(path))
-                    return real(path, *a, **k)  # type: ignore[arg-type]
+                reads.clear()
 
                 with self.subTest(rid=rid), mock.patch.object(Path, "read_text", spy):
                     s = numbers_md._load_runs(R)[0]
                     reason = numbers_md._exclusion_reason(s, R)
-                    self.assertIsNotNone(reason)
+                    assert reason is not None
                     self.assertIn(why, reason)
                     self.assertFalse([r for r in reads if "outside" in r or "config.json" in r], reads)
             # the direct call the verifier used (no directory known): still refused, nothing read
             s = {"run_id": "../outside", "kind": "score", "producer_check": ok}
-            self.assertIn("not a valid run ID", numbers_md._exclusion_reason(s, R))
+            reason = numbers_md._exclusion_reason(s, R)
+            assert reason is not None
+            self.assertIn("not a valid run ID", reason)
 
 
 class TestG9DriftReportsSkips(unittest.TestCase):

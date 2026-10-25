@@ -1,14 +1,11 @@
 """Each coherence rule fires on a hand-built bad row, and stays silent on good rows and DEV gold."""
 from __future__ import annotations
 
-import datetime as dt
-import json
 import unittest
 
-from evaluation.coherence import (EvidenceIndex, check_file, check_row, format_report, load_evidence_index,
-                                  parse_time)
+from evaluation.coherence import EvidenceIndex, check_file, check_row, format_report, load_evidence_index, parse_time
 from evaluation.gold import load_gold, load_requests
-from evaluation.outputs import OUTPUT_HEADER, OutputFile
+from evaluation.outputs import OUTPUT_HEADER, OutputFile, OutputRow
 
 from .fixtures import complete_example, incomplete_example, renumber, row, st
 
@@ -21,7 +18,7 @@ EV = EvidenceIndex(
 )
 
 
-def rules(r, audit_at: str | None = AUDIT, hard_only: bool = True) -> set[str]:
+def rules(r: OutputRow, audit_at: str | None = AUDIT, hard_only: bool = True) -> set[str]:
     return {v.rule for v in check_row(r, audit_at=audit_at, evidence=EV) if v.severity == "hard" or not hard_only}
 
 

@@ -29,7 +29,6 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
-import json
 import shlex
 import sys
 from pathlib import Path
@@ -46,14 +45,15 @@ if __package__ in (None, ""):  # run as a script: make the ``evaluation`` packag
 
 from evaluation import evidence_guard, runs  # noqa: E402
 from evaluation.gold import load_requests  # noqa: E402
-from evaluation.split import DEV_IDS  # noqa: E402
 from evaluation.outputs import write_output  # noqa: E402
 from evaluation.paths import REPO_ROOT  # noqa: E402
+from evaluation.split import DEV_IDS  # noqa: E402
 
 PROTOTYPE = REPO_ROOT.parent / "research" / "prototype"
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run the prototype on the DEV cases under the evidence guard; 3 = refused, nothing written."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--run-id", required=True)
     ap.add_argument("--vision", action="store_true")
@@ -101,10 +101,12 @@ def main(argv: list[str] | None = None) -> int:
                                        (a.force_intent, "force-intent")) if flag] or ["default"]
     producer = {
         "tool": "code/evaluation/prototype_baseline.py",
-        "command": "python3 -B code/evaluation/prototype_baseline.py " + " ".join(map(shlex.quote, sys.argv[1:] if argv is None else argv)),
+        "command": "python3 -B code/evaluation/prototype_baseline.py "
+                   + " ".join(map(shlex.quote, sys.argv[1:] if argv is None else argv)),
         "description": (
             f"prep prototype (../research/prototype/solver.py, imported read-only) on the 22 DEV cases; "
-            f"variant: {'+'.join(variant)}; vision table {'ON (hand-typed, T7: not shippable)' if a.vision else 'off'}; "
+            f"variant: {'+'.join(variant)}; "
+            f"vision table {'ON (hand-typed, T7: not shippable)' if a.vision else 'off'}; "
             f"job-timing signature {'off' if a.no_signature else 'on'}; intent tables "
             f"{'bypassed (all deletion-authorized)' if a.force_intent else 'as in intent.py'}"),
         "variant": variant,

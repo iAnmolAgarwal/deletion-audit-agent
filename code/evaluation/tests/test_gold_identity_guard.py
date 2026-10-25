@@ -6,6 +6,7 @@ gold file into a temp directory and points ``paths.SAMPLE_OUTPUT`` at it; the re
 """
 from __future__ import annotations
 
+import csv
 import io
 import os
 import shutil
@@ -15,9 +16,10 @@ from pathlib import Path
 from unittest import mock
 
 from evaluation import gold as gold_mod
-from evaluation import outputs, paths
+from evaluation import paths
 from evaluation.gold import UNLOCK_PHRASE, HoldoutLockedError
 from evaluation.outputs import is_gold_file, read_output
+from evaluation.paths import SAMPLE_OUTPUT as REAL_SAMPLE_OUTPUT  # bound at import, before any patch
 
 from .test_gold import write_fixture
 
@@ -30,15 +32,15 @@ class TestIdentityGuard(unittest.TestCase):
         write_fixture(self.gold)  # synthetic: 22 DEV rows, 10 holdout rows of invalid JSON
         self.patch = mock.patch.object(paths, "SAMPLE_OUTPUT", self.gold)
         self.patch.start()
-        self.real_gold = Path(gold_mod.SAMPLE_OUTPUT)
+        self.real_gold = Path(REAL_SAMPLE_OUTPUT)
 
     def tearDown(self) -> None:
         self.patch.stop()
         self.tmp.cleanup()
 
-    def assertRefused(self, p: Path) -> None:  # noqa: N802
+    def assertRefused(self, p: Path) -> None:
         self.assertTrue(is_gold_file(p))
-        with mock.patch.object(outputs.csv, "reader", side_effect=AssertionError("gold rows were parsed")):
+        with mock.patch.object(csv, "reader", side_effect=AssertionError("gold rows were parsed")):  # outputs' csv
             with self.assertRaises(HoldoutLockedError):
                 read_output(p)
 

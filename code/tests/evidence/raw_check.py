@@ -34,9 +34,10 @@ import json
 import re
 import sys
 from collections import defaultdict
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "code"))
@@ -128,14 +129,14 @@ def load_people() -> tuple[dict[str, Person], dict[str, str]]:
             email_to_user[row.email.value] = row.user_id
         if row.phone:
             person.phones[_digits(row.phone.raw)] = "phone (current)"
-    for row in load_audit_log(DATASET):
-        person = people.setdefault(row.user_id, Person(row.user_id))
-        for ident in (row.old_identifier, row.new_identifier):
+    for audit_row in load_audit_log(DATASET):
+        person = people.setdefault(audit_row.user_id, Person(audit_row.user_id))
+        for ident in (audit_row.old_identifier, audit_row.new_identifier):
             if ident is None or ident.kind not in ("email", "phone"):
                 continue
             if ident.kind == "email":
                 person.emails.setdefault(ident.value, "email (old)")
-                email_to_user.setdefault(ident.value, row.user_id)
+                email_to_user.setdefault(ident.value, audit_row.user_id)
             else:
                 person.phones.setdefault(_digits(ident.raw), "phone (old)")
     for person in people.values():
@@ -324,7 +325,7 @@ class CaseResult:
 
 
 def _check_unit(unit: Unit, observations: list[Observation], expected_ids: set[str],
-                companion: bool, peer_tokens: set[str] = frozenset()) -> list[str]:
+                companion: bool, peer_tokens: frozenset[str] | set[str] = frozenset()) -> list[str]:
     """Field mismatches between one raw unit and its observations ([] when they agree)."""
     problems: list[str] = []
     if unit.kind == "pdf_page":
@@ -377,7 +378,11 @@ def compare_file(file_id: str, units: list[Unit], person: Person, index: Evidenc
         companion = unit.ref not in person_units
         if companion and not (unit.trace in trace_ids and RESOURCE.search(unit.text)):
             continue
-        expected = trace_ids[unit.trace] if companion else _person_values(unit, person)
+        if companion:
+            assert unit.trace is not None  # the `continue` above keeps only companions whose trace is known
+            expected = trace_ids[unit.trace]
+        else:
+            expected = _person_values(unit, person)
         result.checked += 1
         observations = by_locator.get((unit.kind, unit.ref), [])
         if not observations:
@@ -473,7 +478,8 @@ def render(rows: list[tuple[Group, int, list[CaseResult]]], index: EvidenceIndex
     ]
     total = [0, 0, 0, 0]
     out += ["## Summary", "",
-            "| Family | Registry family | Files | Candidate cases | Selected | Units checked | Matched | Missed | Mismatched |",
+            "| Family | Registry family | Files | Candidate cases | Selected | Units checked "
+            "| Matched | Missed | Mismatched |",
             "|---|---|---:|---:|---:|---:|---:|---:|---:|"]
     for group, candidates, results in rows:
         checked = sum(r.checked for r in results)
@@ -527,7 +533,7 @@ def main() -> int:
     index = parse_all(DATASET)
     people, email_to_user = load_people()
     cases = load_cases(email_to_user)
-    rows = []
+    rows: list[tuple[Group, int, list[CaseResult]]] = []
     for group in build_groups(index):
         if all(index.files[f].status == "NEEDS_MODEL" for f in group.files):
             rows.append((group, 0, []))
@@ -539,7 +545,8 @@ def main() -> int:
                       f"values scanned; {collisions} equal a known email hash (must be 0, or the 64-hex "
                       f"restriction could hide a real link).\n", encoding="utf-8")
     bad = sum(len(r.missed) + len(r.mismatched) for _, _, results in rows for r in results) + collisions
-    print(f"wrote {REPORT}; problems: {bad}; integrity seals scanned: {seals}, equal to a known email hash: {collisions}")
+    print(f"wrote {REPORT}; problems: {bad}; integrity seals scanned: {seals}, "
+          f"equal to a known email hash: {collisions}")
     return 1 if bad else 0
 
 

@@ -51,7 +51,8 @@ class TestDrift(unittest.TestCase):
 
 class TestRuns(unittest.TestCase):
     def test_flips(self) -> None:
-        prev = [{"case_id": "a", "status_ok": True, "row_exact": False, "order_exact": False, "citation_set_exact": True}]
+        prev = [{"case_id": "a", "status_ok": True, "row_exact": False, "order_exact": False,
+                 "citation_set_exact": True}]
         cur = [{"case_id": "a", "status_ok": True, "row_exact": True, "order_exact": False, "citation_set_exact": True},
                {"case_id": "b", "status_ok": True, "row_exact": True, "order_exact": True, "citation_set_exact": True}]
         f = flips(prev, cur)

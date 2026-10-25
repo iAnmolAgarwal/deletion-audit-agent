@@ -37,9 +37,10 @@ import io
 import json
 import os
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from . import paths
 from .contract import STEP_KEYS
@@ -204,7 +205,8 @@ def read_output(path: Path, *, unlock_phrase: str | None = None, run_id: str | N
                     record = (record + ["", "", ""])[:3]
                 case_id, status, raw = record
                 if case_id in rows:
-                    issues.append(f"record {lineno}: duplicate case_id {case_label(case_id, None) if is_case_name(case_id) else '(value not shown)'}")
+                    shown = case_id if is_case_name(case_id) else "(value not shown)"
+                    issues.append(f"record {lineno}: duplicate case_id {shown}")
                     continue
                 steps, err = parse_steps(raw)
                 rows[case_id] = OutputRow(case_id, status, steps, raw, err)

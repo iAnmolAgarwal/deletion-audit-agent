@@ -10,6 +10,7 @@ import tempfile
 import unittest
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 from unittest import mock
 
 from evaluation import evidence_guard as eg
@@ -47,7 +48,7 @@ class TestF1PngSignature(unittest.TestCase):
     def tearDown(self) -> None:
         self.tmp.cleanup()
 
-    def audit(self, name: str, data: bytes | None) -> dict:
+    def audit(self, name: str, data: bytes | None) -> dict[str, Any]:
         if data is not None:
             (self.ds / name).write_bytes(data)
         return eg.audit_extraction(recorder([], {"e1": name}), ["e1:png-model-needed"], self.ds)
@@ -101,12 +102,12 @@ class TestF2OutputHash(unittest.TestCase):
 
 class TestNote2NullLists(unittest.TestCase):
     def test_null_failures_refused(self) -> None:
-        rec = {"evidence_skipped": [], "evidence_failures": None, "output_sha256": "a" * 64}
+        rec: dict[str, Any] = {"evidence_skipped": [], "evidence_failures": None, "output_sha256": "a" * 64}
         self.assertEqual(eg.check_producer(rec, pred_sha256="a" * 64)["status"], "refused")
 
     def test_null_or_non_list_skips_refused(self) -> None:
         for bad in (None, "e4:png-model-needed", {"a": 1}):
-            rec = {"evidence_skipped": bad, "evidence_failures": [], "output_sha256": "a" * 64}
+            rec: dict[str, Any] = {"evidence_skipped": bad, "evidence_failures": [], "output_sha256": "a" * 64}
             with self.subTest(bad=bad):
                 self.assertEqual(eg.check_producer(rec, pred_sha256="a" * 64)["status"], "refused")
 
@@ -125,7 +126,9 @@ class TestF3FieldSize(unittest.TestCase):
             before = csv.field_size_limit()
             out = read_output(p)
             self.assertEqual(csv.field_size_limit(), before)  # the process limit is restored
-        self.assertEqual(len(out.rows["case_01"].steps), 1)
+        steps = out.rows["case_01"].steps
+        assert steps is not None
+        self.assertEqual(len(steps), 1)
 
     def test_cap_value(self) -> None:
         self.assertEqual(outputs.FIELD_SIZE_CAP, 16 * 1024 * 1024)
@@ -194,22 +197,25 @@ class TestReportRecheck(unittest.TestCase):
         base = {"kind": "score", "command": "x", "description": "d", "coherence": {"hard": 0, "soft": 0},
                 "aggregate": aggregate(cases), "cases": cases, "producer_check": ok_check}
         rec = {"evidence_skipped": [], "evidence_failures": [], "output_sha256": "a" * 64}
-        cfgs = {"run-good": ({**rec}, "a" * 64), "run-nohash": ({"evidence_skipped": [], "evidence_failures": []}, "a" * 64),
+        cfgs = {"run-good": ({**rec}, "a" * 64),
+                "run-nohash": ({"evidence_skipped": [], "evidence_failures": []}, "a" * 64),
                 "run-mismatch": ({**rec}, "b" * 64)}
         with tempfile.TemporaryDirectory() as t:
             for i, (rid, (prod, sha)) in enumerate(cfgs.items()):
                 d = Path(t) / rid
                 d.mkdir()
-                (d / "score.json").write_text(json.dumps({**base, "run_id": rid, "created_at": str(i)}), encoding="utf-8")
-                (d / "config.json").write_text(json.dumps({"producer": prod, "pred_sha256": sha, "config_hash": "0" * 16,
-                                                           "scorer_code_sha256": "0" * 16, "model_ids": [],
-                                                           "paid_model_calls": 0}), encoding="utf-8")
+                score = {**base, "run_id": rid, "created_at": str(i)}
+                (d / "score.json").write_text(json.dumps(score), encoding="utf-8")
+                cfg = {"producer": prod, "pred_sha256": sha, "config_hash": "0" * 16,
+                       "scorer_code_sha256": "0" * 16, "model_ids": [], "paid_model_calls": 0}
+                (d / "config.json").write_text(json.dumps(cfg), encoding="utf-8")
             text = render(Path(t))
         self.assertIn("| `run-good` |", text)
         self.assertNotIn("| `run-nohash` |", text)
         self.assertNotIn("| `run-mismatch` |", text)
-        self.assertIn("- `run-nohash`: passed the producer check at scoring time, but the current check says unverified", text)
-        self.assertIn("- `run-mismatch`: passed the producer check at scoring time, but the current check says output-mismatch", text)
+        passed = "passed the producer check at scoring time, but the current check says"
+        self.assertIn(f"- `run-nohash`: {passed} unverified", text)
+        self.assertIn(f"- `run-mismatch`: {passed} output-mismatch", text)
 
 
 class TestRunNotes(unittest.TestCase):

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import unittest
+from typing import Any, ClassVar
 
 from evaluation.coherence import load_evidence_index
 from evaluation.discrimination import run
@@ -9,6 +10,8 @@ from evaluation.gold import load_gold
 
 
 class TestDiscrimination(unittest.TestCase):
+    t: ClassVar[dict[str, dict[str, Any]]]
+
     @classmethod
     def setUpClass(cls) -> None:
         cls.t = run(load_gold(), sorted(load_evidence_index().files))["table"]

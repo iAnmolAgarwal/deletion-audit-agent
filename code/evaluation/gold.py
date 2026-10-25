@@ -27,9 +27,10 @@ import csv
 import datetime as dt
 import json
 import sys
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from .paths import HOLDOUT_ACCESS_LOG, SAMPLE_OUTPUT, SAMPLE_REQUESTS
 from .split import DEV_IDS, HOLDOUT_IDS
@@ -60,7 +61,7 @@ def check_unlock(holdout: bool, unlock_phrase: str | None, what: str, run_id: st
             f"holdout {what} is locked: pass unlock_phrase={UNLOCK_PHRASE!r}, and only in the "
             "single post-freeze run the developer names (../CLAUDE.md section 4)"
         )
-    stamp = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+    stamp = dt.datetime.now(dt.UTC).isoformat(timespec="seconds")
     line = json.dumps({"at": stamp, "what": what, "run_id": run_id})
     print(f"HOLDOUT ACCESS GRANTED: {line}", file=sys.stderr)
     HOLDOUT_ACCESS_LOG.parent.mkdir(parents=True, exist_ok=True)

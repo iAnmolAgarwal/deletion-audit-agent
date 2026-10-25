@@ -7,10 +7,10 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
+from typing import cast
 
-from deletion_audit.evidence import parse_all, parse_file
-from deletion_audit.evidence import sqlsafe
+from deletion_audit.evidence import FileParse, parse_all, parse_file, sqlsafe
 from deletion_audit.evidence.families._common import Content
 from deletion_audit.evidence.interpret import normalize_time
 from deletion_audit.evidence.manifest import load_manifest
@@ -42,7 +42,7 @@ class TempDataset:
         """The FileRef of the index-th file."""
         return load_manifest(self.dir)[index - 1]
 
-    def parse(self, index: int = 1):
+    def parse(self, index: int = 1) -> FileParse:
         """parse_file on the index-th file."""
         return parse_file(self.ref(index), self.dir)
 
@@ -51,7 +51,7 @@ class TempDataset:
         shutil.rmtree(self.dir, ignore_errors=True)
 
 
-def _single(files: dict[str, bytes | str]):
+def _single(files: dict[str, bytes | str]) -> FileParse:
     """Parse the only file of a temporary dataset."""
     ds = TempDataset(files)
     try:
@@ -171,8 +171,9 @@ class FamilyDetection(unittest.TestCase):
         self.assertIn("snapshot_bundle", fp.detail or "")
 
     def test_detect_needs_exactly_one_match(self) -> None:
-        yes = SimpleNamespace(NAME="yes", sniff=lambda c: True)
-        also = SimpleNamespace(NAME="also", sniff=lambda c: True)
+        # duck-typed stand-ins for family modules (detect reads only NAME and sniff)
+        yes = cast(ModuleType, SimpleNamespace(NAME="yes", sniff=lambda c: True))
+        also = cast(ModuleType, SimpleNamespace(NAME="also", sniff=lambda c: True))
         content = Content(Path("x"), b"data")
         self.assertEqual(detect(content, [yes]).family, yes)
         self.assertEqual(detect(content, [yes, also]).status, "AMBIGUOUS_FAMILY")
@@ -208,6 +209,7 @@ class ExactTimes(unittest.TestCase):
             lines = (DATASET / fp.path).read_text(encoding="utf-8").splitlines()
             for obs in fp.observations:
                 line = lines[int(obs.locator.ref[1:]) - 1]
+                assert obs.record_time is not None
                 self.assertTrue(line.startswith(obs.record_time + " "), (fp.file_id, obs.locator.ref))
 
     def test_real_captured_at_equals_manifest(self) -> None:

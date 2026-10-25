@@ -70,7 +70,8 @@ class TestCaseB_OrderOnly(unittest.TestCase):
         self.assertEqual((self.c["order_concordant"], self.c["order_pairs"]), (0, 1))
         self.assertTrue(self.c["citation_set_exact"])
         self.assertEqual(self.c["prep_tuple_tp"], 2)        # prep tuple ignores step_no and order
-        self.assertEqual(self.c["prep_pos_hits"], 2 * 5)    # positional: step_no, phase, operation, state, evidence agree per slot
+        # positional: step_no, phase, operation, state, evidence agree per slot
+        self.assertEqual(self.c["prep_pos_hits"], 2 * 5)
 
 
 class TestCaseC_KeyOrderAndWhitespaceIgnored(unittest.TestCase):
@@ -175,7 +176,8 @@ class TestAggregate(unittest.TestCase):
         self.assertEqual((f["state"]["n"], f["evidence_id"]["n"], f["step_no"]["n"], f["state"]["of"]), (7, 6, 5, 7))
         self.assertEqual(self.p["sequence_exact"]["n"], 1)
         so = self.p["sequence_pairwise_order"]
-        self.assertEqual((so["n"], so["of"], so["cases_with_pairs"], so["cases_without_pairs"]), (3 + 0 + 1, 3 + 1 + 1, 3, 1))
+        self.assertEqual((so["n"], so["of"], so["cases_with_pairs"], so["cases_without_pairs"]),
+                         (3 + 0 + 1, 3 + 1 + 1, 3, 1))
         self.assertEqual(self.p["citation_set_exact"]["n"], 2)
         self.assertEqual((self.p["citation_on_cited_steps"]["n"], self.p["citation_on_cited_steps"]["of"]), (4, 5))
 
@@ -183,7 +185,8 @@ class TestAggregate(unittest.TestCase):
         q = self.res["aggregate"]["prep"]
         self.assertEqual(q["case_exact"]["n"], 1)
         self.assertEqual(q["step_tuple"]["tp"], 2 + 2 + 2)
-        self.assertEqual((q["field_positional"]["n"], q["field_positional"]["of"]), (20 + 10 + 14 + 0, 28 + 14 + 14 + 28))
+        self.assertEqual((q["field_positional"]["n"], q["field_positional"]["of"]),
+                         (20 + 10 + 14 + 0, 28 + 14 + 14 + 28))
 
     def test_empty_prf(self) -> None:
         agg = aggregate([])

@@ -10,8 +10,9 @@ import hashlib
 import json
 import re
 import subprocess
+from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any
 
 from .gold import GoldCase
 from .paths import REPO_ROOT, RUNS
@@ -27,10 +28,12 @@ def now_ist() -> str:
 
 
 def sha256_bytes(data: bytes) -> str:
+    """Hex sha256 of ``data``."""
     return hashlib.sha256(data).hexdigest()
 
 
 def sha256_file(path: Path) -> str:
+    """Hex sha256 of the file's bytes."""
     return sha256_bytes(path.read_bytes())
 
 
@@ -81,6 +84,7 @@ def run_dir(run_id: str) -> Path:
 
 
 def write_json(path: Path, obj: Any) -> None:
+    """Write ``obj`` as indented JSON with a trailing newline."""
     path.write_text(json.dumps(obj, indent=1, sort_keys=False, default=str) + "\n", encoding="utf-8")
 
 
@@ -101,4 +105,5 @@ def flips(prev_cases: Iterable[Mapping[str, Any]], cur_cases: Iterable[Mapping[s
 
 def load_score(run_id: str) -> dict[str, Any]:
     """Read ``runs/<run_id>/score.json``; the ID is checked by :func:`check_run_id` (T80, M2)."""
-    return json.loads((RUNS / check_run_id(run_id) / "score.json").read_text(encoding="utf-8"))
+    score: dict[str, Any] = json.loads((RUNS / check_run_id(run_id) / "score.json").read_text(encoding="utf-8"))
+    return score

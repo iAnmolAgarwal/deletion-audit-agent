@@ -7,8 +7,9 @@ No number inside the block is typed by hand.
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from . import evidence_guard, runs
 from .paths import NUMBERS_MD, RUNS
@@ -24,7 +25,8 @@ Every number here carries its run ID, the command that produced it and what it m
 """
 
 METRIC_NOTES: list[tuple[str, str]] = [
-    ("status", "cases whose deletion_status equals gold; reading (a): an unparseable steps_json row's status is still credited"),
+    ("status", "cases whose deletion_status equals gold; "
+               "reading (a): an unparseable steps_json row's status is still credited"),
     ("status (c)", "reading (c): as status, but a row whose steps_json is not a JSON list counts as status-wrong"),
     ("row exact", "status equal AND parsed steps_json equal (key order ignored, list order kept)"),
     ("steps exact", "parsed steps_json equal, status ignored (alternative reading of 'row')"),
@@ -47,7 +49,8 @@ INVALID_CORRECTIONS: dict[str, str] = {
         "raised exceptions. An empty parse, other skip labels (`unknown-json`, `unknown`) and a log line whose JSON "
         "failed to parse still passed (verifier finding B2, `notes/verify/g4_verify.md`). Replaced under T47 by "
         "`code/evaluation/evidence_guard.py`: a skip allow-list holding only `png-model-needed`, a zero-unit check "
-        "with the T38 declared-scope exception, and a log-line JSON check; `evaluate.py score` checks the producer record."),
+        "with the T38 declared-scope exception, and a log-line JSON check; "
+        "`evaluate.py score` checks the producer record."),
 }
 
 
@@ -115,7 +118,9 @@ def run_dir_of(s: Mapping[str, Any], runs_dir: Path = RUNS) -> tuple[Path | None
     run ID taken from file content goes through here (T81)."""
     rid = s.get("run_id")
     try:
-        runs.check_run_id(rid)  # type: ignore[arg-type]
+        if not isinstance(rid, str):
+            raise ValueError("run_id is not a string")
+        runs.check_run_id(rid)
     except ValueError:
         return None, "the run_id inside its score.json is not a valid run ID; nothing is read by it"
     if "_dir_name" in s and s["_dir_name"] != rid:
@@ -166,8 +171,9 @@ def render(runs_dir: Path = RUNS) -> str:
     included_ids = {s["run_id"] for s in scored}
     discr = [s for s in loaded if s["kind"] == "discrimination" and not s["_invalid"]]
     L: list[str] = ["## Scored runs (DEV, 22 cases; holdout never loaded; producer check passed)", ""]
-    L += ["| run | status | status (c) | row exact | steps exact | step P / R / F1 | state | evidence | step_no | seq exact "
-          "| pairwise order | citation set | prep tuple | prep fields | prep resources | coherence hard / soft |",
+    L += ["| run | status | status (c) | row exact | steps exact | step P / R / F1 | state | evidence | step_no "
+          "| seq exact | pairwise order | citation set | prep tuple | prep fields | prep resources "
+          "| coherence hard / soft |",
           "|---|" + "---:|" * 15]
     L += [score_row(s) for s in scored]
     if not scored:

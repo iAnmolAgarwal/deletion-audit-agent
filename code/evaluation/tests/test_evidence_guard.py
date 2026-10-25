@@ -8,6 +8,7 @@ import types
 import unittest
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from evaluation import evidence_guard as eg
 
@@ -115,7 +116,7 @@ class TestNoResourceIdState(unittest.TestCase):
         self.layers[name] = layer
         return name
 
-    def audit(self, files: dict[str, str], units: list[U] | None = None) -> dict:
+    def audit(self, files: dict[str, str], units: list[U] | None = None) -> dict[str, Any]:
         return eg.audit_extraction(recorder(units or [], files), [], self.ds,
                                    pdf_text=lambda p: self.layers[Path(p).name], extra_prefixes=["legal_hold_"])
 
@@ -165,7 +166,10 @@ class TestNoResourceIdState(unittest.TestCase):
 
     def test_extractor_raising_refuses(self) -> None:
         self.pdf("r.pdf", "x")
-        a = eg.audit_extraction(recorder([], {"e1": "r.pdf"}), [], self.ds, pdf_text=lambda p: 1 / 0)
+        def boom(p: Path) -> str:
+            raise ZeroDivisionError("division by zero")
+
+        a = eg.audit_extraction(recorder([], {"e1": "r.pdf"}), [], self.ds, pdf_text=boom)
         self.assertFalse(a["ok"])
         self.assertIn("zero-units-unreadable:ZeroDivisionError", a["zero_unit_files"][0])
 
@@ -176,7 +180,7 @@ class TestNoResourceIdState(unittest.TestCase):
 
 class TestInstrumentLogLines(unittest.TestCase):
     def test_swallowed_json_error_surfaces_and_patches_restored(self) -> None:
-        def parse_line(line: str) -> dict:  # mimics logparse: swallows the JSON error
+        def parse_line(line: str) -> dict[str, Any]:  # mimics logparse: swallows the JSON error
             return {"raw": line.rstrip("\n"), "kv": {}}
 
         def parse_log(path, fid, cap):  # type: ignore[no-untyped-def]
@@ -203,7 +207,9 @@ class TestInstrumentLogLines(unittest.TestCase):
 class TestCheckProducer(unittest.TestCase):
     def test_statuses(self) -> None:
         h = "c" * 64
-        chk = lambda rec: eg.check_producer(rec, pred_sha256=h)  # noqa: E731
+        def chk(rec: dict[str, Any] | None) -> dict[str, Any]:
+            return eg.check_producer(rec, pred_sha256=h)
+
         self.assertEqual(chk(None)["status"], "no-producer-record")
         self.assertEqual(chk({})["status"], "no-producer-record")
         good = {"evidence_skipped": ["e4:png-model-needed"], "evidence_failures": [], "output_sha256": h}
@@ -233,12 +239,16 @@ class TestReportsTakeOnlyCheckedRuns(unittest.TestCase):
         from evaluation.scorer import aggregate
         base = {"kind": "score", "command": "x", "description": "d", "coherence": {"hard": 0, "soft": 0}}
         runs = {
-            "run-ok": {**base, "run_id": "run-ok", "created_at": "1", "aggregate": aggregate(ok_cases), "cases": ok_cases,
+            "run-ok": {**base, "run_id": "run-ok", "created_at": "1", "aggregate": aggregate(ok_cases),
+                       "cases": ok_cases,
                        "producer_check": {"status": "ok", "reasons": [], "allowed_skips": ["e4:png-model-needed"],
                                           "no_resource_id_files": ["e18"], "skip_count": 1},
-                       "prev_run": "run-old", "flips": [{"case_id": "case_a", "metric": "row_exact", "prev": False, "now": True}]},
-            "run-old": {**base, "run_id": "run-old", "created_at": "0", "aggregate": aggregate(bad_cases), "cases": bad_cases},
-            "run-unv": {**base, "run_id": "run-unv", "created_at": "2", "aggregate": aggregate(bad_cases), "cases": bad_cases,
+                       "prev_run": "run-old",
+                       "flips": [{"case_id": "case_a", "metric": "row_exact", "prev": False, "now": True}]},
+            "run-old": {**base, "run_id": "run-old", "created_at": "0", "aggregate": aggregate(bad_cases),
+                        "cases": bad_cases},
+            "run-unv": {**base, "run_id": "run-unv", "created_at": "2", "aggregate": aggregate(bad_cases),
+                        "cases": bad_cases,
                         "producer_check": {"status": "unverified", "reasons": ["predates"], "allowed_skips": [],
                                            "no_resource_id_files": [], "skip_count": 0}},
         }

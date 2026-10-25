@@ -42,9 +42,10 @@ from __future__ import annotations
 import contextlib
 import json
 import re
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Iterable, Iterator, Mapping
+from typing import Any
 
 from .contract import PREFIX_SYSTEM
 
@@ -110,7 +111,7 @@ class Recorder:
     """What :func:`instrument` saw while the prototype extracted evidence."""
 
     units: list[Any] | None = None           # extract_all's units (no link, alias or vision units)
-    manifest: dict[str, dict] | None = None
+    manifest: dict[str, dict[str, Any]] | None = None
     skipped: list[str] = field(default_factory=list)
     log_line_failures: list[str] = field(default_factory=list)
     _current_file: str | None = None
@@ -302,7 +303,7 @@ def check_producer(producer: Mapping[str, Any] | None, *, pred_sha256: str | Non
 
     Only ``ok`` runs may feed a report (T51, T60); the others are listed as excluded.
     """
-    base = {"allowed_skips": [], "no_resource_id_files": [], "skip_count": None,
+    base: dict[str, Any] = {"allowed_skips": [], "no_resource_id_files": [], "skip_count": None,
             "output_sha256": None, "pred_sha256": pred_sha256}
     if not producer:
         return {**base, "status": "no-producer-record", "reasons": [

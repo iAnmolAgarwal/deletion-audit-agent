@@ -8,7 +8,8 @@ phase-then-operation-table order holds in 22 of 22 DEV cases).
 from __future__ import annotations
 
 import json
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 STATUSES: tuple[str, ...] = ("COMPLETE", "INCOMPLETE", "NOT_APPLICABLE")
 PHASES: tuple[str, ...] = ("FINDING", "REMEDIATION", "VERIFICATION")

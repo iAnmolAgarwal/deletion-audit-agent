@@ -7,6 +7,8 @@ Every snapshot is a collection exported in full, so each one is declared as a
 """
 from __future__ import annotations
 
+from typing import Any
+
 from ..model import ParseError, RawFile, RawRecord, RawScope
 from ._common import Content, flatten, optional_str, require_dict, require_list
 
@@ -19,7 +21,7 @@ def sniff(content: Content) -> bool:
     return isinstance(doc, dict) and isinstance(doc.get("snapshots"), list)
 
 
-def _snapshot_header(snap: dict, where: str) -> tuple[str, str, str]:
+def _snapshot_header(snap: dict[str, Any], where: str) -> tuple[str, str, str]:
     """The snapshot's captured_at, data_store and collection, all required strings."""
     values = []
     for key in ("captured_at", "data_store", "collection"):

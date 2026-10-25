@@ -27,12 +27,23 @@ import csv
 import datetime as dt
 import re
 from collections import Counter
+from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any
 
-from .contract import (FINDING_TO_REMEDIATION, OPERATIONS, PREFIX_SYSTEM, REMEDIATION_TO_VERIFICATION,
-                       STATUSES, STEP_KEYS, hashable, resource_prefix, sort_key, step_key)
+from .contract import (
+    FINDING_TO_REMEDIATION,
+    OPERATIONS,
+    PREFIX_SYSTEM,
+    REMEDIATION_TO_VERIFICATION,
+    STATUSES,
+    STEP_KEYS,
+    hashable,
+    resource_prefix,
+    sort_key,
+    step_key,
+)
 from .outputs import OUTPUT_HEADER, OutputFile, OutputRow, case_label, is_case_name
 from .paths import EVIDENCE_MANIFEST, SYSTEM_ACTIVITY, USER_AUDIT_LOG
 
@@ -100,7 +111,8 @@ def check_file(out: OutputFile, *, audit_at: Mapping[str, str], evidence: Eviden
     if out.order not in (sorted(out.order), sorted(out.order, key=_numeric_key)):
         v.append(Violation("<file>", "H16", "hard", "rows are sorted neither by string nor by numeric case_id"))
     elif out.order != sorted(out.order):
-        v.append(Violation("<file>", "H16", "soft", "rows are in numeric, not string, case_id order (G1 A1, unsettled)"))
+        v.append(Violation("<file>", "H16", "soft",
+                           "rows are in numeric, not string, case_id order (G1 A1, unsettled)"))
     for cid in out.order:
         v.extend(check_row(out.rows[cid], audit_at=audit_at.get(cid), evidence=evidence,
                            label=case_label(cid, out.record_no.get(cid))))
@@ -186,7 +198,7 @@ def check_row(row: OutputRow, *, audit_at: str | None, evidence: EvidenceIndex,
                    "INCOMPLETE (findings imply INCOMPLETE)")
 
     # H06 order
-    for (_, a), (i, b) in zip(objs, objs[1:]):
+    for (_, a), (i, b) in zip(objs, objs[1:], strict=False):
         if sort_key(b) < sort_key(a):
             add("H06", f"{at(i)}: out of spec order (phase, operation table, system_id, resource_id)", i)
 
@@ -209,8 +221,9 @@ def check_row(row: OutputRow, *, audit_at: str | None, evidence: EvidenceIndex,
         for i, s in objs:
             by_res.setdefault((hashable(s.get("system_id")), hashable(s.get("resource_id"))), {}).setdefault(
                 str(s.get("phase")), []).append((i, str(s.get("operation"))))
-        for ph in by_res.values():
-            fs, rs, vs = ph.get("FINDING", []), ph.get("REMEDIATION", []), ph.get("VERIFICATION", [])
+        for phase_ops in by_res.values():
+            fs, rs = phase_ops.get("FINDING", []), phase_ops.get("REMEDIATION", [])
+            vs = phase_ops.get("VERIFICATION", [])
             f_ops, r_ops, v_ops = [o for _, o in fs], [o for _, o in rs], [o for _, o in vs]
             for i, f_op in fs:
                 if not any(r in FINDING_TO_REMEDIATION.get(f_op, ()) for r in r_ops):

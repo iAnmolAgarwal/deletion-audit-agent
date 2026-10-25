@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import functools
 import unittest
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 from deletion_audit.evidence import EvidenceIndex, FileParse, parse_all, parse_file
 from deletion_audit.evidence.model import FileRef, Identifier, Observation
@@ -25,7 +25,7 @@ def parse_fixture(name: str) -> FileParse:
     return parse_file(fixture_ref(name), FIXTURES)
 
 
-@functools.lru_cache(maxsize=None)
+@functools.cache
 def real_index() -> EvidenceIndex:
     """parse_all over the real dataset, computed once per test run."""
     return parse_all(DATASET)

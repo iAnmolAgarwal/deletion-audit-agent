@@ -308,7 +308,7 @@ def _resource_ids(raw: RawRecord, text: str | None) -> list[str | None]:
     if value is not None and not is_null(value):
         return [value]
     if raw.locator_kind == "pdf_page" and text:
-        named = list(dict.fromkeys(m.group(0) for m in RESOURCE_ID_IN_TEXT.finditer(text)))
+        named: list[str | None] = list(dict.fromkeys(m.group(0) for m in RESOURCE_ID_IN_TEXT.finditer(text)))
         return named or [None]
     return [None]
 

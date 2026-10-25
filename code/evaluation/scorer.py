@@ -47,8 +47,9 @@ field accuracy and the (system_id, resource_id) resource sets.
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Iterable, Mapping
+from typing import Any
 
 from .contract import OPERATIONS, STATUSES, STEP_KEYS, hashable, step_key
 from .gold import GoldCase
@@ -64,7 +65,7 @@ def _get(step: Any, key: str) -> Any:
 
 def _occurrence_keys(steps: list[Any]) -> list[tuple[tuple[Any, ...], int]]:
     """Each step's key plus its occurrence number, so duplicate keys match one to one."""
-    seen: Counter = Counter()
+    seen: Counter[tuple[Any, ...]] = Counter()
     out = []
     for s in steps:
         k = step_key(s)
@@ -241,15 +242,19 @@ def confusion(cases: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, int]]:
     return out
 
 
-def aggregate(cases: list[Mapping[str, Any]]) -> dict[str, Any]:
+def aggregate(cases: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     """Aggregate per-case scores into the published and prep-replay metric blocks."""
     n = len(cases)
-    s = lambda k: sum(int(c[k]) for c in cases)  # noqa: E731
+    def s(key: str) -> int:
+        return sum(int(c[key]) for c in cases)
+
     per_op: dict[str, list[int]] = {}
     for c in cases:
         for op, (tp, np_, ng) in c["per_op"].items():
             acc = per_op.setdefault(op, [0, 0, 0])
-            acc[0] += tp; acc[1] += np_; acc[2] += ng
+            acc[0] += tp
+            acc[1] += np_
+            acc[2] += ng
     ordered_ops = [op for op in OPERATIONS if op in per_op] + sorted(op for op in per_op if op not in OPERATIONS)
     matched = s("step_tp")
     eligible = sum(1 for c in cases if c["order_pairs"] > 0)

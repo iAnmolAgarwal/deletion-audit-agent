@@ -4,6 +4,7 @@ from __future__ import annotations
 import shutil
 import tempfile
 import unittest
+from collections.abc import Callable
 from pathlib import Path
 
 from deletion_audit.inputs import (
@@ -73,6 +74,7 @@ class LoaderFixtures(unittest.TestCase):
 
     def test_identity_rows(self) -> None:
         first, second = load_identities(self.inputs.dir)
+        assert first.email is not None and first.phone is not None
         self.assertEqual(first.user_id, "user_07")
         self.assertEqual(first.updated_at, "2026-03-14T14:21:59Z")
         self.assertEqual((first.email.kind, first.email.value, first.email.raw),
@@ -87,6 +89,8 @@ class LoaderFixtures(unittest.TestCase):
         rows = load_audit_log(self.inputs.dir)
         self.assertEqual([r.audit_id for r in rows], ["audit_009", "audit_010", "audit_011"])
         email, phone, other = rows
+        assert email.old_identifier is not None
+        assert phone.old_identifier is not None and phone.new_identifier is not None
         self.assertEqual(email.event_time, "2025-01-04T00:11:24Z")
         self.assertEqual(email.old_value, "Old.Ada@Example.Test")
         self.assertEqual((email.old_identifier.kind, email.old_identifier.value,
@@ -102,7 +106,7 @@ class LoaderFixtures(unittest.TestCase):
 class MalformedInputs(unittest.TestCase):
     """Every malformed row raises InputFormatError naming the file and line."""
 
-    def _raises(self, loader, **files: str) -> InputFormatError:
+    def _raises(self, loader: Callable[[Path], object], **files: str) -> InputFormatError:
         inputs = TempInputs(**files)
         self.addCleanup(inputs.cleanup)
         with self.assertRaises(InputFormatError) as caught:
@@ -150,14 +154,14 @@ class RealInputs(unittest.TestCase):
         import csv
         with (DATASET / "user_audit_log.csv").open(newline="", encoding="utf-8") as handle:
             raw = list(csv.DictReader(handle))
-        for row, typed in zip(raw, load_audit_log(DATASET)):
+        for row, typed in zip(raw, load_audit_log(DATASET), strict=False):
             self.assertEqual(typed.audit_id, row["audit_id"])
             self.assertEqual(typed.event_time, row["event_time"])
             self.assertEqual(typed.old_value, row["old_value"] or None)
         with (DATASET / "system_activity.csv").open(newline="", encoding="utf-8") as handle:
             raw_activity = list(csv.DictReader(handle))
-        for row, typed in zip(raw_activity, load_activity(DATASET)):
-            self.assertEqual((typed.activity_id, typed.event_time, typed.resource_id),
+        for row, typed_activity in zip(raw_activity, load_activity(DATASET), strict=False):
+            self.assertEqual((typed_activity.activity_id, typed_activity.event_time, typed_activity.resource_id),
                              (row["activity_id"], row["event_time"], row["resource_id"] or None))
 
 

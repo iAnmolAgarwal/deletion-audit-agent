@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import unittest
+from typing import Any
 
 from ._support import DATASET, assert_real_family, id_set, parse_fixture, real_index
 
@@ -49,11 +50,11 @@ class PdfTextReal(unittest.TestCase):
             for ident in (row.email, row.phone):
                 if ident is not None:
                     owner.setdefault((ident.kind, ident.value), set()).add(row.user_id)
-        for row in load_audit_log(DATASET):
-            for ident in (row.old_identifier, row.new_identifier):
+        for audit_row in load_audit_log(DATASET):
+            for ident in (audit_row.old_identifier, audit_row.new_identifier):
                 if ident is not None:
-                    owner.setdefault((ident.kind, ident.value), set()).add(row.user_id)
-        pages: dict[tuple[str, str], list] = {}
+                    owner.setdefault((ident.kind, ident.value), set()).add(audit_row.user_id)
+        pages: dict[tuple[str, str], list[Any]] = {}
         for obs in real_index().observations():
             if obs.locator.kind == "pdf_page":
                 pages.setdefault((obs.file_id, obs.locator.ref), []).append(obs)

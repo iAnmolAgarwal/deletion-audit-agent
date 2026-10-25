@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import unittest
+from typing import Any
 
 from evaluation.coherence import EvidenceIndex, check_file, check_row, parse_time
 from evaluation.contract import STEP_KEYS, hashable, step_key
@@ -15,10 +16,10 @@ from .fixtures import gold, incomplete_example, row
 
 AUDIT = "2026-09-15T12:00:00Z"
 EV = EvidenceIndex(files={"evidence_01": parse_time("2026-09-01T00:00:00Z")}, activities={}, audits={})
-BAD_VALUES = ([1, 2], ["account_service"], {"a": 1}, {"x": [1, {"y": 2}]}, [])
+BAD_VALUES: tuple[Any, ...] = ([1, 2], ["account_service"], {"a": 1}, {"x": [1, {"y": 2}]}, [])
 
 
-def poisoned(field: str, value: object) -> list[dict]:
+def poisoned(field: str, value: object) -> list[dict[str, Any]]:
     steps = [dict(s) for s in incomplete_example()]
     for s in steps:
         s[field] = value
@@ -83,7 +84,8 @@ class TestStatusReadingsM2(unittest.TestCase):
         missing = score_case(None, gold("case_g", "NOT_APPLICABLE", []))
         p = aggregate([c, ok, missing])["published"]
         self.assertEqual((p["status_accuracy"]["n"], p["status_accuracy"]["of"]), (2, 3))
-        self.assertEqual((p["status_accuracy_unparseable_wrong"]["n"], p["status_accuracy_unparseable_wrong"]["of"]), (1, 3))
+        strict = p["status_accuracy_unparseable_wrong"]
+        self.assertEqual((strict["n"], strict["of"]), (1, 3))
 
 
 if __name__ == "__main__":

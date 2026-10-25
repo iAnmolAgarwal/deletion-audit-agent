@@ -35,7 +35,8 @@ class TestNoCellValueInMessages(unittest.TestCase):
         late = {"step_no": 1, "phase": "VERIFICATION", "system_id": "system-ZQ79", "resource_id": "account_8813",
                 "operation": "VERIFY_RECORD_PRESENT", "state": "PRESENT", "evidence_id": "evidence_01"}
         rows = [
-            ["case_201", "zq.person1@example.test", "Zq Person One", "please erase everything ZQ80", "2026-08-01T00:00:00Z"],
+            ["case_201", "zq.person1@example.test", "Zq Person One", "please erase everything ZQ80",
+             "2026-08-01T00:00:00Z"],
             ["case_202", "zq.person2@example.test", json.dumps([bad_step, bad_step, late])],
             ["case_203", "COMPLETEZQ81", json.dumps([late, {"nested": ["ZQ82", {"kZQ86": "ZQ83"}]}, "ZQ84", 98765])],
             ["case_204", "NOT_APPLICABLE", json.dumps({"objZQ87": "ZQ85"})],

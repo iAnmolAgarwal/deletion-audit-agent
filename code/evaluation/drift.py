@@ -8,7 +8,8 @@ section 4, "matching gold's class frequencies").
 from __future__ import annotations
 
 from collections import Counter
-from typing import Any, Iterable, Mapping
+from collections.abc import Iterable, Mapping
+from typing import Any
 
 from .contract import OPERATIONS, PHASES, STATUSES
 from .gold import GoldCase
@@ -24,7 +25,7 @@ def _bucket(n: int) -> str:
 def distributions(rows: Iterable[tuple[str, list[Any]]]) -> dict[str, dict[str, float]]:
     """Percent distributions per dimension. Status and steps-per-case are per case; the
     step dimensions are per step."""
-    counts: dict[str, Counter] = {d: Counter() for d in DIMENSIONS}
+    counts: dict[str, Counter[str]] = {d: Counter() for d in DIMENSIONS}
     n_cases = 0
     for status, steps in rows:
         n_cases += 1
@@ -64,5 +65,7 @@ def format_table(table: list[dict[str, Any]]) -> str:
     """Markdown rendering of a drift table."""
     lines = ["| dimension | label | predicted % | DEV gold % | gap (pts) | flag |", "|---|---|---:|---:|---:|---|"]
     for r in table:
-        lines.append(f"| {r['dimension']} | {r['label']} | {r['pred_pct']} | {r['gold_pct']} | {r['gap_pts']} | {'**>15**' if r['flag'] else ''} |")
+        flag = "**>15**" if r["flag"] else ""
+        lines.append(f"| {r['dimension']} | {r['label']} | {r['pred_pct']} | {r['gold_pct']} | {r['gap_pts']} "
+                     f"| {flag} |")
     return "\n".join(lines)

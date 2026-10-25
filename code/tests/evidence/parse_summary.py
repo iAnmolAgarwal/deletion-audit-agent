@@ -11,6 +11,7 @@ import json
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
+from typing import Any
 from zoneinfo import ZoneInfo
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -22,9 +23,9 @@ from deletion_audit.evidence.interpret import system_from_prefix  # noqa: E402
 DATASET = REPO_ROOT / "dataset"
 
 
-def summarize(index: EvidenceIndex) -> dict:
+def summarize(index: EvidenceIndex) -> dict[str, Any]:
     """Per-family counts, every non-OK file, and cross-checks on the observations."""
-    families: dict[str, dict] = defaultdict(lambda: {"files": 0, "file_ids": [], "observations": 0,
+    families: dict[str, dict[str, Any]] = defaultdict(lambda: {"files": 0, "file_ids": [], "observations": 0,
                                                      "scopes": 0, "failures": 0, "statuses": Counter()})
     for fp in index.files.values():
         row = families[fp.family or "(none)"]
