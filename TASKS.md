@@ -67,6 +67,15 @@ Rebuilt at the developer's direction (turn 2026-10-25T00:08:45+05:30). Updated a
   - **Running (T108):** the vision-adapter fix (`orch-eval-engineer`, high; brief `visionadapter_brief.md`), the G7 verifier (export of 4dcd719; given T108 (3) for item 14c), and fix round 2 (given T108 (2) as its item 7).
   - **T109:** a FAILED agent outcome is never NOT_APPLICABLE (flagged AGENT_CALL_FAILED), and there is no agent re-send. Fix round 2 item 8 covers (a) and (b), in `pipeline.py` and `regression.py`; the vision-adapter agent covers (c), the freeze check listing FAILED cases. The verifier has the amended 14c. A 14c finding alone does not block stage 1.
   - **T110:** a FAILED case blocks the freeze (T87(2)); the remedy is a re-run. The same case failing with the same error class on two re-runs in a row stops for the developer (case, error class, request size), with no override. Sent to the vision-adapter agent for `freeze_check.py`.
+  - **G7 verifier: FIX** (12:58; `notes/verify/g7_verify.md`). 0 BLOCKER, 6 MAJOR, 2 MINOR. **Stage 1 is stopped by T108** (MAJORs beyond 14c), and fix classes wait for the developer.
+    - MAJOR 1: an image showing nothing becomes REDACTED/ANONYMIZED.
+    - MAJOR 2: 14c fails T109 at 4dcd719 (already assigned).
+    - MAJOR 3: the item-9 dependency gap.
+    - MAJOR 4: the adapter, already assigned, plus no resolution field.
+    - MAJOR 5: `--write-root` before the gate.
+    - MAJOR 6: 14b (fix-round item 7; case_55 also ties to the backup rule).
+    - MINOR 7: the gate is opt-in.
+    - MINOR 8: R03's evidence flag is not tested end to end.
   - **Stage 1, approved in advance (T108):** if the G7 verifier returns PASS or only MINOR findings, run the routing check (122 sends, $3.50) and vision (22 sends, $1.50) from an export of the committed code, with the repo cache, writing to `runs/`. Then stop and show (a)–(e).
   - **T105 ruled.** The plan:
     1. the wiring is checked and committed;
