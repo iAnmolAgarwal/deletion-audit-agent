@@ -3979,3 +3979,124 @@ parent_agent=none
 worktree=main
 branch=main
 repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T06:04:20+05:30] Commit 8bce1e1 pushed (log fix T89, G5 verifier report, T88)
+
+User Prompt (verbatim, secrets redacted):
+(Same developer turn as the entry above; no new developer text.)
+
+Agent Response Summary:
+I committed the log fix, the G5 verifier report and the T88/T89 rulings as 8bce1e1 and pushed it to github main. The commit stages only scripts/check_log.py, scripts/test_check_log.py, log.txt, TASKS.md, notes/DECISIONS.md and notes/verify/g5_verify.md. G5's engine stays uncommitted until its fix round.
+
+Actions:
+* git add of the six paths; scripts/secret_scan.sh --staged PASS; the pre-commit check_log PASS (94 entries, 0 blocking).
+* git commit 8bce1e1; git push github main; github/main is 8bce1e1. https://github.com/iAnmolAgarwal/orchestrate-oct26-ghost-data
+* ../hooks/log_guard.py and ../hooks/test_log_guard.py are kit files outside this repo, so they are not in this commit.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T06:10:21+05:30] G7b agent report and freeze check built
+
+User Prompt (verbatim, secrets redacted):
+[brief written by main; approved in developer turn 2026-10-25T05:49:46+05:30]
+G7b: build the reported-effect report (agent_report.py) and the freeze-check command, from run artifacts.
+(full brief from main)
+
+Agent Response Summary:
+Built code/evaluation/agent_report.py (G3 section 9 items 1-6, generated from runs/<id>/ artifacts only, Markdown and JSON, every number naming its run) and code/evaluation/freeze_check.py (refuses unless FAILED_CLOSED rows, INTENT_FAILED_CLOSED, evidence skips and unresolved vision disagreements are all 0 on a checked run). Every per-case agent field and the vision artifact is read through one adapter, read_run_artifacts, whose field names sit in one constants block; a missing or malformed field is an error that replaces the run's counts, never a zero. Unchecked input runs refuse the whole report (exit 3). On the G5 runs: the report (run g7b-agent-report-g5-20261025T0609) reproduces DEV status 22/22, row exact 19/22, step F1 0.9887 and reports every agent and vision section as an error (no agent field, no vision.json); the freeze check refuses g5-test-20261025T0530 with failed_closed_rows=18 and evidence_skips=11, and g5-dev22-20261025T0530 with evidence_skips=11. Tests 187 OK (150 before), lint clean; no model calls, .env not read, no holdout gold touched.
+
+Actions:
+* Wrote code/evaluation/agent_report.py, code/evaluation/freeze_check.py, code/evaluation/tests/run_dirs.py, test_agent_report.py, test_freeze_check.py
+* .venv/bin/python -B -m unittest discover -s code/evaluation/tests -t code -> Ran 187 tests, OK
+* bash scripts/lint.sh code/evaluation -> ruff and mypy clean
+* Mutation probes on a scratchpad copy of code/evaluation (7 mutations, each caught by a new test)
+* agent_report.py --run-id g7b-agent-report-g5-20261025T0609 --dev A+=g5-dev22-20261025T0530 --test A+=g5-test-20261025T0530 -> exit 2
+* freeze_check.py on g5-dev22-20261025T0530 and g5-test-20261025T0530 (records g7b-freeze-<run>) -> exit 1 both
+* agent_report.py refusal probe on g4-baseline-20261025T0228 -> exit 3, refused.json
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=orch-eval-engineer
+parent_agent=main
+directed_by=2026-10-25T05:49:46+05:30
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T06:12:40+05:30] GM transport keeps the API error text in calls.jsonl
+
+User Prompt (verbatim, secrets redacted):
+[brief written by main; approved in developer turn 2026-10-25T06:08:27+05:30]
+GM follow-up: the transport keeps the API's error text in calls.jsonl, with a test.
+(full brief from main)
+
+Agent Response Summary:
+AnthropicTransport now builds the Failure for an anthropic.APIStatusError with the API's error type and message (from the parsed body, each capped at 500 characters with a "...[cut, N chars]" marker; a missing or odd-shaped body gives None) and the response's request ID. Failure gained api_error_type, api_error_message and request_id; CallLogEntry gained api_error_type and api_error_message; ModelClient._log copies them and falls back to failure.request_id. Failure.detail and CallLogEntry.detail keep the policy decision (NON_RETRYABLE etc.). Five new offline tests (real SDK exceptions on httpx2 responses, stand-in client, JsonlCallLog) fail before the change and pass after; no live call, .env not read.
+
+Actions:
+* edited code/deletion_audit/model/transport.py (API_TEXT_LIMIT, cap_api_text, api_error_fields, _status_failure), policy.py (Failure fields), calllog.py (CallLogEntry fields), client.py (_log passes the fields)
+* added code/tests/model/test_api_error_text.py
+* edited notes/INTERFACES.md §8, the call-log fields line only
+* ran unittest discover on code/tests/model (81 OK) and code/tests (273 OK); scripts/lint.sh on model + tests/model (clean)
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=orch-builder
+parent_agent=main
+directed_by=2026-10-25T06:08:27+05:30
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T06:14:14+05:30] [auto] G7b done and checked: agent report and freeze check (187 tests OK)
+
+User Prompt (verbatim, secrets redacted):
+(Background-agent notification: G7b, orch-eval-engineer, directed_by 2026-10-25T05:49:46+05:30, finished. No developer text.)
+
+Agent Response Summary:
+G7b built code/evaluation/agent_report.py and freeze_check.py with 36 new tests. Main re-ran them: 187 evaluation tests OK (150 before), ruff and mypy clean, and gold is read only through gold.load_gold. The freeze check refuses g5-test-20261025T0530 with 18 FAILED_CLOSED rows and 11 skips; the intent and vision counts can't be computed yet, because G5 runs carry no agent fields. G7b stays uncommitted until the G7 verifier.
+
+Actions:
+* Re-ran: .venv/bin/python -B -m unittest discover -s code/evaluation/tests -t code (Ran 187, OK); scripts/lint.sh code/evaluation (ruff All checks passed; mypy Success).
+* python -m evaluation.freeze_check --run-id g5-test-20261025T0530 exits 1: failed_closed_rows 18, evidence_skips 11, intent and vision not computed, adapter errors "agent: missing" (518) and vision.json missing.
+* G7b's four wiring items (the vision file name, committed_key vs a label, no resolution field for a vision disagreement, the adapter recomputing agree/disagreements) and the runs.code_hash side effect are on TASKS.md's open items.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T06:14:14+05:30] [auto] GM error-text fix done and checked (81 model tests, 273 total OK)
+
+User Prompt (verbatim, secrets redacted):
+(Background-agent notification: the GM error-text fix, orch-builder, directed_by 2026-10-25T06:08:27+05:30, finished. No developer text.)
+
+Agent Response Summary:
+The GM transport now keeps an APIStatusError's error type, message (capped at 500 characters with a cut marker) and request ID, and calls.jsonl logs them in new api_error_type and api_error_message fields; detail keeps its meaning. Main re-ran it: 81 model tests and 273 in code/tests pass, lint is clean, and the 5 new tests fail on GM as committed (9 errors) and pass after. The agent used git stash on four model files for the before-run; the stash list is empty and nothing was lost. Under T90 it stays uncommitted until the G7 verifier reviews it.
+
+Actions:
+* Re-ran: unittest discover -s code/tests/model (Ran 81, OK) and -s code/tests (Ran 273, OK); scripts/lint.sh on model/ and its tests (clean).
+* Before/after: test_api_error_text.py copied into the scratchpad export of committed GM (gm_before/) gives Ran 5, FAILED (errors=9).
+* Changed: model/transport.py, policy.py (Failure: api_error_type, api_error_message, request_id), calllog.py (CallLogEntry: api_error_type, api_error_message), client.py; tests/model/test_api_error_text.py (new); notes/INTERFACES.md §8 (one line).
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
