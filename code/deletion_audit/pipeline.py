@@ -1,10 +1,34 @@
-"""The pipeline: inputs -> engine -> validated rows -> ``runs/<run_id>/output.csv`` plus artifacts.
+"""The pipeline: inputs -> vision -> agent per case -> engine rows -> ``runs/<run_id>/output.csv`` plus artifacts.
 
 * The output goes to ``runs/<run_id>/output.csv``. The root ``output.csv`` is written only when
   ``write_root=True`` is passed explicitly (``../CLAUDE.md`` section 5; developer approval needed).
-* G5 builds the engine path only (``notes/INTERFACES.md`` section 7): ``mode`` and
-  ``replay_only`` are recorded, no model is called, and every case gets the fail-closed intent
-  of T71 Q2 (the engine's deletion-path row, flagged).
+* **Model wiring (G7; G7a's wiring proposals 1-6).** Every model call goes through GM's
+  :class:`~deletion_audit.model.ModelClient`. A :class:`ModelSetup` holds the one transport, the
+  one :class:`~deletion_audit.model.BudgetGuard` and the two reply-cache namespaces
+  (``config.REPLY_NAMESPACES``) of a command run. **Replay-only is the default:** without a paid
+  setup no request is ever sent, every cache miss is an explicit ``REPLAY_MISS`` failure, the
+  intent of such a case fails closed (T71 Q2: the engine's deletion-path row, flagged) and an
+  image with a missing reading stays an unparsed dependency (T8).
+* **What a full run may buy:** only the case conversation (turn 1 and the loop) in the first
+  namespace. The turn-1 replicate and both vision readings are replayed from the cache; they are
+  bought by their own commands (:func:`run_routing_check`, :func:`run_vision`), so a full run
+  never pays for a reading the developer has not seen (T88 (1), T97).
+* **Order of a run:** inputs -> vision (two readings per PNG, ``learn_shapes`` then
+  ``read_images``, ``vision_readings.json``/``.md`` and ``vision.json``) -> the engine's world on
+  ``replace(ctx, image_observations=..., vision_read=...)`` -> per case
+  :func:`~deletion_audit.agent.audit_with_agent` (``result.applied`` is the row; ``result.report``
+  goes under ``"agent"`` in ``cases.jsonl``) -> the pre-write gate (inside the engine) -> output.
+* **Vision review (T88 (1); G7a proposal 2):** a paid full run is refused while any image needs
+  review (a failed or disagreeing reading) unless ``vision_ack`` names the vision run whose
+  readings the developer reviewed, and that run's review list and readings equal this run's. The
+  acknowledgement is recorded in ``producer.json``. A replay-only run is never refused for it.
+* **Image answers (G7a proposal 6):** a validated ``IMAGE_FIELD_UNREADABLE`` answer is applied by
+  compiling the case on a world built from ``patch_image_observations``.
+* **Model-on regression gate (T100, T101; :mod:`deletion_audit.agent.regression`):** with
+  ``regression_gate=True`` the output is compared row by row with the approved file named in
+  ``notes/approved_output.json``; every changed row gets a cause by recompiling. A stop row or a
+  refused baseline marks the run as not passing in ``producer.json`` (``run_passed`` false, with
+  the refusal) and the CLI exits non-zero.
 * Every requested case gets exactly one row; a row is never left empty (``FAILED_CLOSED``).
 * **Holdout guard** (``../CLAUDE.md`` section 4): :func:`run` refuses, before it reads any input,
   an explicit case list that names a holdout case, and, after resolving ``"test"``, any resolved
@@ -21,26 +45,56 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import subprocess
 import sys
 import time
-from collections.abc import Iterable, Sequence
-from dataclasses import dataclass
+from collections import Counter
+from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Literal
 
-from .artifacts import RunArtifacts, now_ist
-from .engine import AuditContext, FailClosedIntent, World, audit_all, build_context, build_world
-from .steps.serialize import write_output
+from .agent import (
+    MODES,
+    AgentCaseResult,
+    FixedIntent,
+    LoopCaps,
+    ValidatedAnswer,
+    VisionRun,
+    audit_with_agent,
+    learn_shapes,
+    read_images,
+    routing_table,
+    vision_run_report,
+    write_vision_artifacts,
+)
+from .agent.answers import patch_image_observations
+from .agent.crosscheck import intake_crosscheck
+from .agent.regression import Baseline, BaselineRefused, CaseEvidence, Row, image_facts, load_baseline, run_gate
+from .agent.regression import write_gate as write_regression
+from .agent.routing import text_id
+from .artifacts import RunArtifacts, now_ist, write_json
+from .config import APPROVED_OUTPUT_RECORD, REPLY_NAMESPACES
+from .engine import AuditContext, World, audit_case, build_context, build_world, malformed_record
+from .inputs.requests import load_requests_checked
+from .model import BudgetGuard, CallLog, ModelClient, ReplyCache, RetryPolicy, Transport
+from .record import CaseRecord, fail_closed_intent
+from .steps.serialize import steps_json, write_output
 
 Mode = Literal["A+", "A", "tools_off"]
 RUN_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*", re.ASCII)
 REPO_ROOT = Path(__file__).resolve().parents[2]
+TEXT_SOURCES: tuple[str, ...] = ("dev", "test", "fixtures", "redteam")
 
 
 class HoldoutRefused(ValueError):
     """A run named a holdout case (module docstring); the message never lists the IDs."""
+
+
+class VisionReviewRequired(RuntimeError):
+    """A paid full run met images that need the developer's review and no matching acknowledgement."""
 
 
 def holdout_ids() -> frozenset[str]:
@@ -52,6 +106,14 @@ def holdout_ids() -> frozenset[str]:
     from evaluation.split import HOLDOUT_IDS
 
     return frozenset(HOLDOUT_IDS)
+
+
+def dev_ids() -> frozenset[str]:
+    """The DEV case IDs, from ``code/evaluation/split.py``."""
+    holdout_ids()  # puts code/ on the path
+    from evaluation.split import DEV_IDS
+
+    return frozenset(DEV_IDS)
 
 
 def refuse_holdout(cases: Iterable[str]) -> None:
@@ -92,6 +154,94 @@ def git_head() -> str | None:
     return head if out.returncode == 0 and re.fullmatch(r"[0-9a-f]{40}", head) else None
 
 
+# ----------------------------------------------------------------------------- model setup
+class NoSendTransport:
+    """The transport of a replay-only setup. A replay-only client never sends, so a send is a bug."""
+
+    def send(self, body: Mapping[str, Any]) -> Mapping[str, Any]:
+        """Refuse every send."""
+        raise RuntimeError("replay-only setup: nothing is ever sent")
+
+
+def namespace_roots(cache_dir: Path) -> tuple[Path, Path]:
+    """The two reply-cache roots under ``cache_dir`` (``config.REPLY_NAMESPACES``)."""
+    return (Path(cache_dir) / REPLY_NAMESPACES[0], Path(cache_dir) / REPLY_NAMESPACES[1])
+
+
+@dataclass(frozen=True)
+class ModelSetup:
+    """One command run's model wiring: one transport, one BudgetGuard, one retry policy, two namespaces.
+
+    ``paid`` False means replay only: every client is built with ``replay_only=True`` and nothing is
+    sent, whatever a caller asks for. ``extra_log`` also receives every call entry (the holdout
+    run's own call file).
+    """
+
+    transport: Transport
+    budget: BudgetGuard
+    roots: tuple[Path, Path]
+    paid: bool
+    policy: RetryPolicy = field(default_factory=RetryPolicy)
+    extra_log: CallLog | None = None
+
+    def __post_init__(self) -> None:
+        """Refuse one root for both namespaces (reading 2 would replay reading 1; T88 (1))."""
+        if Path(self.roots[0]).resolve() == Path(self.roots[1]).resolve():
+            raise ValueError("the two reply namespaces need separate cache roots")
+
+    @classmethod
+    def replay(cls, cache_dir: Path) -> ModelSetup:
+        """A replay-only setup over ``cache_dir`` (no transport, a zero budget that never reserves)."""
+        return cls(NoSendTransport(), BudgetGuard(0.0, 0, Path(cache_dir) / "ledger.jsonl"),
+                   namespace_roots(cache_dir), paid=False)
+
+    @classmethod
+    def paid_run(cls, transport: Transport, *, dollar_cap: float, call_cap: int, cache_dir: Path) -> ModelSetup:
+        """A paid setup: ``transport`` and one BudgetGuard with these caps on the project ledger."""
+        return cls(transport, BudgetGuard(dollar_cap, call_cap, Path(cache_dir) / "ledger.jsonl"),
+                   namespace_roots(cache_dir), paid=True)
+
+    @classmethod
+    def from_client(cls, client: ModelClient) -> ModelSetup:
+        """The setup around an existing client (the holdout run's): its transport, budget, policy and log;
+        its cache root is the first namespace and the second is its sibling."""
+        root = Path(client.cache.root)
+        if root.name != REPLY_NAMESPACES[0]:
+            raise ValueError(f"the client's cache root must be named {REPLY_NAMESPACES[0]!r}")
+        return cls(client.transport, client.budget, namespace_roots(root.parent), paid=not client.replay_only,
+                   policy=client.policy, extra_log=client.log)
+
+    def client(self, namespace: int, *, paid: bool, log: CallLog | RunArtifacts, run_id: str) -> ModelClient:
+        """A client on one namespace; it may send only when ``paid`` and the setup is paid. Given the run's
+        artifacts as ``log``, its entries are tagged with the namespace (for ``usage.json``)."""
+        send = paid and self.paid
+        sink = log.namespace_log(namespace) if isinstance(log, RunArtifacts) else log
+        return ModelClient(self.transport, ReplyCache(self.roots[namespace]), self.budget, self.policy, sink,
+                           replay_only=not send, run_id=run_id)
+
+    def budget_record(self) -> dict[str, Any]:
+        """Caps and spend of this setup's guard (for the run records)."""
+        return {"paid": self.paid, "dollar_cap": self.budget.dollar_cap, "call_cap": self.budget.call_cap,
+                "sends": self.budget.calls, "settled_usd": round(self.budget.run_spent_usd, 6),
+                "namespaces": [Path(r).name for r in self.roots]}
+
+
+class _RunLock:
+    """Releases the setup's paid-run lock at the end of a command, if the command took it."""
+
+    def __init__(self, setup: ModelSetup) -> None:
+        self.setup = setup
+        self.held_before = setup.budget.holds_run_lock
+
+    def __enter__(self) -> _RunLock:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        if not self.held_before:
+            self.setup.budget.release_run_lock()
+
+
+# ----------------------------------------------------------------------------- the full run
 @dataclass(frozen=True)
 class RunSummary:
     """What a run wrote and its headline counts."""
@@ -101,10 +251,16 @@ class RunSummary:
     output_sha256: str
     rows: int
     metrics: dict[str, Any]
+    gate: dict[str, Any] | None = None
+    passed: bool = True
 
 
 def evidence_record(ctx: AuditContext, world: World) -> dict[str, Any]:
-    """Producer-record evidence fields for ``evidence_guard.check_producer`` (T47, T60, T72)."""
+    """Producer-record evidence fields for ``evidence_guard.check_producer`` (T47, T60, T72).
+
+    A PNG the vision step read (``ctx.vision_read``) is not a failure of the world, so it is not a
+    skip; it is listed under ``evidence_read_by_vision`` instead.
+    """
     skipped = sorted(f"{f.file_id}:png-model-needed" for f in world.failures if f.png)
     failures = sorted(f"{f.file_id}:{f.status}" for f in world.failures if not f.png)
     return {
@@ -113,6 +269,7 @@ def evidence_record(ctx: AuditContext, world: World) -> dict[str, Any]:
         "evidence_failures": failures,
         "evidence_no_resource_id_files": [],
         "evidence_parse": {fid: fp.status for fid, fp in ctx.index.files.items()},
+        "evidence_read_by_vision": sorted(ctx.vision_read),
     }
 
 
@@ -122,6 +279,137 @@ def resolve_cases(ctx: AuditContext, cases: Sequence[str] | Literal["test"]) -> 
         bad = [i.case_id for i in ctx.request_issues if i.case_id and i.file == "deletion_requests.csv"]
         return sorted({r.case_id for r in ctx.requests if r.source == "test"} | set(bad))
     return list(cases)
+
+
+def check_vision_ack(vision: VisionRun, ack_run_id: str | None, runs_dir: Path) -> dict[str, Any]:
+    """Whether ``ack_run_id`` acknowledges exactly this run's images that need review (module docstring).
+
+    The named run's ``vision_readings.json`` must list the same images as needing review, and its
+    report of each of them (status, reply keys, both readings, agreement, flags, IDs) must equal this
+    run's: the developer reviewed these very readings, not others.
+    """
+    needs = list(vision.needs_review())
+    out: dict[str, Any] = {"needs_review": needs, "ack_run_id": ack_run_id}
+    if not needs:
+        return {**out, "ack_matches": None, "reason": "no image needs review"}
+    if ack_run_id is None:
+        return {**out, "ack_matches": False, "reason": "no acknowledgement given"}
+    if RUN_ID_RE.fullmatch(ack_run_id) is None:
+        return {**out, "ack_matches": False, "reason": "the acknowledged run ID is not shaped like a run ID"}
+    path = Path(runs_dir) / ack_run_id / "vision_readings.json"
+    try:
+        body = json.loads(path.read_text(encoding="utf-8"))
+        theirs = {i["file_id"]: i for i in body["images"]}
+        listed = list(body["needs_review"])
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        return {**out, "ack_matches": False, "reason": f"the acknowledged run's vision_readings.json is unreadable "
+                                                       f"({type(exc).__name__})"}
+    mine = {i["file_id"]: i for i in vision_run_report(vision)}
+    same = listed == needs and all(theirs.get(f) == mine.get(f) for f in needs)
+    reason = "same images and readings" if same else "the acknowledged run's review list or readings differ"
+    return {**out, "ack_matches": same, "reason": reason}
+
+
+class _PatchedWorlds:
+    """Builds the world for a case's validated image answers, and keeps it for the regression gate."""
+
+    def __init__(self, ctx: AuditContext) -> None:
+        self.ctx = ctx
+        self.case: str | None = None
+        self.built: dict[str, World] = {}
+
+    def __call__(self, validated: Sequence[ValidatedAnswer]) -> World:
+        obs = patch_image_observations(self.ctx.image_observations, validated)
+        w = build_world(replace(self.ctx, image_observations=obs))
+        if self.case is not None:
+            self.built[self.case] = w
+        return w
+
+
+def _not_run_report(mode: str, reason: str) -> dict[str, Any]:
+    """The ``"agent"`` object of a case the agent did not run (a request row that could not be loaded):
+    nothing about the request is trusted, so no model sees it (T86 item 2). Same fields as G7a's report."""
+    return {
+        "mode": mode,
+        "intent": {"label": None, "source": "FAILED_CLOSED", "committed_key": None, "final_key": None,
+                   "committed_label": None, "final_label": None, "agrees": None,
+                   "crosscheck": {"intake_non_deletion": False, "activity_ids": []}},
+        "turn1_replicates": [], "tool_calls": [], "audit_case_calls": 0, "answers_applied": [], "answers_noted": [],
+        "answers_rejected": [], "steps_differ_when_applied": False, "status": "FAILED",
+        "flags": ["AGENT_NOT_RUN"], "not_run_reason": reason,
+        "instruction_like_text": {"code": False, "model": False, "merged": False, "code_patterns": [],
+                                  "code_sources": [], "checked": False},
+        "replies": [],
+    }
+
+
+def _with_answers(res: AgentCaseResult) -> CaseRecord:
+    """The applied record with its open questions, validated answers and rejections (G7a proposal 6)."""
+    return replace(
+        res.applied,
+        open_questions=tuple(q.oq_id for q in res.outcome.questions),
+        answers=tuple(v.oq_id for v in res.check.validated),
+        rejected=tuple(f"{r.oq_id}:{r.reason}" for r in res.check.rejected),
+    )
+
+
+def _row(rec: CaseRecord) -> Row:
+    return Row(rec.status, steps_json(rec.steps))
+
+
+@dataclass
+class _GateInputs:
+    """What the regression gate's recompiles need from one run."""
+
+    world: World
+    world_plain: World
+    patched: _PatchedWorlds
+    vision: VisionRun
+    records: Mapping[str, CaseRecord]
+    results: Mapping[str, AgentCaseResult]
+
+    def evidence(self, cid: str) -> CaseEvidence:
+        """Recompile one changed case with the intent only, the images only and both (T100)."""
+        after = self.records[cid]
+        res = self.results.get(cid)
+        if res is None:  # the agent did not run: neither input exists for this case
+            row = _row(after)
+            return CaseEvidence(cid, row, row, row, row, False, None, after.intent.source, (), False)
+        applied = res.intent
+        w_case = self.patched.built.get(cid, self.world)
+        fail = FixedIntent(fail_closed_intent(applied.crosscheck))
+        intent_only = audit_case(cid, self.world_plain, FixedIntent(applied))
+        image_only = audit_case(cid, w_case, fail)
+        both = audit_case(cid, w_case, FixedIntent(applied))
+        plain_fc = audit_case(cid, self.world_plain, fail)
+        resources = frozenset(r.key.resource_id for rec in (after, image_only) for r in rec.resources)
+        png = {r.file_id for r in self.vision.records}
+        image_obs = w_case.ctx.image_observations
+        involved = set(plain_fc.failed_dependencies) & png
+        involved |= {o.file_id for o in image_obs if o.resource_id in resources}
+        waiting = sorted(r.key.resource_id for r in plain_fc.resources
+                         if any(f.code == "STATE_NEEDS_IMAGE" for f in r.flags))
+        supplied = sorted({o.resource_id for o in image_obs if o.file_id in involved and o.resource_id})
+        return CaseEvidence(
+            case_id=cid, after=_row(after), intent_only=_row(intent_only), image_only=_row(image_only),
+            both=_row(both), intent_changed=applied.source in ("MODEL", "MODEL_AFTER_TOOLS"),
+            intent_label=applied.label, intent_source=applied.source,
+            turn1_labels=tuple(res.report["turn1_replicates"]),
+            intake_non_deletion=applied.crosscheck.intake_non_deletion,
+            images=image_facts(sorted(involved), self.vision.by_file(), resources),
+            waiting_resources=tuple(waiting), image_resources=tuple(supplied),
+        )
+
+
+def _setup_for(model: ModelSetup | None, replay_only: bool) -> ModelSetup:
+    """The run's setup; ``replay_only`` must agree with it (a paid run needs a paid setup)."""
+    if model is None:
+        if not replay_only:
+            raise ValueError("a paid run needs a paid ModelSetup (pipeline.ModelSetup.paid_run)")
+        return ModelSetup.replay(REPO_ROOT / "cache")
+    if model.paid == replay_only:
+        raise ValueError("replay_only contradicts the ModelSetup's paid flag")
+    return model
 
 
 def run(
@@ -135,53 +423,279 @@ def run(
     runs_dir: Path | None = None,
     command: str = "",
     holdout_unlock: str | None = None,
+    model: ModelSetup | None = None,
+    vision_ack: str | None = None,
+    regression_gate: bool = False,
+    approved_record: Path | None = None,
+    caps: LoopCaps | None = None,
 ) -> RunSummary:
-    """Run the engine on ``cases`` and write the run directory (module docstring)."""
+    """Run the pipeline on ``cases`` and write the run directory (module docstring).
+
+    ``model`` is the command's :class:`ModelSetup` (default: replay only over ``cache/``);
+    ``vision_ack`` the reviewed vision run ID; ``regression_gate`` turns on the T100/T101 gate
+    against ``approved_record`` (default ``notes/approved_output.json``).
+    """
     if RUN_ID_RE.fullmatch(run_id) is None:
         raise ValueError("run id must match ^[A-Za-z0-9][A-Za-z0-9._-]*$")
+    if mode not in MODES:
+        raise ValueError(f"unknown mode {mode!r}")
     granted = False
     if cases != "test":
         granted = guard_holdout(cases, holdout_unlock, run_id, granted)  # before any input is read
+    setup = _setup_for(model, replay_only)
     t0 = time.monotonic()
-    ctx = build_context(dataset_dir)
-    wanted = resolve_cases(ctx, cases)
+    ctx0 = build_context(dataset_dir)
+    wanted = resolve_cases(ctx0, cases)
     granted = guard_holdout(wanted, holdout_unlock, run_id, granted)  # also a resolved "test" run
-    world = build_world(ctx)
-    records = audit_all(ctx, wanted, FailClosedIntent(), world)
-    run_dir = (runs_dir or REPO_ROOT / "runs") / run_id
+    known = {r.case_id for r in ctx0.requests}
+    malformed = {i.case_id for i in ctx0.request_issues if i.case_id}
+    missing = sorted(set(wanted) - known - malformed)
+    if missing:
+        raise KeyError(f"{len(missing)} requested case(s) are in no request file")
+    runs_root = runs_dir or REPO_ROOT / "runs"
+    run_dir = runs_root / run_id
+    arts = RunArtifacts(run_dir, extra_log=setup.extra_log)
+    arts.start_calls()
+    with _RunLock(setup):
+        primary = setup.client(0, paid=True, log=arts, run_id=run_id)
+        replica = setup.client(1, paid=False, log=arts, run_id=run_id)
+        vision_clients = (setup.client(0, paid=False, log=arts, run_id=run_id), replica)
+        vision = read_images(ctx0, vision_clients, learn_shapes(ctx0.index.observations(), ctx0.activity))
+        write_vision_artifacts(run_dir, vision)
+        write_json(run_dir / "vision.json", vision_run_report(vision))
+        review = check_vision_ack(vision, vision_ack, runs_root)
+        if setup.paid and review["needs_review"] and not review["ack_matches"]:
+            write_json(run_dir / "refused.json", {"run_id": run_id, "refused": "vision review required",
+                                                  "vision_review": review, "created_at": now_ist()})
+            raise VisionReviewRequired(
+                f"refused: {len(review['needs_review'])} image(s) need the developer's review before a paid full "
+                "run; pass the reviewed vision run ID (--vision-ack)")
+        ctx = replace(ctx0, image_observations=vision.observations, vision_read=vision.read_ok())
+        world = build_world(ctx)
+        patched = _PatchedWorlds(ctx)
+        records: dict[str, CaseRecord] = {}
+        results: dict[str, AgentCaseResult] = {}
+        for cid in sorted(set(wanted)):
+            if cid not in known:
+                records[cid] = malformed_record(cid, world)
+                arts.case(records[cid], _not_run_report(mode, "MALFORMED_REQUEST"))
+                continue
+            patched.case = cid
+            res = audit_with_agent(cid, world, primary, mode=mode, caps=caps, vision=vision,
+                                   replicate_clients=(replica,), world_for_answers=patched)
+            results[cid], records[cid] = res, _with_answers(res)
+            arts.case(records[cid], res.report)
     out_path = run_dir / "output.csv"
-    sha = write_output([(r.case_id, r.status, r.steps) for r in records.values()], out_path)
+    rows = [(r.case_id, r.status, r.steps) for r in records.values()]
+    sha = write_output(rows, out_path)
     if write_root:
-        root_sha = write_output([(r.case_id, r.status, r.steps) for r in records.values()], REPO_ROOT / "output.csv")
+        root_sha = write_output(rows, REPO_ROOT / "output.csv")
         if root_sha != sha:
             raise RuntimeError("root output.csv differs from the run's output.csv")
-    arts = RunArtifacts(run_dir)
-    for r in records.values():
-        arts.case(r)
+    gate: dict[str, Any] | None = None
+    passed = True
+    if regression_gate:
+        baseline: Baseline | BaselineRefused
+        try:
+            baseline = load_baseline(approved_record or REPO_ROOT / APPROVED_OUTPUT_RECORD, REPO_ROOT)
+        except BaselineRefused as exc:
+            baseline = exc
+        plain = world if not (ctx.image_observations or ctx.vision_read) else build_world(ctx0)
+        inputs = _GateInputs(world, plain, patched, vision, records, results)
+        result = run_gate(baseline, {cid: _row(r) for cid, r in records.items()}, inputs.evidence)
+        write_regression(run_dir, result, run_id)
+        gate, passed = result.summary(), result.passed
+    usage = arts.usage(setup.roots)
     producer = {
         "tool": "code/deletion_audit (pipeline.run)",
         "command": command,
         "description": (
-            f"G5 deterministic engine on {len(records)} case(s); mode {mode} recorded, engine path only; "
-            "intent fail-closed (T71 Q2); no model calls"
+            f"G7 pipeline on {len(records)} case(s), mode {mode}, "
+            f"{'paid' if setup.paid else 'replay-only'}: vision, then the agent per case on the G5 engine; "
+            f"{usage['replies_used']['count']} model replies used, {usage['model_calls']} sent by this run"
         ),
         "mode": mode,
-        "replay_only": replay_only,
+        "replay_only": not setup.paid,
         "rows_written": len(records),
         "output_sha256": sha,
-        "model_ids": [],
-        "paid_model_calls": 0,
+        "model_ids": usage["model_ids"],
+        "paid_model_calls": usage["model_calls"],
+        "budget": setup.budget_record(),
         "created_at": now_ist(),
         "code_sha256": code_hash(),
         "git_head": git_head(),
         "holdout_unlocked": granted,
         **evidence_record(ctx, world),
+        "vision": {"images": len(vision.records), "read_ok": sorted(vision.read_ok()),
+                   "observations": len(vision.observations), "review": review},
+        "intent_sources": dict(sorted(Counter(r.intent.source for r in records.values()).items())),
+        "regression_gate": gate if gate is not None else {"run": False},
+        "run_passed": passed,
         "request_issues": [
             {"file": i.file, "line": i.line, "case_id": i.case_id, "reason": i.reason} for i in ctx.request_issues
         ],
     }
-    metrics = arts.finish(sha, producer, time.monotonic() - t0)
-    return RunSummary(run_id, out_path, sha, len(records), metrics)
+    if not passed and gate is not None:
+        producer["refusal"] = (f"regression gate: {gate['refusal']}" if gate.get("refusal")
+                               else f"regression gate: {len(gate['stop_cases'])} changed row(s) marked stop")
+    metrics = arts.finish(sha, producer, time.monotonic() - t0, usage)
+    return RunSummary(run_id, out_path, sha, len(records), metrics, gate, passed)
+
+
+# ----------------------------------------------------------------------------- the paid entry points
+@dataclass(frozen=True)
+class TextCase:
+    """One request of a text source: where it came from and its text (never written to an artifact)."""
+
+    source: str
+    folder: str
+    dataset_dir: Path
+    case_id: str
+    text: str
+
+
+def _fixture_dirs(root: Path) -> list[Path]:
+    return sorted(p for p in root.iterdir() if p.is_dir() and (p / "deletion_requests.csv").is_file())
+
+
+def text_cases(sources: Sequence[str], repo_root: Path = REPO_ROOT) -> list[TextCase]:
+    """The requests of each named source, read from the request files only (never from gold).
+
+    * ``dev``: the DEV case IDs (``code/evaluation/split.py``) of ``dataset/sample_deletion_requests.csv``;
+      a holdout case is never included (the selection is refused if one slips in);
+    * ``test``: every loadable row of ``dataset/deletion_requests.csv``;
+    * ``fixtures``: every loadable row of both request files of each ``code/tests/fixtures/F*`` folder;
+    * ``redteam``: the same for each ``code/tests/fixtures/redteam/R*`` folder.
+    """
+    unknown = sorted(set(sources) - set(TEXT_SOURCES))
+    if unknown or not sources:
+        raise ValueError(f"text sources must be among {list(TEXT_SOURCES)}")
+    out: list[TextCase] = []
+    fixtures = repo_root / "code" / "tests" / "fixtures"
+    for source in sources:
+        if source in ("dev", "test"):
+            d = repo_root / "dataset"
+            reqs, _ = load_requests_checked(d)
+            if source == "dev":
+                pick = [r for r in reqs if r.source == "sample" and r.case_id in dev_ids()]
+                refuse_holdout(r.case_id for r in pick)
+            else:
+                pick = [r for r in reqs if r.source == "test"]
+            out += [TextCase(source, "dataset", d, r.case_id, r.request_text) for r in pick]
+            continue
+        dirs = _fixture_dirs(fixtures / "redteam") if source == "redteam" else [
+            p for p in _fixture_dirs(fixtures) if p.name != "redteam"]
+        for d in dirs:
+            reqs, _ = load_requests_checked(d)
+            out += [TextCase(source, d.name, d, r.case_id, r.request_text) for r in reqs]
+    return out
+
+
+def _run_record(kind: str, run_id: str, command: str, setup: ModelSetup, **extra: Any) -> dict[str, Any]:
+    return {"kind": kind, "run_id": run_id, "command": command, "created_at": now_ist(), "git_head": git_head(),
+            "code_sha256": code_hash(), "budget": setup.budget_record(), **extra}
+
+
+def run_routing_check(*, run_id: str, sources: Sequence[str], model: ModelSetup, runs_dir: Path | None = None,
+                      command: str = "", repo_root: Path = REPO_ROOT) -> dict[str, Any]:
+    """The turn-1 routing check (G3 section 3; T70, T92, T97): turn 1 only, on every distinct text of
+    ``sources``, once per namespace (two replicates; G7a's :func:`~deletion_audit.agent.routing_table`).
+
+    Writes ``routing_table.json`` / ``.md`` (per case: each reading's label against the intake
+    cross-check, and whether the two readings agree), ``calls.jsonl``, ``usage.json`` and
+    ``run.json`` under ``runs/<run_id>/``. Texts are named by ``text_id``, never written.
+    """
+    if RUN_ID_RE.fullmatch(run_id) is None:
+        raise ValueError("run id must match ^[A-Za-z0-9][A-Za-z0-9._-]*$")
+    picked = text_cases(sources, repo_root)
+    worlds: dict[Path, World] = {}
+    for c in picked:
+        if c.dataset_dir not in worlds:
+            worlds[c.dataset_dir] = build_world(build_context(c.dataset_dir))
+    run_dir = (runs_dir or REPO_ROOT / "runs") / run_id
+    arts = RunArtifacts(run_dir, extra_log=model.extra_log)
+    arts.start_calls()
+    with _RunLock(model):
+        clients = [model.client(i, paid=True, log=arts, run_id=run_id) for i in (0, 1)]
+        table = routing_table([c.text for c in picked], clients)
+    by_text = {row["text_id"]: row for row in table}
+    case_rows = []
+    for c in picked:
+        cc = intake_crosscheck(c.case_id, worlds[c.dataset_dir])
+        row = by_text[text_id(c.text)]
+        case_rows.append({"source": c.source, "folder": c.folder, "case_id": c.case_id, "text_id": row["text_id"],
+                          "labels": row["labels"], "agree": row["agree"], "intake_non_deletion": cc.intake_non_deletion,
+                          "intake_activity_ids": list(cc.activity_ids)})
+    matrix = {}
+    for k, ns in enumerate(REPLY_NAMESPACES):
+        counts: dict[str, dict[str, int]] = {}
+        for r in case_rows:
+            label = r["labels"][k] or "FAILED"
+            cell = counts.setdefault(label, {"intake_row_present": 0, "intake_row_absent": 0})
+            cell["intake_row_present" if r["intake_non_deletion"] else "intake_row_absent"] += 1
+        matrix[ns] = dict(sorted(counts.items()))
+    usage = arts.usage(model.roots)
+    body = {
+        "kind": "routing-check", "run_id": run_id, "sources": list(sources), "namespaces": list(REPLY_NAMESPACES),
+        "distinct_texts": len(table), "cases": len(case_rows),
+        "texts": table, "case_rows": case_rows, "matrix_label_x_intake": matrix,
+        "replicate_agreement": {
+            "texts": dict(sorted(Counter("agree" if r["agree"] else "disagree_or_failed" for r in table).items())),
+            "cases": dict(sorted(Counter("agree" if r["agree"] else "disagree_or_failed" for r in case_rows).items())),
+        },
+        "measured": "turn-1 replies through ModelClient per namespace; intake cross-check from the engine's world",
+    }
+    write_json(run_dir / "routing_table.json", body)
+    (run_dir / "routing_table.md").write_text(_routing_markdown(body), encoding="utf-8")
+    write_json(run_dir / "usage.json", usage)
+    record = _run_record("routing-check", run_id, command, model, sources=list(sources), distinct_texts=len(table),
+                         cases=len(case_rows), model_calls=usage["model_calls"], model_ids=usage["model_ids"])
+    write_json(run_dir / "run.json", record)
+    return {**record, "matrix_label_x_intake": matrix, "replicate_agreement": body["replicate_agreement"]}
+
+
+def _routing_markdown(body: Mapping[str, Any]) -> str:
+    lines = [f"# Turn-1 routing check: run {body['run_id']}", "",
+             f"Sources {', '.join(body['sources'])}: {body['cases']} cases, {body['distinct_texts']} distinct texts, "
+             f"read once in each namespace ({', '.join(body['namespaces'])}).", ""]
+    for ns, counts in body["matrix_label_x_intake"].items():
+        lines += [f"## Model label x intake cross-check ({ns})", "",
+                  "| label | intake row present | intake row absent |", "|---|---|---|"]
+        lines += [f"| {lab} | {c['intake_row_present']} | {c['intake_row_absent']} |" for lab, c in counts.items()]
+        lines.append("")
+    agree = body["replicate_agreement"]
+    lines += [f"Replicate agreement: texts {agree['texts']}; cases {agree['cases']}.", "",
+              "| source | folder | case | text | labels | agree | intake row |", "|---|---|---|---|---|---|---|"]
+    lines += [f"| {r['source']} | {r['folder']} | {r['case_id']} | {r['text_id']} | {r['labels']} | {r['agree']} | "
+              f"{r['intake_non_deletion']} |" for r in body["case_rows"]]
+    return "\n".join(lines) + "\n"
+
+
+def run_vision(dataset_dir: Path, *, run_id: str, model: ModelSetup, runs_dir: Path | None = None,
+               command: str = "") -> dict[str, Any]:
+    """The vision command (T88, T97): every PNG read twice, once per namespace, then compared and merged.
+
+    Writes ``vision_readings.json`` / ``.md`` (both readings, for the developer's review),
+    ``vision.json`` (G7b's adapter list), ``calls.jsonl``, ``usage.json`` and ``run.json``.
+    """
+    if RUN_ID_RE.fullmatch(run_id) is None:
+        raise ValueError("run id must match ^[A-Za-z0-9][A-Za-z0-9._-]*$")
+    ctx = build_context(dataset_dir)
+    run_dir = (runs_dir or REPO_ROOT / "runs") / run_id
+    arts = RunArtifacts(run_dir, extra_log=model.extra_log)
+    arts.start_calls()
+    with _RunLock(model):
+        clients = [model.client(i, paid=True, log=arts, run_id=run_id) for i in (0, 1)]
+        vision = read_images(ctx, clients, learn_shapes(ctx.index.observations(), ctx.activity))
+    write_vision_artifacts(run_dir, vision)
+    write_json(run_dir / "vision.json", vision_run_report(vision))
+    usage = arts.usage(model.roots)
+    write_json(run_dir / "usage.json", usage)
+    record = _run_record("vision-readings", run_id, command, model, images=len(vision.records),
+                         read_ok=sorted(vision.read_ok()), needs_review=list(vision.needs_review()),
+                         model_calls=usage["model_calls"], model_ids=usage["model_ids"])
+    write_json(run_dir / "run.json", record)
+    return record
 
 
 def code_hash() -> str:

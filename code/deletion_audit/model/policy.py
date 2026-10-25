@@ -47,6 +47,10 @@ class Failure:
         retry_after_s: the server's requested wait in seconds, when it sent one.
         should_retry: the server's ``x-should-retry`` header value, when present.
         detail: a short description for the call log (no reply text).
+        api_error_type: the API's error ``type`` from an HTTP error body, else None.
+        api_error_message: the API's error ``message`` from an HTTP error body (at most 500
+            characters, cut with a marker), else None. Untrusted API text, kept as data.
+        request_id: the request ID of the failed HTTP response, when it had one.
     """
 
     kind: FailureKind
@@ -55,6 +59,9 @@ class Failure:
     retry_after_s: float | None = None
     should_retry: str | None = None
     detail: str = ""
+    api_error_type: str | None = None
+    api_error_message: str | None = None
+    request_id: str | None = None
 
 
 @dataclass(frozen=True)

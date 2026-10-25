@@ -95,3 +95,15 @@ class EngineConfig:
     """Top-level engine configuration."""
 
     accounts: AccountConfig = field(default_factory=AccountConfig)
+
+
+# ----------------------------------------------------------------------------- model wiring (G7)
+#: Reply-cache namespaces under the cache directory: the case's own conversation (and vision
+#: reading 1) in the first, the turn-1 replicate (and vision reading 2) in the second. Basis: G3
+#: section 8 ("replicates ... use a separate cache root (``cache/replies-replica-k/``), not a key
+#: change"); T88 (1) (two readings per image, in separate cache namespaces); T70 (two replicate runs).
+REPLY_NAMESPACES: tuple[str, str] = ("replies", "replies-replica-1")
+
+#: The record of the developer-approved output (T101 (1)); the regression gate and the freeze check
+#: read the approved file's path and sha256 from it at run time, relative to the repo root.
+APPROVED_OUTPUT_RECORD = "notes/approved_output.json"

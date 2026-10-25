@@ -5,8 +5,9 @@
   never COMPLETE and never NOT_APPLICABLE, with its reason counted in the run artifacts. It is
   used when no schema-valid honest row exists: an unparsed dependency (T8), a missing evidence
   file or a malformed request row (T86), an unresolved identity (T63), a linked record whose
-  evidence gives no step (UNINTERPRETED_RECORD, ``engine`` module docstring), nothing found, or a
-  row the validator refuses.
+  evidence gives no step (UNINTERPRETED_RECORD, ``engine`` module docstring), a finding whose
+  record only post-audit files hold (POST_AUDIT_ONLY_FINDING, developer ruling T101), nothing
+  found, or a row the validator refuses.
 * ``IntentDecision`` lives here until the model gate (G7) exists; G5's intent stage returns the
   fail-closed decision of T71 Q2: the engine's deletion-path row, flagged, never NOT_APPLICABLE.
 """
@@ -31,6 +32,7 @@ IntentSource = Literal["MODEL", "MODEL_AFTER_TOOLS", "FAILED_CLOSED", "FAILED_BU
 FailedClosedReason = Literal[
     "UNPARSED_DEPENDENCY",
     "UNINTERPRETED_RECORD",
+    "POST_AUDIT_ONLY_FINDING",
     "MISSING_EVIDENCE_FILE",
     "IDENTITY_UNRESOLVED",
     "NOTHING_FOUND",

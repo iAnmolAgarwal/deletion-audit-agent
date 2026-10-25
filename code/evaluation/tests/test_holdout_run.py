@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import tempfile
 import unittest
 from pathlib import Path
 from typing import Any
@@ -346,16 +347,37 @@ class TestPipelineRunnerAndBudget(unittest.TestCase):
 
     def test_pipeline_runner_passes_the_intended_keywords(self) -> None:
         from deletion_audit import pipeline
+        from deletion_audit.model import FakeTransport, MemoryCallLog, ModelClient, ReplyCache, RetryPolicy
 
-        sentinel_client = object()
-        with mock.patch.object(pipeline, "run", return_value="summary") as run:
-            out = hr.pipeline_runner(dataset_dir=Path("/d"), run_id="holdout-x", cases=("case_952", "case_951"),
-                                     phrase=PHRASE, client=sentinel_client,  # type: ignore[arg-type]
-                                     runs_dir=Path("/r"), command="c")
+        with tempfile.TemporaryDirectory() as tmp:
+            budget = hr.make_budget(hr.Settings(repo_root=Path(tmp), runs_root=Path(tmp) / "runs",
+                                                dataset_dir=Path(tmp) / "d", gold_path=Path(tmp) / "g",
+                                                split_json=Path(tmp) / "s", cache_root=Path(tmp) / "cache"))
+            log = MemoryCallLog()
+            client = ModelClient(FakeTransport(), ReplyCache(pipeline.namespace_roots(Path(tmp) / "cache")[0]), budget,
+                                 RetryPolicy(), log, replay_only=False, run_id="holdout-x")
+            try:
+                with mock.patch.object(pipeline, "run", return_value="summary") as run:
+                    out = hr.pipeline_runner(dataset_dir=Path("/d"), run_id="holdout-x",
+                                             cases=("case_952", "case_951"), phrase=PHRASE, client=client,
+                                             runs_dir=Path("/r"), command="c")
+            finally:
+                client.close()
         self.assertEqual(out, "summary")
-        run.assert_called_once_with(Path("/d"), run_id="holdout-x", cases=["case_952", "case_951"], mode="A+",
-                                    replay_only=False, holdout_unlock=PHRASE, client=sentinel_client,
-                                    runs_dir=Path("/r"), command="c")
+        run.assert_called_once()
+        args, kw = run.call_args
+        self.assertEqual(args, (Path("/d"),))
+        setup = kw.pop("model")
+        self.assertEqual(kw, {"run_id": "holdout-x", "cases": ["case_952", "case_951"], "mode": "A+",
+                              "replay_only": False, "holdout_unlock": PHRASE, "runs_dir": Path("/r"), "command": "c"})
+        # the holdout client's wiring: same transport, the one $1/60 guard, its policy and log; paid
+        self.assertIs(setup.transport, client.transport)
+        self.assertIs(setup.budget, budget)
+        self.assertEqual((setup.budget.dollar_cap, setup.budget.call_cap), (1.0, 60))
+        self.assertIs(setup.policy, client.policy)
+        self.assertIs(setup.extra_log, log)
+        self.assertTrue(setup.paid)
+        self.assertEqual(setup.roots, pipeline.namespace_roots(Path(tmp) / "cache"))
 
 
 class TestRealPathsUntouched(unittest.TestCase):

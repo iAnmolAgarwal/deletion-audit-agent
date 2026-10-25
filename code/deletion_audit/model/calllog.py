@@ -1,7 +1,9 @@
 """The call log: one entry per cache read, send attempt and reply check.
 
 Each entry names the run, the request key, what happened, and for a failure its
-``error_class`` and HTTP ``status``. Entries carry IDs, counts and costs, never reply text.
+``error_class`` and HTTP ``status``, plus, for an HTTP error, the API's own error type and
+message. Entries carry IDs, counts, costs and that capped error text, never reply text, request
+bodies, headers or the API key.
 :class:`JsonlCallLog` appends entries to a JSON-lines file (``runs/<run_id>/calls.jsonl``);
 :class:`MemoryCallLog` keeps them in a list.
 """
@@ -37,8 +39,12 @@ class CallLogEntry:
         stop_reason: the reply's stop reason, when there was a reply.
         usage: the reply's flattened usage, for a send that got a reply.
         cost_usd: the settled cost of a send (0.0 for a failed send or a cache read).
-        request_id: the API request ID, when known.
+        request_id: the API request ID, when known (for a failed HTTP send, the error
+            response's ID).
         detail: a short note (decision, give-up reason); never reply text.
+        api_error_type: for a send that got an HTTP error, the API's error ``type``; else None.
+        api_error_message: for a send that got an HTTP error, the API's error ``message``
+            (at most 500 characters, cut with a marker); else None. Untrusted API text.
     """
 
     run_id: str
@@ -54,6 +60,8 @@ class CallLogEntry:
     cost_usd: float = 0.0
     request_id: str | None = None
     detail: str = ""
+    api_error_type: str | None = None
+    api_error_message: str | None = None
 
 
 class CallLog(Protocol):

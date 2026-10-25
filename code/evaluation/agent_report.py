@@ -19,7 +19,8 @@ What it reports, per arm:
    gold (``gold.load_gold``, DEV only), fixture pass counts, and the test rows that differ
    between arms, by case ID.
 4. **Intent:** the model's label against the intake cross-check, ``agrees``, committed vs
-   final key, and turn-1 replicate agreement.
+   final intent label (T92: labels, not reply keys; the keys are read as provenance only), and
+   turn-1 replicate agreement.
 5. **Vision:** per-field replicate agreement per image, and the extracted resource IDs.
 6. **Cost:** from each run's ``usage.json``.
 
@@ -83,7 +84,8 @@ AGENT_KEYS = {"mode": "mode", "intent": "intent", "turn1_replicates": "turn1_rep
               "answers_applied": "answers_applied", "answers_rejected": "answers_rejected",
               "steps_differ_when_applied": "steps_differ_when_applied", "status": "status", "flags": "flags"}
 INTENT_KEYS = {"label": "label", "source": "source", "committed_key": "committed_key",
-               "final_key": "final_key", "agrees": "agrees", "crosscheck": "crosscheck",
+               "final_key": "final_key", "committed_label": "committed_label", "final_label": "final_label",
+               "agrees": "agrees", "crosscheck": "crosscheck",
                "intake_non_deletion": "intake_non_deletion", "activity_ids": "activity_ids"}
 TOOL_KEYS = {"name": "name", "args_hash": "args_hash", "is_error": "is_error", "evidence_ids": "evidence_ids"}
 REJECT_KEYS = {"oq_id": "oq_id", "reason": "reason"}
@@ -144,11 +146,13 @@ class IntentView:
 
     label: str | None
     source: str
-    committed_key: str | None
+    committed_key: str | None  # reply-cache keys: provenance only, never compared (T92)
     final_key: str | None
     agrees: bool | None
     intake_non_deletion: bool
     activity_ids: tuple[str, ...]
+    committed_label: str | None = None  # the intent labels compared committed vs final (T92)
+    final_label: str | None = None
 
 
 @dataclass(frozen=True)
@@ -304,6 +308,8 @@ def _adapt_intent(f: _Fields, raw: Any) -> IntentView | None:
     source = f.enum(raw, k["source"], f"{p}.{k['source']}", INTENT_SOURCES)
     committed = f.str_(raw, k["committed_key"], f"{p}.{k['committed_key']}", nullable=True)
     final = f.str_(raw, k["final_key"], f"{p}.{k['final_key']}", nullable=True)
+    committed_label = f.enum(raw, k["committed_label"], f"{p}.{k['committed_label']}", [*INTENT_LABELS, None])
+    final_label = f.enum(raw, k["final_label"], f"{p}.{k['final_label']}", [*INTENT_LABELS, None])
     agrees = f.bool_(raw, k["agrees"], f"{p}.{k['agrees']}", nullable=True)
     cc = f.get(raw, k["crosscheck"], f"{p}.{k['crosscheck']}")
     cp = f"{p}.{k['crosscheck']}"
@@ -316,7 +322,7 @@ def _adapt_intent(f: _Fields, raw: Any) -> IntentView | None:
         f.bad(f"{p}.{k['label']}", "label must be null exactly when the source is FAILED_CLOSED or FAILED_BUDGET")
     if not f.ok:
         return None
-    return IntentView(label, source, committed, final, agrees, intake, acts)
+    return IntentView(label, source, committed, final, agrees, intake, acts, committed_label, final_label)
 
 
 def _adapt_tool_calls(f: _Fields, items: list[Any], path: str) -> tuple[ToolCall, ...]:
@@ -599,7 +605,7 @@ def _all_flags(c: CaseView) -> set[str]:
 
 
 def intent_table(cases: Sequence[CaseView]) -> dict[str, Any]:
-    """Intent: model label (or FAILED) x intake cross-check row, agrees, committed/final, replicates."""
+    """Intent: model label (or FAILED) x intake cross-check row, agrees, committed/final label, replicates."""
     rows = {lab: {"intake_row_present": 0, "intake_row_absent": 0} for lab in (*INTENT_LABELS, FAILED_LABEL)}
     agrees: Counter[str] = Counter()
     cvf: Counter[str] = Counter()
@@ -611,12 +617,12 @@ def intent_table(cases: Sequence[CaseView]) -> dict[str, Any]:
         it = a.intent
         rows[it.label or FAILED_LABEL]["intake_row_present" if it.intake_non_deletion else "intake_row_absent"] += 1
         agrees[{True: "true", False: "false", None: "null"}[it.agrees]] += 1
-        if it.committed_key is None and it.final_key is None:
+        if it.committed_label is None and it.final_label is None:
             cvf["both_null"] += 1
-        elif it.committed_key is None or it.final_key is None:
+        elif it.committed_label is None or it.final_label is None:
             cvf["one_null"] += 1
         else:
-            cvf["equal" if it.committed_key == it.final_key else "differ"] += 1
+            cvf["equal" if it.committed_label == it.final_label else "differ"] += 1
         if len(a.turn1_replicates) < 2:
             reps["fewer_than_2"] += 1
         elif len(set(a.turn1_replicates)) == 1:
@@ -629,7 +635,7 @@ def intent_table(cases: Sequence[CaseView]) -> dict[str, Any]:
         "table": rows,
         "agrees": dict(sorted(agrees.items())),
         "sources": dict(sorted(Counter(c.agent.intent.source for c in cases if c.agent).items())),
-        "committed_vs_final_key": dict(sorted(cvf.items())),
+        "committed_vs_final_label": dict(sorted(cvf.items())),
         "intent_drift_flagged_cases": sum(1 for c in cases if INTENT_DRIFT_FLAG in _all_flags(c)),
         "turn1_replicates": {**dict(sorted(reps.items())), "disagree_case_ids": sorted(rep_disagree)},
     }
@@ -702,7 +708,8 @@ MEASURED = {
     "m_answers": f"{CASES_FILE} {AGENT_KEY}.steps_differ_when_applied (each case compiled with validated answers "
                  f"applied and withheld) and {AGENT_KEY}.answers_rejected[].reason",
     "intent": f"{CASES_FILE} {AGENT_KEY}.intent.label (null = FAILED) x intent.crosscheck.intake_non_deletion; "
-              "agrees as recorded; committed_key vs final_key equality; turn1_replicates all equal",
+              "agrees as recorded; committed_label vs final_label equality (T92; the keys are provenance); "
+              "turn1_replicates all equal",
     "vision": f"{VISION_ARTIFACT}: per field, the two readings compared by canonical JSON; resource_ids flags as "
               "recorded (well_formed, named_elsewhere)",
     "dev_score": f"evaluation.scorer.score_predictions on runs/<id>/{OUTPUT_FILE} against DEV gold "
@@ -932,7 +939,7 @@ def _md_intent(lines: list[str], v: Mapping[str, Any]) -> None:
     lines += [f"| {lab} | {c['intake_row_present']} | {c['intake_row_absent']} |" for lab, c in v["table"].items()]
     rep = v["turn1_replicates"]
     lines += ["", f"- agrees: {v['agrees']}; sources: {v['sources']}.",
-              f"- committed_key vs final_key: {v['committed_vs_final_key']}; INTENT_DRIFT flagged: "
+              f"- committed vs final intent label: {v['committed_vs_final_label']}; INTENT_DRIFT flagged: "
               f"{v['intent_drift_flagged_cases']}.",
               f"- turn-1 replicates: all agree {rep.get('all_agree', 0)}, disagree {rep.get('disagree', 0)}, "
               f"fewer than 2 {rep.get('fewer_than_2', 0)}; disagreeing cases: {rep['disagree_case_ids'] or 'none'}."]

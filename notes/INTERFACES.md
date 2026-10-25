@@ -667,6 +667,6 @@ The private `_load_file` return type also changed. The verifier's AST diff shows
   - no `temperature`;
   - one retry ladder for 408, 409, 429, 529, `InternalServerError`, `APIConnectionError` and `APITimeoutError`;
   - `stop_reason == "max_tokens"` and refusals are failures;
-  - each failed call's error class and status go to the run artifacts;
+  - each failed call's error class and status go to the run artifacts; for an HTTP error status, each `calls.jsonl` entry of that attempt also has `api_error_type` and `api_error_message` (the API's error body, message capped at 500 characters with a cut marker, kept as untrusted data) and `request_id`; `detail` keeps the policy decision (for example `NON_RETRYABLE`); connection errors, timeouts and reply-check failures leave the two `api_error_*` fields null;
   - fake-client tests for retry, cache and give-up.
 - **SDK version (T76):** `anthropic==1.13.0`, installed in `.venv/` (`requirements.txt`). GM writes `AnthropicTransport` for 1.13.0 and makes no live call. GM's tests run on `FakeTransport`. A live smoke call is proposed separately, cost first, before G7's routing check.

@@ -29,6 +29,7 @@ def agent(**over: Any) -> dict[str, Any]:
     base: dict[str, Any] = {
         "mode": "A+",
         "intent": {"label": "DELETION_REQUEST", "source": "MODEL", "committed_key": "k", "final_key": "k",
+                   "committed_label": "DELETION_REQUEST", "final_label": "DELETION_REQUEST",
                    "agrees": True, "crosscheck": {"intake_non_deletion": False, "activity_ids": []}},
         "turn1_replicates": ["DELETION_REQUEST", "DELETION_REQUEST"],
         "tool_calls": [],
@@ -44,9 +45,16 @@ def agent(**over: Any) -> dict[str, Any]:
     return base
 
 
+_SAME = object()
+
+
 def intent(label: str | None, source: str = "MODEL", *, intake: bool = False, agrees: bool | None = True,
-           committed: str | None = "k", final: str | None = "k") -> dict[str, Any]:
+           committed: str | None = "k", final: str | None = "k", committed_label: Any = _SAME,
+           final_label: Any = _SAME) -> dict[str, Any]:
+    """An intent block; the committed and final labels default to ``label`` (T92 label fields)."""
     return {"label": label, "source": source, "committed_key": committed, "final_key": final, "agrees": agrees,
+            "committed_label": label if committed_label is _SAME else committed_label,
+            "final_label": label if final_label is _SAME else final_label,
             "crosscheck": {"intake_non_deletion": intake, "activity_ids": ["activity_1"] if intake else []}}
 
 

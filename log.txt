@@ -5185,3 +5185,55 @@ parent_agent=none
 worktree=main
 branch=main
 repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T12:33:54+05:30] G7 wiring: agent connected to the pipeline, paid entry points added
+
+User Prompt (verbatim, secrets redacted):
+[brief written by main; approved in developer turn 2026-10-25T11:28:05+05:30]
+directed_by: 2026-10-25T11:28:05+05:30
+
+G7 wiring: connect G7a's agent package to the committed G5 pipeline, add the paid entry points for the routing check and vision, and keep every replay-only output byte-identical.
+(full brief from main)
+
+Agent Response Summary:
+pipeline.run now runs vision (two readings, replay-only in a full run), then audit_with_agent per case on the engine world built from the image observations, with a ModelSetup (one transport, one BudgetGuard, two reply namespaces) that is replay-only by default; calls.jsonl, usage.json, producer model_ids/paid_model_calls, the agent block, T92 labels, the vision-review acknowledgement, the R06 POST_AUDIT_ONLY_FINDING rule, the read-PNG skip fix, the T100/T101 model-on regression gate, the freeze check's approved-output comparison and holdout_run's client wiring are in. The CLI gained routing-check and vision commands and --paid/--dollar-cap/--call-cap/--env-file (only the API key line is loaded; never printed or written). The replay-only gate with an empty reply cache made 0 sends and kept both outputs byte-identical: DEV 641dbc8d... (run g7wire-dev22-20261025T1233) and test cf2a90b0... (run g7wire-test-20261025T1233, regression gate 0 changed rows); the 11 PNGs stay skips and unparsed dependencies until real readings exist. Suites: code/tests 489 OK, evaluation 277 OK (another agent's T106 generators added tests during the run); lint clean on every touched path; 17/17 planted faults caught. No paid call, .env not read, no gold or sample_output.csv opened.
+
+Actions:
+* Edited code/deletion_audit/{pipeline.py, artifacts.py, __main__.py, config.py, engine.py (vision_read failures, R06 rule), record.py (one reason)}
+* Edited code/deletion_audit/agent/{report.py, harness.py}; added agent/regression.py
+* Edited code/evaluation/{agent_report.py (label comparison), freeze_check.py (approved output), holdout_run.py (pipeline_runner, anthropic_client)} and their tests (holdout_fixtures.py, run_dirs.py, test_agent_report.py, test_freeze_check.py, test_holdout_run.py)
+* Added code/tests/pipeline/{_wiring.py, test_wiring.py, test_regression_gate.py, test_cli_paid.py, test_redteam_wired.py}; edited code/tests/agent/{test_report.py, test_properties.py (T63 pin 5 hand-written order)}
+* Ran: unittest discover (code/tests, code/evaluation/tests), scripts/lint.sh, replay-only DEV/test runs g7wire-*-20261025T1220 and g7wire-*-20261025T1233, routing-check and vision dry runs (replay-only, scratchpad), freeze_check on g7wire-test-20261025T1233, scratchpad g7wire/mutate.py
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=orch-builder-core
+parent_agent=main
+directed_by=2026-10-25T11:28:05+05:30
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T12:36:25+05:30] [auto] G7 wiring done and checked; committed before its review (T105)
+
+User Prompt (verbatim, secrets redacted):
+(Background-agent notification: the G7 wiring, orch-builder-core, directed_by 2026-10-25T11:28:05+05:30, finished. No developer text.)
+
+Agent Response Summary:
+The wiring connects G7a's agent package to the pipeline (ModelSetup, vision with two cache namespaces, a vision-review acknowledgement, the agent fields in cases.jsonl, calls.jsonl and usage.json from GM's logs). It adds routing-check and vision commands that are paid only with --paid and --env-file, the model-on regression gate (agent/regression.py), the R06 POST_AUDIT_ONLY_FINDING rule, the approved-output freeze check and the T92 labels. Main checked it: code/tests 489 OK and evaluation 277 OK, no new lint finding, and the replay-only gate runs give DEV 641dbc8d… and test cf2a90b0… with 0 paid calls. As T105 planned, it is committed before its review together with G7a and the GM error-text fix. Its three open points (the adapter's vision reading, a read screenshot that doesn't show a catalog-only record, a failed loop call keeping the committed intent) go to the developer and to the G7 verifier.
+
+Actions:
+* Checks: git status and diff --stat (protected modules empty; model/ GM only); unittest code/tests Ran 489 OK and code/evaluation/tests Ran 277 OK; scripts/lint.sh (ruff 4 pre-existing: inputs/__init__.py ×3, code/main.py D100; mypy clean, 222 files); producer.json of g7wire-dev22-20261025T1233 and g7wire-test-20261025T1233 (hashes match, paid 0); python -m deletion_audit --help; ls runs/HOLDOUT_ACCESS.log (none).
+* Paid commands, as reported, for after the G7 verifier: routing-check (--dollar-cap 3.50 --call-cap 146; 61 distinct texts, 122 sends) and vision (--dollar-cap 1.50 --call-cap 24; 22 sends). The two caps sum to $5.00 and 170 sends.
+* notes/agent_reports/g7_wiring.md (the report verbatim, with main's check).
+* git add of the 58 wiring/G7a/GM files and the report; secret scan PASS; commit pushed to github main (hash in the next entry).
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26

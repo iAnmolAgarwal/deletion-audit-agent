@@ -34,6 +34,17 @@ Fail-closed rules, each with its basis:
   (runs ``g5fix1-dev22-20261025T0650``, ``g5fix1-test-20261025T0650``): 0 such records; the only
   NO_STEP records are 3 catalog-only records with no observation, waiting for images, already
   FAILED_CLOSED(UNPARSED_DEPENDENCY).
+* **A screenshot the vision step read is not unread** (G7a wiring proposal 5; T60: zero skips at
+  freeze). A PNG named in ``AuditContext.vision_read`` (both of its readings succeeded, so its
+  records are in ``image_observations``) is neither a pending image nor a skip. A PNG whose
+  reading failed, or that was never read, stays a :class:`FileFailure` and an unparsed dependency
+  exactly as T8 says.
+* **POST_AUDIT_ONLY_FINDING** (developer ruling T101 on red-team fixture R06): a FINDING whose
+  record is held only by files captured after ``audit_at`` fails its row closed with its own
+  reason and a ``POST_AUDIT_ONLY_FINDING`` flag naming the resource. Such a finding can cite no
+  file that both contains it and was captured at or before ``audit_at`` (T66 rule 1 and CD-F21
+  cannot both hold), so the row is decided here, never left to the validator. Measured by main on
+  real data: 0 such findings on DEV and on test.
 """
 
 from __future__ import annotations
@@ -169,6 +180,7 @@ class AuditContext:
     config: EngineConfig = field(default_factory=EngineConfig)
     image_observations: tuple[Observation, ...] = ()
     request_issues: tuple[RequestIssue, ...] = ()
+    vision_read: frozenset[str] = frozenset()  # PNG file IDs whose two vision readings both succeeded
 
 
 def build_context(
@@ -218,6 +230,7 @@ class World:
 
 
 def _failures(ctx: AuditContext, file_captured: Mapping[str, str]) -> tuple[FileFailure, ...]:
+    """Manifest files that did not parse to OK, minus the PNGs the vision step read (module docstring)."""
     out = []
     for ref in ctx.manifest:
         fp = ctx.index.files.get(ref.file_id)
@@ -230,6 +243,8 @@ def _failures(ctx: AuditContext, file_captured: Mapping[str, str]) -> tuple[File
                     png = handle.read(len(PNG_SIGNATURE)) == PNG_SIGNATURE
             except OSError:
                 png = False
+        if png and ref.file_id in ctx.vision_read:
+            continue  # read by the vision step: its records are image observations, not a pending file
         missing = fp.status == "ERROR" and not (ctx.dataset_dir / ref.path).is_file()
         out.append(FileFailure(ref.file_id, fp.status, file_captured[ref.file_id], png, missing))
     return tuple(out)
@@ -455,6 +470,7 @@ def audit_case(case_id: str, w: World, intent_for: IntentProvider) -> CaseRecord
     resources: list[ResourceFinding] = []
     deps: set[str] = set(structural)
     uninterpreted: list[str] = []
+    post_audit_only: list[str] = []
     for rid in sorted(found):
         basis, hint = found[rid]
         system = _resource_system(rid, w, hint)
@@ -529,6 +545,15 @@ def audit_case(case_id: str, w: World, intent_for: IntentProvider) -> CaseRecord
             )
         if system_from_prefix(rid) and system_from_prefix(rid) != system:
             rflags.append(Flag("SYSTEM_DIFFERS_FROM_PREFIX", f"{rid}: {system}"))
+        if decision.outcome == "FINDING" and _held_only_after(rid, obs, w, audit_at):
+            post_audit_only.append(rid)
+            rflags.append(
+                Flag(
+                    "POST_AUDIT_ONLY_FINDING",
+                    f"{rid}: only files captured after audit_at hold this record, so no citable file contains it "
+                    "(T101; T66 rule 1 and CD-F21)",
+                )
+            )
         cite = ""
         if decision.outcome == "FINDING":
             vfiles = [r.file_id for r in state.readings if r.value == state.value and r.kind != "omission"]
@@ -543,6 +568,8 @@ def audit_case(case_id: str, w: World, intent_for: IntentProvider) -> CaseRecord
         failed = "MISSING_EVIDENCE_FILE"  # T86 item 1: FAILED_CLOSED even with findings
     elif deps:
         failed = "UNPARSED_DEPENDENCY"  # T8/T86 item 1: an unread dependency fails the row closed
+    elif post_audit_only:
+        failed = "POST_AUDIT_ONLY_FINDING"  # T101 (R06): decided here, not left to the validator
     elif uninterpreted:
         failed = "UNINTERPRETED_RECORD"  # module docstring: evidence the engine cannot read is no proof
     elif not any(r.decision.outcome in ("FINDING", "COMPLIANT") for r in resources):
@@ -578,6 +605,14 @@ def audit_case(case_id: str, w: World, intent_for: IntentProvider) -> CaseRecord
         failed_closed=failed,
     )
     return gate(record, w.validation)
+
+
+def _held_only_after(rid: str, obs: Sequence[Observation], w: World, audit_at: str) -> bool:
+    """T101 (R06): every file that holds ``rid`` (an observation of it, or a catalog alias of it) was
+    captured after ``audit_at``. False when no manifest file holds it (no file evidence to judge)."""
+    holders = {o.file_id for o in obs} | {a.file_id for a in w.aliases if a.resource_id == rid}
+    known = [f for f in sorted(holders) if f in w.file_captured]
+    return bool(known) and not any(timeutil.le(w.file_captured[f], audit_at) for f in known)
 
 
 def observation_state_ok(o: Observation, key: ResourceKey, audit_at: str) -> bool:

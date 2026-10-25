@@ -343,26 +343,32 @@ def make_budget(settings: Settings) -> BudgetGuard:
 
 
 def anthropic_client(run_id: str, budget: BudgetGuard, settings: Settings) -> ModelClient:
-    """The production client: the real transport, the shared reply cache, a paid (not replay) client."""
+    """The production client: the real transport, the first reply namespace under the shared cache
+    (``pipeline.namespace_roots``), a paid (not replay) client on the holdout ``BudgetGuard``."""
     from deletion_audit.model import AnthropicTransport, JsonlCallLog, ModelClient, ReplyCache, RetryPolicy
+    from deletion_audit.pipeline import namespace_roots
 
-    return ModelClient(AnthropicTransport(), ReplyCache(settings.cache_root / "replies"), budget, RetryPolicy(),
-                       JsonlCallLog(settings.runs_root / run_id / CALLS_FILE), replay_only=False, run_id=run_id)
+    return ModelClient(AnthropicTransport(), ReplyCache(namespace_roots(settings.cache_root)[0]), budget,
+                       RetryPolicy(), JsonlCallLog(settings.runs_root / run_id / CALLS_FILE), replay_only=False,
+                       run_id=run_id)
 
 
 def pipeline_runner(*, dataset_dir: Path, run_id: str, cases: Sequence[str], phrase: str, client: ModelClient,
                     runs_dir: Path, command: str) -> Any:
-    """Run ``deletion_audit.pipeline.run`` on the holdout cases (T96: the keyword main adds after G5).
+    """Run ``deletion_audit.pipeline.run`` on the holdout cases with the unlock (T96) and ``client``'s wiring.
 
-    ``holdout_unlock`` and ``client`` are the intended keywords. Until ``pipeline.run`` takes
-    them, binding the call raises TypeError before its body runs, so no input is read and the
-    command fails (exit 1) before any gold is unlocked.
+    ``pipeline.ModelSetup.from_client`` keeps ``client``'s transport, its one ``BudgetGuard`` (the
+    $1 / 60-send caps of :func:`make_budget`), its retry policy and its call log
+    (``holdout_calls.jsonl``; the pipeline also writes ``calls.jsonl``). Only the case conversation
+    may send: the turn-1 replicate and both vision readings replay from the cache (``pipeline``
+    module docstring), so vision is never bought by this run.
     """
     from deletion_audit import pipeline
 
     engine: Callable[..., Any] = pipeline.run
     return engine(dataset_dir, run_id=run_id, cases=list(cases), mode=HOLDOUT_MODE, replay_only=False,
-                  holdout_unlock=phrase, client=client, runs_dir=runs_dir, command=command)
+                  holdout_unlock=phrase, model=pipeline.ModelSetup.from_client(client), runs_dir=runs_dir,
+                  command=command)
 
 
 def _published(score: Mapping[str, Any]) -> dict[str, Any]:

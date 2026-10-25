@@ -214,12 +214,15 @@ class ModelClient:
     def _log(self, key: str, event: Event, attempt: int, decision: Retry | Repair | GiveUp,
              from_cache: bool, *, failure: Failure, stop_reason: str | None = None,
              request_id: str | None = None) -> None:
-        """Log a failure and the decision taken on it."""
+        """Log a failure and the decision taken on it, with the failure's API error text and
+        request ID when it has them."""
         outcome: Outcome = ("retry" if isinstance(decision, Retry)
                             else "repair" if isinstance(decision, Repair) else "give_up")
         detail = decision.reason if isinstance(decision, GiveUp) else failure.detail
         self._entry(key, event, attempt, outcome, from_cache, error_class=failure.error_class,
-                    status=failure.status, stop_reason=stop_reason, request_id=request_id, detail=detail)
+                    status=failure.status, stop_reason=stop_reason,
+                    request_id=request_id or failure.request_id, detail=detail,
+                    api_error_type=failure.api_error_type, api_error_message=failure.api_error_message)
 
     def _entry(self, key: str, event: Event, attempt: int, outcome: Outcome, from_cache: bool,
                **fields: Any) -> None:

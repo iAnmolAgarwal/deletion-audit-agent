@@ -22,6 +22,7 @@ from typing import Any
 from unittest import mock
 
 from deletion_audit.model import FakeTransport, MemoryCallLog, ModelClient, ModelRequest, ReplyCache, RetryPolicy
+from evaluation import freeze_check as freeze_check_mod
 from evaluation import gold as gold_mod
 from evaluation import holdout_run as hr
 from evaluation import paths, split
@@ -123,6 +124,7 @@ class World:
         self.dataset = self.repo / "dataset"
         self.access_log = self.runs / "HOLDOUT_ACCESS.log"
         self.gold = self.gold_dir / "sample_output.csv"
+        self.approved = base / "approved_output.json"
         self.runner_calls: list[dict[str, Any]] = []
         self.factory_budgets: list[Any] = []
         self.transports: list[FakeTransport] = []
@@ -146,6 +148,14 @@ class World:
         self.commit = git(self.repo, "rev-parse", "HEAD")
         self.write_gold()
         self.write_freeze_run()
+        self.approve(FREEZE_RUN)
+
+    def approve(self, run_id: str) -> None:
+        """Record ``run_id``'s output as the approved file (T101), outside the frozen repo tree."""
+        sha = json.loads((self.runs / run_id / "producer.json").read_text(encoding="utf-8"))["output_sha256"]
+        self.approved.write_text(json.dumps({"approved_output": {"run_id": run_id, "sha256": sha,
+                                                                 "path": f"runs/{run_id}/output.csv"}}),
+                                 encoding="utf-8")
 
     def write_gold(self) -> None:
         with self.gold.open("w", newline="", encoding="utf-8") as f:
@@ -175,7 +185,8 @@ class World:
     def start(self) -> World:
         targets = [(split, "HOLDOUT_IDS", frozenset(HOLD)), (split, "DEV_IDS", frozenset(DEV)),
                    (gold_mod, "HOLDOUT_IDS", frozenset(HOLD)), (gold_mod, "DEV_IDS", frozenset(DEV)),
-                   (gold_mod, "HOLDOUT_ACCESS_LOG", self.access_log), (paths, "SAMPLE_OUTPUT", self.gold)]
+                   (gold_mod, "HOLDOUT_ACCESS_LOG", self.access_log), (paths, "SAMPLE_OUTPUT", self.gold),
+                   (freeze_check_mod, "APPROVED_RECORD", self.approved)]
         for obj, name, value in targets:
             p = mock.patch.object(obj, name, value)
             p.start()

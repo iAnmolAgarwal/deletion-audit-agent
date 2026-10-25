@@ -34,13 +34,15 @@ def test_cases(mode: str = "A+") -> list[dict[str, Any]]:
                                intent=intent("DELETION_REQUEST", committed="k1", final="k1"))),
         case("case_902", agent(mode=mode, tool_calls=[tool("inspect_evidence", is_error=True)],
                                answers_applied=["oq_1"], steps_differ_when_applied=True, flags=["INTENT_DRIFT"],
-                               intent=intent("NOT_DELETION", intake=True, committed="k2", final="k3"),
+                               intent=intent("NOT_DELETION", intake=True, committed="k2", final="k3",
+                                             committed_label="DELETION_REQUEST"),
                                turn1_replicates=["NOT_DELETION", "NOT_DELETION"])),
         case("case_903", agent(mode=mode, tool_calls=[tool("lookup_identity"), tool("lookup_identity")],
                                audit_case_calls=2,
                                answers_rejected=[{"oq_id": "oq_2", "reason": "NO_EVIDENCE"},
                                                  {"oq_id": "oq_3", "reason": "CONFLICTING"}],
-                               intent=intent("UNCERTAIN", agrees=None, committed=None, final=None),
+                               intent=intent("UNCERTAIN", agrees=None, committed=None, final=None,
+                                             final_label=None),
                                turn1_replicates=["UNCERTAIN", "DELETION_REQUEST"])),
         case("case_904", agent(mode=mode, audit_case_calls=0,
                                answers_rejected=[{"oq_id": "oq_4", "reason": "NO_EVIDENCE"}],
@@ -120,10 +122,27 @@ class TestCounts(Base):
             "FAILED": {"intake_row_present": 1, "intake_row_absent": 0}})
         self.assertEqual(it["agrees"], {"null": 2, "true": 2})
         self.assertEqual(it["sources"], {"FAILED_CLOSED": 1, "MODEL": 3})
-        self.assertEqual(it["committed_vs_final_key"], {"both_null": 1, "differ": 1, "equal": 1, "one_null": 1})
+        self.assertEqual(it["committed_vs_final_label"], {"both_null": 1, "differ": 1, "equal": 1, "one_null": 1})
+        self.assertNotIn("committed_vs_final_key", it)
         self.assertEqual(it["intent_drift_flagged_cases"], 1)
         self.assertEqual(it["turn1_replicates"], {"all_agree": 2, "disagree": 1, "fewer_than_2": 1,
                                                   "disagree_case_ids": ["case_903"]})
+
+    def test_committed_vs_final_compares_labels_not_keys(self) -> None:
+        """T92: equal reply keys say nothing about intent; the labels decide equal vs differ."""
+        cases = [case("case_901", agent(intent=intent("NOT_DELETION", committed="same", final="same",
+                                                      committed_label="DELETION_REQUEST"))),
+                 case("case_902", agent(intent=intent("DELETION_REQUEST", committed="k1", final="k1")))]
+        write_run(self.runs, "t-labels", test_rows(["case_901", "case_902"]), cases, vision=[], mode="A+")
+        it = self.report(Spec(test={"A+": "t-labels"}))["intent"]["test"]["A+"]
+        self.assertEqual(it["committed_vs_final_label"], {"differ": 1, "equal": 1})
+
+    def test_missing_label_field_is_an_adapter_error(self) -> None:
+        bad = agent()
+        del bad["intent"]["final_label"]
+        write_run(self.runs, "t-nolabel", test_rows(["case_901"]), [case("case_901", bad)], vision=[], mode="A+")
+        view = read_run_artifacts(self.runs / "t-nolabel")
+        self.assertTrue(any(e.path == "agent.intent.final_label" for e in view.agent_errors), view.agent_errors)
 
     def test_vision(self) -> None:
         self.test_run()

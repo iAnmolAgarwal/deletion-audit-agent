@@ -1,4 +1,5 @@
-"""Freeze check (T60, T71 Q5, T87, T88): refuse a run unless its four blocking counts are 0.
+"""Freeze check (T60, T71 Q5, T87, T88, T101): refuse a run unless its four blocking counts are 0 and its
+output is the approved file.
 
 Usage (from the repo root):
     python3 -B code/evaluation/freeze_check.py --run-id <run_id> [--record-run-id <id>]
@@ -20,7 +21,10 @@ It reads ``runs/<run_id>/`` only and passes (exit 0) only when ALL of these hold
 * ``evidence_skips`` = 0: the producer's ``evidence_skipped`` list is empty, so the
   ``png-model-needed`` allow-list is unused (T60). ``evidence_skip_count`` must agree;
 * ``vision_unresolved_disagreements`` = 0: images whose two readings disagree (T88). The
-  artifact has no resolution field yet, so every disagreement is unresolved.
+  artifact has no resolution field yet, so every disagreement is unresolved;
+* **the approved output** (developer ruling T101 (1) and (3)): the sha256 of the run's
+  ``output.csv`` equals the ``approved_output.sha256`` of ``notes/approved_output.json``, read at
+  check time. Both are printed. A mismatch, or a record that cannot be read, refuses.
 
 Otherwise it refuses with exit status 1 and names each failing count, or the error that kept
 a count from being computed. A count that cannot be computed is never reported as 0.
@@ -53,11 +57,28 @@ from evaluation.agent_report import (  # noqa: E402
     run_path,
     summarize_errors,
 )
-from evaluation.paths import RUNS  # noqa: E402
+from evaluation.paths import REPO_ROOT, RUNS  # noqa: E402
 
 COUNTS: tuple[str, ...] = ("failed_closed_rows", "intent_failed_closed", "evidence_skips",
                            "vision_unresolved_disagreements")
 SAMPLE = 10  # case IDs shown per failing count
+APPROVED_RECORD: Path = REPO_ROOT / "notes" / "approved_output.json"  # T101 (1): the developer-approved output
+
+
+def approved_output_check(output_sha256: str | None, record: Path) -> dict[str, Any]:
+    """Compare a run's output sha256 with the approved one (T101); ``error`` is set when it cannot be read."""
+    out: dict[str, Any] = {"record": str(record), "output_sha256": output_sha256, "approved_sha256": None,
+                           "approved_run_id": None, "matches": False, "error": None}
+    try:
+        approved = json.loads(record.read_text(encoding="utf-8"))["approved_output"]
+        sha = approved["sha256"]
+        if not isinstance(sha, str) or len(sha) != 64:
+            raise ValueError("approved sha256 is not 64 hex characters")
+    except (OSError, UnicodeDecodeError, ValueError, KeyError, TypeError) as exc:
+        out["error"] = f"approved-output record unreadable ({type(exc).__name__})"
+        return out
+    out.update(approved_sha256=sha, approved_run_id=approved.get("run_id"), matches=output_sha256 == sha)
+    return out
 
 
 def is_failed_closed(c: CaseView) -> bool:
@@ -90,8 +111,10 @@ def _skips(producer: Mapping[str, Any]) -> tuple[int | None, list[str]]:
     return len(skipped), []
 
 
-def freeze_check(run_id: str, *, runs_root: Path = RUNS) -> dict[str, Any]:
-    """Compute the freeze record for one run (never raises on bad artifacts; reports them)."""
+def freeze_check(run_id: str, *, runs_root: Path = RUNS, approved_record: Path | None = None) -> dict[str, Any]:
+    """Compute the freeze record for one run (never raises on bad artifacts; reports them).
+
+    ``approved_record`` defaults to :data:`APPROVED_RECORD` (``notes/approved_output.json``)."""
     run = load_run(runs_root, run_id)
     view = run.view
     errors: list[str] = []
@@ -134,8 +157,14 @@ def freeze_check(run_id: str, *, runs_root: Path = RUNS) -> dict[str, Any]:
     refusals = [f"{k} = {n} (e.g. {', '.join(case_lists[k][:SAMPLE])})" for k, n in counts.items() if n]
     refusals += [f"{k}: not computed (see errors)" for k, n in counts.items() if n is None]
     refusals += [f"error: {e}" for e in errors]
+    approved = approved_output_check(run.producer_check["pred_sha256"], approved_record or APPROVED_RECORD)
+    if approved["error"]:
+        refusals.append(f"approved output: {approved['error']}")
+    elif not approved["matches"]:
+        refusals.append(f"approved output: the run's output sha256 {approved['output_sha256']} differs from the "
+                        f"approved {approved['approved_sha256']} (T101)")
     return {"run_id": run_id, "kind": "freeze-check", "checked_at": runs.now_ist(), "producer_check": pstatus,
-            "output_sha256": run.producer_check["pred_sha256"], "counts": counts,
+            "output_sha256": run.producer_check["pred_sha256"], "approved_output": approved, "counts": counts,
             "lower_bounds_when_not_computed": lower_bounds,
             "ids": {k: v for k, v in case_lists.items() if v}, "errors": errors, "refusals": refusals,
             "passed": not refusals}
@@ -153,6 +182,10 @@ def main(argv: list[str] | None = None) -> int:
     for k, n in res["counts"].items():
         floor = f" (record-level floor: at least {floors[k]})" if k in floors else ""
         print(f"  {k}: {'not computed' if n is None else n}{floor}")
+    ap_out = res["approved_output"]
+    print(f"  output sha256:   {ap_out['output_sha256']}")
+    verdict = ap_out["error"] or ("match" if ap_out["matches"] else "MISMATCH")
+    print(f"  approved sha256: {ap_out['approved_sha256']} ({verdict})")
     if a.record_run_id:
         d = run_path(RUNS, a.record_run_id)
         if d == run_path(RUNS, a.run_id) or (d / OUTPUT_FILE).exists():
@@ -161,7 +194,7 @@ def main(argv: list[str] | None = None) -> int:
         d.mkdir(parents=True, exist_ok=True)
         runs.write_json(d / "freeze_check.json", res)
     if res["passed"]:
-        print("FREEZE CHECK PASSED: all four counts are 0 on a checked run")
+        print("FREEZE CHECK PASSED: all four counts are 0 on a checked run whose output is the approved file")
         return 0
     print("FREEZE CHECK REFUSED:")
     for r in res["refusals"]:
