@@ -58,8 +58,8 @@ def check_unlock(holdout: bool, unlock_phrase: str | None, what: str, run_id: st
         return
     if unlock_phrase != UNLOCK_PHRASE:
         raise HoldoutLockedError(
-            f"holdout {what} is locked: pass unlock_phrase={UNLOCK_PHRASE!r}, and only in the "
-            "single post-freeze run the developer names (../CLAUDE.md section 4)"
+            f"holdout {what} is locked: it opens only with the developer's own unlock phrase, given "
+            "in the single post-freeze run the developer names (../CLAUDE.md section 4)"
         )
     stamp = dt.datetime.now(dt.UTC).isoformat(timespec="seconds")
     line = json.dumps({"at": stamp, "what": what, "run_id": run_id})

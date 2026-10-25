@@ -4555,3 +4555,57 @@ parent_agent=none
 worktree=main
 branch=main
 repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T06:48:11+05:30] Holdout run command and tests built (T96)
+
+User Prompt (verbatim, secrets redacted):
+[brief written by main; approved in developer turn 2026-10-25T06:32:14+05:30]
+directed_by: 2026-10-25T06:32:14+05:30
+
+Build the HOLDOUT EVALUATION RUN command (holdout_run.py), its tests, and the gold.py refusal-message fix. Nothing here is ever run against real holdout gold.
+
+You are orch-eval-engineer (high effort) in the Orchestrate October 2026 build. Repo root: /Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26. The operating rules in ../CLAUDE.md apply (they load automatically). The developer approved this in the turn 2026-10-25T06:32:14+05:30 (ruling T96 in notes/DECISIONS.md).
+(full brief from main)
+
+Agent Response Summary:
+Built code/evaluation/holdout_run.py, the only caller of the holdout unlock: it checks the argv phrase, the freeze tag, HEAD and a clean tree, re-runs freeze_check, checks the freeze producer's git_head and the once-only rule, all before any holdout input or gold is read; then it runs the engine through a ModelClient with a BudgetGuard of exactly $1 and 60 sends, scores, and writes score.json, holdout_record.json (with split.json's caveat, read not retyped) and the access-log lines. The gold.py refusal message no longer prints the phrase. Tests are synthetic only (temporary git repo, synthetic split, gold and access log, a fake engine and GM's FakeTransport): an AST scan proving only gold.py, pipeline.py and holdout_run.py can unlock (13 planted violations caught), 36 behavioural refusal, good-path and retry tests with a file-open spy, holdout_section tests and the message test. Evaluation suite 252 tests OK (187 before), lint clean, runs/HOLDOUT_ACCESS.log still absent; outputs.py's existing check_unlock forwarder is allowed narrowly in the static rule and flagged for the developer.
+
+Actions:
+* Wrote code/evaluation/holdout_run.py; edited code/evaluation/gold.py (refusal message only).
+* Wrote code/evaluation/tests/holdout_fixtures.py, test_holdout_run.py, test_holdout_static.py, test_gold_refusal_message.py.
+* Ran .venv/bin/python -B -m unittest discover -s code/evaluation/tests -t code (252 OK), bash scripts/lint.sh code/evaluation (clean), code/tests/hygiene (5 OK), ls runs/HOLDOUT_ACCESS.log (no such file), and the script with no phrase on the real repo (refused, exit 3).
+* No model calls; .env and dataset/sample_output.csv not opened; nothing in code/deletion_audit/ touched.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=orch-eval-engineer
+parent_agent=main
+directed_by=2026-10-25T06:32:14+05:30
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T06:50:35+05:30] [auto] Holdout build done and checked; committed with the G7b modules it imports
+
+User Prompt (verbatim, secrets redacted):
+(Background-agent notification: the holdout run build, orch-eval-engineer, directed_by 2026-10-25T06:32:14+05:30, finished. No developer text.)
+
+Agent Response Summary:
+The build added evaluation/holdout_run.py, the only unlock caller, plus a static AST scan, behavioural tests and the gold.py refusal-message fix; the phrase is no longer printed. Main checked it: 252 evaluation tests OK, lint clean, no access log written, and the real script with no phrase exits 3. Under T98 I committed it together with G7b's agent_report.py and freeze_check.py, which it imports. In the committed snapshot alone, 2 tests fail because they need G5's uncommitted pipeline.py and __main__.py; they pass once G5 commits.
+
+Actions:
+* Checks: git diff of gold.py (message only, 2+/2-); unittest discover -s code/evaluation/tests (Ran 252, OK); scripts/lint.sh code/evaluation (clean, 41 files); ls runs/HOLDOUT_ACCESS.log (no such file, before and after); holdout_run.py without --unlock printed "HOLDOUT RUN REFUSED: the developer's unlock phrase is missing or not exact (argv --unlock only)" and exited 3.
+* Import chain: holdout_run imports freeze_check, which imports agent_report. git checkout-index of the staged index into scratchpad idx_export/ (dataset linked in): Ran 252, failures=1, errors=1, namely test_pipeline_runner_passes_the_intended_keywords (ImportError, deletion_audit.pipeline) and test_the_scan_covers_the_tree (expects pipeline.py and __main__.py). Both rest on G5's uncommitted files.
+* Open items, in TASKS.md and for HANDOFF.md: pipeline.run needs holdout_unlock= and client=; producer.json needs git_head; the developer decides on outputs.read_output's narrowly allowed unlock forwarder.
+* notes/agent_reports/holdout_build.md: the report verbatim, with main's check at the top.
+* git commit of the 11 build files, notes/agent_reports/holdout_build.md, TASKS.md and log.txt; secret scan PASS; pushed to github main (hash in HANDOFF.md).
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
