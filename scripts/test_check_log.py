@@ -66,6 +66,18 @@ class CheckLogTest(unittest.TestCase):
         code, out = self.run_on(entry("## [2026-10-25T03:00:00+0530] compact offset"))
         self.assertIn("H1", out)
 
+    def test_utc_stamp_is_its_own_entry_and_fails_h1(self) -> None:
+        """A 'Z' header starts a new entry (not body text of the one before) and fails H1;
+        it is time-ordered by its UTC value."""
+        text = (entry("## [2026-10-25T05:43:52+05:30] before")
+                + "\n" + entry("## [2026-10-25T00:14:32Z] utc stamp")
+                + "\n" + entry("## [2026-10-25T05:44:36+05:30] after"))
+        code, out = self.run_on(text)
+        self.assertEqual(code, 1)
+        self.assertIn("3 entries", out)
+        self.assertIn("[2026-10-25T00:14:32Z] H1", out)
+        self.assertNotIn("T1", out)
+
     def test_long_title_fails_h2(self) -> None:
         code, out = self.run_on(entry("## [2026-10-25T03:00:00+05:30] " + "x" * 81))
         self.assertIn("H2", out)

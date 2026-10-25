@@ -39,7 +39,7 @@ LOG = REPO / "log.txt"
 
 # A header line starts with "## " followed by a timestamp, with or without brackets.
 # Lines such as "## Blocked on me" inside a verbatim prompt are not headers.
-HEADER_ANY = re.compile(r"^## \[?(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:?\d{2})\]? ?(.*)$")
+HEADER_ANY = re.compile(r"^## \[?(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:[+-]\d{2}:?\d{2}|Z))\]? ?(.*)$")
 HEADER_OK = re.compile(r"^## \[(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+05:30)\] (\S.*)$")
 TITLE_MAX = 80
 
@@ -58,6 +58,7 @@ NOTE_0132 = "correction note in the 2026-10-25T01:32:51+05:30 entry (T18, confir
 NOTE_0237 = "correction note in the 2026-10-25T02:37:47+05:30 entry"
 NOTE_0244 = "correction note in the 2026-10-25T02:44:55+05:30 entry"
 NOTE_0316 = "correction note in the 2026-10-25T03:16:49+05:30 entry"
+NOTE_0553 = "correction note in the 2026-10-25T05:53:29+05:30 entry: written by a session-summary process"
 
 # A header stamped wrongly is ordered by the time its correction note gives, so one bad
 # stamp does not make every later entry look out of order. stamp -> (effective time, note)
@@ -79,6 +80,8 @@ EXCEPTIONS: dict[tuple[str, str], str] = {
     ("H1", "2026-10-25T01:09:13+0530"): NOTE_0132,
     ("H1", "2026-10-25T01:47:03+05:30"): NOTE_0237,
     ("H1", "2026-10-25T02:43:14+05:30"): NOTE_0244,
+    ("H1", "2026-10-25T00:14:32Z"): NOTE_0553,
+    ("H1", "2026-10-25T05:44:36+0530"): NOTE_0553,
     **{("H2", stamp): NOTE_0237 for stamp in (
         "2026-10-25T00:13:30+05:30", "2026-10-25T00:14:42+05:30", "2026-10-25T01:37:06+05:30",
         "2026-10-25T01:41:22+05:30", "2026-10-25T01:49:56+05:30", "2026-10-25T01:55:30+05:30",
@@ -127,7 +130,7 @@ def split_entries(text: str) -> list[Entry]:
 
 
 def parse_stamp(stamp: str) -> datetime:
-    """Parse a header timestamp, accepting the known '+0530' defect form."""
+    """Parse a header timestamp, accepting the known '+0530' and UTC 'Z' defect forms."""
     if re.search(r"[+-]\d{4}$", stamp):
         stamp = stamp[:-2] + ":" + stamp[-2:]
     return datetime.fromisoformat(stamp)
