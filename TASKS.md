@@ -52,7 +52,17 @@ Rebuilt at the developer's direction (turn 2026-10-25T00:08:45+05:30). Updated a
     1. the four §11 review checkpoints have no log.txt entries yet;
     2. "I chose" and the D4c approval show only in the SESSION START provenance line (the prep session's, D16), so G10 must cite them truthfully;
     3. cite `g5-dev22-20261025T0530` for DEV 19/22.
-  - **Running (T106):** the report generators (`orch-eval-engineer`, high, since about 12:10; brief `reports_brief.md`), alongside the G7 wiring.
+  - **Report generators done** (about 12:30, T106; committed; report `notes/agent_reports/report_generators.md`).
+    - Command: `code/evaluation/reports.py --spec <json>`.
+    - **For G9:**
+      1. name the fixture runs in `custom_runs`;
+      2. point `usage.run` at the final run;
+      3. add the arms;
+      4. write into `code/evaluation/`;
+      5. check `run_metrics`'s `open_questions`/`answers` keys against the wiring;
+      6. add a "failures found and fixes" narrative.
+    - **Docs:** T58 says "the lost row" (case_08), but DEV has 3 rows that are not row-exact (case_08, case_18, case_20). README and G10 must say three.
+    - The `calls_only` spec flag (for a usage run with no `output.csv`) is the developer's to keep or drop.
   - **T105 ruled.** The plan:
     1. the wiring is checked and committed;
     2. the G7 verifier (export of that commit), in parallel with G5 fix round 2 (`orch-builder-core`, high; brief `g5fix2_brief.md`) and stage 1 plus vision (main, export);
