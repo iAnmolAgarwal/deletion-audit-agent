@@ -357,7 +357,7 @@ def usage_json_check(usage: Mapping[str, Any] | None, own: Mapping[str, Any],
 
 
 def build_usage(run_id: str, *, runs_root: Path, cache_root: Path, calls_file: str = "calls.jsonl",
-                usage: Mapping[str, Any] | None = None, calls_only: bool = False) -> dict[str, Any]:
+                usage: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """The usage report's data for one run (module docstring)."""
     table, price_source = price_table()
     calls_all, problems = read_calls(runs_root / run_id / calls_file)
@@ -370,7 +370,7 @@ def build_usage(run_id: str, *, runs_root: Path, cache_root: Path, calls_file: s
     sent_keys = sorted({c.key for c in calls if c.event == "send"})
     led_sent = round(sum(cost for k, cost in ledger if k in set(sent_keys)), 9)
     return {
-        "run_id": run_id, "calls_file": f"runs/{run_id}/{calls_file}", "calls_only": calls_only,
+        "run_id": run_id, "calls_file": f"runs/{run_id}/{calls_file}",
         "provider": PROVIDER,
         "price_basis": {"source": price_source, "module": "code/deletion_audit/model/prices.py",
                         "usd_per_million": {m: vars(p) for m, p in sorted(table.items())}},
@@ -421,9 +421,6 @@ def render_usage(u: Mapping[str, Any], *, report_id: str, created_at: str, comma
              f"Generated {created_at} by `{command}` from `{u['calls_file']}`, the reply cache entries it names, "
              "the buying runs' call logs and `cache/ledger.jsonl` (code/evaluation/usage_report.py). "
              "Every figure names its run. Nothing is typed by hand.", ""]
-    if u["calls_only"]:
-        lines += [f"> Run `{rid}` is a calls-only run (spec `usage.calls_only`): it has no `output.csv`, so "
-                  "nothing it holds is scored. G9 points this report at the final run.", ""]
     lines += ["## Providers and models", "", f"- Provider: {u['provider']}.",
               f"- Models of the replies used (run `{rid}`): {', '.join(a['by_model']) or 'none'}.", "",
               "## (a) Tokens and cost originally spent on the replies this run used", "",

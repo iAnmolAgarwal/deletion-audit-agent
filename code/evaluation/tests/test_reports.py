@@ -260,14 +260,15 @@ class TestRefusals(Base):
         self.assertFalse((self.w.runs / "rep-1" / "evaluation_report.md").exists())
         self.assertIn("output-mismatch", err.getvalue())
 
-    def test_usage_run_without_output_needs_calls_only(self) -> None:
+    def test_usage_run_without_output_is_refused(self) -> None:
+        """T107: a usage run with no output.csv is refused; there is no calls-only exception."""
         self.w.dev_run("dev-a")
         (self.w.runs / "probe").mkdir()
         (self.w.runs / "probe" / "calls.jsonl").write_text("", encoding="utf-8")
         with self.assertRaises(ReportRefused):
             self.build(self.w.spec(usage={"run": "probe"}))
-        b = self.build(self.w.spec(usage={"run": "probe", "calls_only": True}))
-        self.assertIn("is a calls-only run", b["usage_md"])
+        with self.assertRaises(ValueError):  # the old flag is now an unknown key
+            self.w.spec(usage={"run": "probe", "calls_only": True})
 
     def test_spec_rejects_unknown_key_and_self_reference(self) -> None:
         with self.assertRaises(ValueError):
@@ -314,7 +315,7 @@ class TestUsageAttribution(Base):
             encoding="utf-8")
 
     def usage_of(self) -> dict[str, Any]:
-        return usage_report.build_usage("final", runs_root=self.w.runs, cache_root=self.w.cache, calls_only=True)
+        return usage_report.build_usage("final", runs_root=self.w.runs, cache_root=self.w.cache)
 
     def test_cache_hits_summed_by_buying_run(self) -> None:
         u = self.usage_of()

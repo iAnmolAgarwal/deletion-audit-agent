@@ -5237,3 +5237,39 @@ parent_agent=none
 worktree=main
 branch=main
 repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T12:38:50+05:30] T107: calls_only dropped; DEV-row and NUMBERS notes for G10; verifier on
+
+User Prompt (verbatim, secrets redacted):
+Reports: good work. Rulings:
+
+1. calls_only: drop it. G9 points usage at the final run, which has an output.csv. Buying runs are read through their call logs and the ledger, not load_checked. So the flag would never be used at ship, and it is a documented exception to the unchecked-run refusal that nothing needs. Remove the flag, its branch in report_spec.load_checked and its test. Replace the test with one asserting that a usage run with no output.csv is refused. Touch only the report files, so the change stays separate from the wiring's working tree. Run the evaluation tests on HEAD plus these files, as you did for 41bd2c2, and commit on its own. The demo folder in runs/ can stay as it is.
+
+2. DEV rows: agreed, three. Two additions for G10:
+   (a) Cite the freeze run's DEV figure, not a G5 run. Use the G5 number only if the freeze run reproduces it. For each row that isn't row-exact, state its cause as measured from that run's diff.
+   (b) Several sections of NUMBERS.md list only case_18 and case_20 as not row-exact, which is two rows against 19/22. Before G10 quotes either, say which run and which metric each section is.
+
+3. test_cli_paid.py hygiene failure: fine. Check it when the wiring lands; the full suite passing is part of its done criterion.
+
+4. Log: check_log passes but warns that 12 summaries run 6-8 sentences (the latest at 12:33:54). Keep new entries to 2-5 sentences. Never edit old entries.
+
+Then carry on with order (i): commit the wiring before its review, then the G7 verifier.
+
+Time is not a factor.
+
+Agent Response Summary:
+Orchestration decisions (developer): the wiring is committed as 4dcd719 before its review. The G7 verifier (orch-verifier, high, T92) now reviews an export of that commit, and G5 fix round 2 (orch-builder-core, high, T105) edits the working tree in parallel. I removed calls_only from the report files only, and HEAD plus those four files runs 277 evaluation tests OK. The full suite already passes with test_cli_paid.py (489 OK), and the DEV-row items are in TASKS for G10.
+
+Actions:
+* code/evaluation/report_spec.py, usage_report.py and reports.py: the flag, its spec key, its load_checked branch, its render note and the unused OUTPUT_FILE import removed. tests/test_reports.py: test_usage_run_without_output_is_refused (refused, and the old key is now rejected) replaces the calls_only test. Lint clean; git archive HEAD plus the 4 files in scratchpad callsonly_export/: Ran 277 OK.
+* Briefs: scratchpad g7verifier_brief.md (items 1–16, export of 4dcd719) and g5fix2_brief.md (base 4dcd719), with 0 lines starting with "## ["; both agents launched.
+* notes/DECISIONS.md T107; TASKS.md. git commit of the 4 report files, DECISIONS, TASKS and log.txt, pushed to github main.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26

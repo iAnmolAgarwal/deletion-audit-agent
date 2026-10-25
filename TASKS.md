@@ -62,7 +62,8 @@ Rebuilt at the developer's direction (turn 2026-10-25T00:08:45+05:30). Updated a
       5. check `run_metrics`'s `open_questions`/`answers` keys against the wiring;
       6. add a "failures found and fixes" narrative.
     - **Docs:** T58 says "the lost row" (case_08), but DEV has 3 rows that are not row-exact (case_08, case_18, case_20). README and G10 must say three.
-    - The `calls_only` spec flag (for a usage run with no `output.csv`) is the developer's to keep or drop.
+    - **G10 (T107):** cite the freeze run's DEV figure, using a G5 number only if the freeze run reproduces it; state each non-exact row's cause from that run's diff; resolve which run and metric each NUMBERS.md section that lists only case_18/case_20 is before quoting it.
+    - `calls_only` was dropped (T107).
   - **T105 ruled.** The plan:
     1. the wiring is checked and committed;
     2. the G7 verifier (export of that commit), in parallel with G5 fix round 2 (`orch-builder-core`, high; brief `g5fix2_brief.md`) and stage 1 plus vision (main, export);

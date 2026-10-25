@@ -56,7 +56,7 @@ def build_all(spec: ReportSpec, ctx: evaluation_report.Context, *, command: str)
     if usage_json is not None:  # read_usage type-checks five fields; the full object feeds the cross-check
         raw_usage = json.loads((ctx.runs_root / u.run / "usage.json").read_text(encoding="utf-8"))
     us = usage_report.build_usage(u.run, runs_root=ctx.runs_root, cache_root=ctx.cache_root,
-                                  calls_file=u.calls_file, usage=raw_usage, calls_only=u.calls_only)
+                                  calls_file=u.calls_file, usage=raw_usage)
     dev_prev = [r for r in spec.dev_history if r != spec.dev_run]
     entries = [("final", loaded[spec.final_run], loaded.get(spec.previous_run or "")),
                ("dev", loaded[spec.dev_run], loaded[dev_prev[-1]] if dev_prev else None)]

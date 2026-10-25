@@ -11,7 +11,7 @@ A spec is a JSON object (``reports.py --spec <file>``)::
                                                    #   the DEV run's predecessor in metrics.json
       "arms": {"dev": {ARM: run}, "test": {ARM: run}, "fixtures": {ARM: {FIXTURE: run}}},
       "custom_runs": {"<fixture folder>": "<run id>"},   # folder relative to code/tests/fixtures
-      "usage": {"run": "<run id>", "calls_only": false, "calls_file": "calls.jsonl"},
+      "usage": {"run": "<run id>", "calls_file": "calls.jsonl"},
       "holdout_run": null,                         # optional: must match a completed record
       "coherence": true                            # run the coherence checks on final and DEV output
     }
@@ -22,10 +22,9 @@ silently drops out of a report.
 
 **Unchecked runs never feed a report (T60, T81).** :func:`load_checked` refuses every run
 whose producer check (``evidence_guard.check_producer`` against the sha256 of its
-``output.csv``) is not ``ok``. The one exception is explicit: a usage run with
-``"calls_only": true`` may have no ``output.csv`` at all (a call-only probe such as a smoke
-run). Such a run feeds the usage report only, nothing it holds is scored, and the report says
-so. A calls-only run that does hold an ``output.csv`` is checked like any other.
+``output.csv``) is not ``ok``, the usage run included. There is no exception: a usage run with
+no ``output.csv`` is refused (T107). The runs that bought the replies are read through their
+call logs and the ledger, never through :func:`load_checked`.
 """
 from __future__ import annotations
 
@@ -36,11 +35,11 @@ from pathlib import Path
 from typing import Any
 
 from . import runs
-from .agent_report import OUTPUT_FILE, LoadedRun, ReportRefused, Spec, load_run, run_path
+from .agent_report import LoadedRun, ReportRefused, Spec, load_run, run_path
 
 TOP_KEYS: frozenset[str] = frozenset({"report_id", "final_run", "dev_run", "previous_run", "dev_history", "arms",
                                       "custom_runs", "usage", "holdout_run", "coherence"})
-USAGE_KEYS: frozenset[str] = frozenset({"run", "calls_only", "calls_file"})
+USAGE_KEYS: frozenset[str] = frozenset({"run", "calls_file"})
 ARM_KEYS: frozenset[str] = frozenset({"dev", "test", "fixtures"})
 DEFAULT_CALLS_FILE = "calls.jsonl"
 
@@ -50,7 +49,6 @@ class UsageSpec:
     """Which run's call log the usage report reads."""
 
     run: str
-    calls_only: bool = False
     calls_file: str = DEFAULT_CALLS_FILE
 
 
@@ -133,10 +131,7 @@ def spec_from_mapping(raw: Mapping[str, Any]) -> ReportSpec:
         calls_file = u.get("calls_file", DEFAULT_CALLS_FILE)
         if not isinstance(calls_file, str) or "/" in calls_file or not calls_file.endswith(".jsonl"):
             raise ValueError("usage 'calls_file' must be a bare *.jsonl file name inside the run folder")
-        calls_only = u.get("calls_only", False)
-        if not isinstance(calls_only, bool):
-            raise ValueError("usage 'calls_only' must be true or false")
-        usage = UsageSpec(_str(u, "run", required=True) or final_run, calls_only, calls_file)
+        usage = UsageSpec(_str(u, "run", required=True) or final_run, calls_file)
     coherence = raw.get("coherence", True)
     if not isinstance(coherence, bool):
         raise ValueError("spec 'coherence' must be true or false")
@@ -176,8 +171,6 @@ def load_checked(spec: ReportSpec, runs_root: Path) -> dict[str, LoadedRun]:
         d = run_path(runs_root, u.run)
         if not d.is_dir():
             reasons.append(f"{u.run}: usage run folder does not exist")
-        elif u.calls_only and not (d / OUTPUT_FILE).exists():
-            pass  # an explicit call-only probe: nothing it holds is scored (module docstring)
         else:
             lr = load_run(runs_root, u.run)
             if lr.producer_check["status"] != "ok":
