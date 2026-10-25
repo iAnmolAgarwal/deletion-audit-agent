@@ -22,13 +22,14 @@ ROOT = Path(__file__).resolve().parents[3]
 RECORD = ROOT / APPROVED_OUTPUT_RECORD
 TEST_SHA = "cf2a90b070db785456b2cb26398add0eba95a69ae8a763eb838a367f135751fc"
 DEV_SHA = "641dbc8d921186efbf92514b2c71fe25a3b133d412515dd952da19f8ac85b15c"
+SHIPPED_SHA = "a00ba71a756736cc09a3ef5119b5575d871a2db2c9482d9829333181d5676967"  # T120: the root output.csv
 
 
 class TestApprovedBaselines(unittest.TestCase):
     def test_record_and_files_live_in_the_shipped_code_tree(self) -> None:
         self.assertEqual(Path(APPROVED_OUTPUT_RECORD).parts[0], "code")
         body = json.loads(RECORD.read_text(encoding="utf-8"))
-        paths = [body["approved_output"]["path"], *(e["path"] for e in body["approved_outputs"].values())]
+        paths = [e["path"] for e in body["approved_outputs"].values()]  # the gate's per-split baselines
         for rel in paths:
             self.assertFalse(Path(rel).is_absolute(), rel)
             self.assertEqual(Path(rel).parts[0], "code", rel)
@@ -39,9 +40,14 @@ class TestApprovedBaselines(unittest.TestCase):
         dev = load_baseline(RECORD, ROOT, split="dev")
         self.assertEqual((test.sha256, len(test.rows)), (TEST_SHA, 518))
         self.assertEqual((dev.sha256, len(dev.rows)), (DEV_SHA, 22))
-        self.assertEqual(load_baseline(RECORD, ROOT).sha256, TEST_SHA)  # the legacy key names the test file
         for b in (test, dev):
             self.assertEqual(hashlib.sha256((ROOT / b.path).read_bytes()).hexdigest(), b.sha256)
+
+    def test_approved_output_is_the_shipped_root_output(self) -> None:
+        """T120: the approved output is the root output.csv (the gate keeps its per-split baselines)."""
+        body = json.loads(RECORD.read_text(encoding="utf-8"))
+        self.assertEqual((body["approved_output"]["path"], body["approved_output"]["sha256"]),
+                         ("output.csv", SHIPPED_SHA))
 
     def test_freeze_check_record_is_byte_identical(self) -> None:
         if not (ROOT / "notes").is_dir():
