@@ -38,7 +38,7 @@ Rebuilt at the developer's direction (turn 2026-10-25T00:08:45+05:30). Updated a
 ## Agent queue (cap: 3 at once, T79; never two of the same type)
 - **Running:** G7a (`orch-builder-core`, high, T88), since about 05:57.
 - **Order (T90/T92):** G7a finishes → the G5 fix round → its verifier → G5 commit → G7a's wiring → the G7 verifier → routing check stage 1 → stage 2.
-- **Next, when G7a finishes (T90):** the G5 fix round (`orch-builder-core`, high, directed_by 2026-10-25T06:08:27+05:30); the brief is ready at scratchpad `g5fix_brief.md`. Then a fresh verifier on that diff, then the G5 commit.
+- **Next, when G7a finishes (T90):** the G5 fix round (`orch-builder-core`, high, directed_by 2026-10-25T06:08:27+05:30); the brief is ready at scratchpad `g5fix_brief.md`. Then a fresh verifier on that diff (T90). **T93:** a PASS, or only findings below BLOCKER (which go on the G9 list), commits G5 without waiting; a BLOCKER stops for the developer.
 - **Done:** the G5 verifier (FIX, 05:56); G7b (06:09); the GM error-text fix (06:13).
 
 ## Open items

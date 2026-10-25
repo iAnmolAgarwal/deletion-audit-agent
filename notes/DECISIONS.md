@@ -234,5 +234,11 @@ The full prep-era log (D1–D19) is in the kit at `../research/DECISIONS.md`. Th
 |---|---|---|
 | T92 | **(1) G7 verifier approved:** `orch-verifier` (high), directed_by 2026-10-25T06:15:34+05:30. It launches when G7a's wiring is done. **Scope:** G7a, G7b and the GM error-text change, plus G7b's four open details (the vision file name; `committed_key`/`final_key`; no resolution field for a vision disagreement; the adapter recomputing `agree`/`disagreements`). **`committed_key`/`final_key` must compare intent labels, not reply keys.** **(2) The routing check runs in two stages.** It is still proposed first with its call count and cost, as planned. Stage 1: the 22 DEV texts and the fixtures, through the new transport (the GM error-text version; the smoke call tested the committed GM). Stage 2: the 375 test texts, twice. Main stops between the stages if anything fails. **(3) NUMBERS.md** notes that score runs from now on record a new scorer hash, so earlier baselines carry the old one. | Developer. |
 
+## Developer turn 2026-10-25T06:18:13+05:30
+
+| # | Decision | Reason given / basis |
+|---|---|---|
+| T93 | **The G5 fix round's verifier: commit without waiting, unless there is a BLOCKER.** If that verifier (T90) returns PASS, or only findings below BLOCKER, main commits G5 without stopping for the developer's reply. The non-BLOCKER findings go on the G9 list, as under T80. A BLOCKER still stops for the developer's reply. This applies to that one verdict. Every other verifier, judge or code-review verdict still stops for the developer's reply (../CLAUDE.md §1). | Developer, to save a round trip. |
+
 ## Organiser claims adopted
 (None yet. G1's `notes/CONTRACT_DRAFT.md` will propose them; each adoption is added here with its DEV evidence.)

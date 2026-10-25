@@ -2,7 +2,7 @@
 
 The durable state is in these files. Read them first after a compaction:
 - `TASKS.md`: gate status, the agent queue, the G9 list and the freeze checks.
-- `notes/DECISIONS.md`: T1–T92, every developer ruling.
+- `notes/DECISIONS.md`: T1–T93, every developer ruling.
 - `notes/INTERFACES.md`:
   - §7 is G5's engine, amended by T68–T77; §7.1 holds its **as-built signatures**, accepted under T87.
   - §8 is GM's model client.
@@ -36,7 +36,7 @@ Scratchpad below means `/private/tmp/claude-501/-Users-anmolagarwal-hackerrank-o
 **Order (T90/T92), each step after the one before:**
 1. G7a finishes. Main checks its report, including its proposed wiring changes.
 2. The G5 fix round: `orch-builder-core`, high, directed_by 2026-10-25T06:08:27+05:30. The brief is at scratchpad `g5fix_brief.md`, and the repros at `g5fix_repros/`. It keeps T69 and adds the new fail-closed rule for records that cannot be interpreted.
-3. A fresh verifier on that diff, then the developer's reply, then the G5 commit.
+3. A fresh verifier on that diff. **T93:** if it returns PASS or only findings below BLOCKER, commit G5 without waiting and put those findings on the G9 list. A BLOCKER stops for the developer's reply.
 4. G7a's wiring into `pipeline.py` and `artifacts.py`. `committed_key`/`final_key` must compare intent labels (T92).
 5. The G7 verifier: `orch-verifier`, high, directed_by 2026-10-25T06:15:34+05:30. Scope: G7a, G7b, the GM change and G7b's four details.
 6. The routing check, proposed first with its call count and cost. Stage 1 is DEV and the fixtures through the new transport; stage 2 is the 375 test texts, twice. Stop between the stages on any failure.
