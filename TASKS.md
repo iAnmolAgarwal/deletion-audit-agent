@@ -52,6 +52,7 @@ Rebuilt at the developer's direction (turn 2026-10-25T00:08:45+05:30). Updated a
     1. the four §11 review checkpoints have no log.txt entries yet;
     2. "I chose" and the D4c approval show only in the SESSION START provenance line (the prep session's, D16), so G10 must cite them truthfully;
     3. cite `g5-dev22-20261025T0530` for DEV 19/22.
+  - **G7 verifier items** are collected in `notes/g7_verifier_items.md` (13 items, including the T103 dependency gap). The full brief is written when the wiring finishes.
   - **At the stage-1 stop (T102):** the seven showcase cases. For each: what its screenshot shows for the linked resource, the capture time, and the state with the reading applied (latest observation wins). A resource present or active before `audit_at` means a finding citing the screenshot. The map, from main's pre-check, is case_34→evidence_04 (account_5762; its row is COMPLETE today), 35→09 (search_428), 39→14 (data_flow_1121), 50→19 (analytics_7438), 52→23 (export_1260), 53→28 (support_1034), 55→32 (backup_9287).
   - **Output lock (T101):** the approved file is in `notes/approved_output.json` (`g5-test-20261025T0530`, `cf2a90b0…`). Any change to the test output needs re-approval; at freeze, print the sha256 and compare.
 - **R06 count (T99 D), done at 11:40:**

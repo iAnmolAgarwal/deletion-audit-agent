@@ -24,7 +24,7 @@ In DEV, R15-R4 only ever supplied *verification* steps of INCOMPLETE rows (empty
 - `evidence_930601` (kv log, captured 11:20): account_9305101 404 at 10:10; audit_record_9305103 at 10:25.
 - `evidence_930602` (snapshot bundle, captured **13:00**): one snapshot at **11:59:59**, `search_service/customer_search_documents` = search_9305102 (his name, email, `user_930510`).
 
-## Expected row (`expected_output.csv`), reading (a): `INCOMPLETE`, 5 steps
+## Reading (a), superseded by T101 (kept for the record; its file was removed): `INCOMPLETE`, 5 steps
 | # | phase | operation | system_id | resource_id | state | evidence | basis |
 |---|---|---|---|---|---|---|---|
 | 1 | FINDING | REPORT_REMAINING_RECORD | search_service | search_9305102 | PRESENT | **evidence_930601** | R15-R4 discovery and state; rule_03; R15-R9. Citation by R15-R14 (the case's one file = the latest *pre-audit* linked file). **Breaks T66 rule 1**: this file does not contain search_9305102 |
@@ -51,5 +51,5 @@ Whether T66 rule 1's hard check exempts a finding discovered through R15-R4, and
 ## Ruling (T101, 2026-10-25): reading (d)
 The developer ruled: **a finding whose record only a post-audit file holds fails its row closed**, and the rule gets its own fixture test.
 - case_93051's row is FAILED_CLOSED. It is INCOMPLETE, never COMPLETE and never NOT_APPLICABLE, and its reason names `search_9305102`. It never cites `evidence_930602`.
-- `expected_assertions.json` is the authority for this fixture. `expected_output.csv` shows the superseded reading (a) and is not asserted.
+- `expected_assertions.json` is this fixture's one expectation. The superseded reading (a)'s `expected_output.csv` was removed (developer, 2026-10-25); git history keeps it.
 - Measured impact on real data (main, 2026-10-25): 0 of 29 DEV FINDINGs and 0 of the engine's 713 test FINDINGs have this shape.

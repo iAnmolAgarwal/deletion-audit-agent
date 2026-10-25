@@ -31,7 +31,7 @@
       "failed_closed_reason_names": [
         "search_9305102"
       ],
-      "exact_row": "not asserted: the steps of a FAILED_CLOSED row are the engine's validated steps (T71 Q5, T86); expected_output.csv shows the superseded reading (a)"
+      "exact_row": "not asserted: the steps of a FAILED_CLOSED row are the engine's validated steps (T71 Q5, T86)"
     }
   }
 }

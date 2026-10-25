@@ -4914,3 +4914,27 @@ parent_agent=none
 worktree=main
 branch=main
 repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T12:01:12+05:30] T103: R06 old expected_output.csv removed; dependency gap to G7 verifier
+
+User Prompt (verbatim, secrets redacted):
+Delete R06's superseded expected_output.csv; git history keeps it, and each fixture should carry one expectation, so a reader can't mistake the old one for current. Add the dependency gap you found (an unread screenshot newer than a record's text evidence isn't counted as a dependency) to the G7 verifier's brief.
+
+Time is not a factor.
+
+Agent Response Summary:
+Developer decision: R06 keeps one expectation, its assertions file, and the dependency gap becomes a G7 verifier check. I removed the superseded file with git rm, re-headed reading (a) in EXPECTED.md as superseded, and dropped the stale reference from expected_assertions.json. The G7 verifier's brief doesn't exist yet (it launches after the wiring), so I collected its 13 items, the gap among them with case_34's evidence, in notes/g7_verifier_items.md. The README draft was committed as ff2b5ef.
+
+Actions:
+* git rm code/tests/fixtures/redteam/R06_preaudit_line_in_postaudit_file/expected_output.csv; EXPECTED.md heading and authority line; expected_assertions.json exact_row text.
+* notes/g7_verifier_items.md (also in the scratchpad): the scope (G7a, G7b, the GM change, the wiring diff) and items 1–13, with item 9 the dependency gap (case_34 COMPLETE on evidence_01, captured 2026-09-15T11:59:39Z; evidence_04 captured 2026-09-26T11:00:00Z, before audit_at, not in depends_on).
+* notes/DECISIONS.md T103; TASKS.md. git commit pushed to github main.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
