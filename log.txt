@@ -4866,3 +4866,51 @@ parent_agent=none
 worktree=main
 branch=main
 repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T11:59:09+05:30] README draft written (DRAFT, G10 finalises)
+
+User Prompt (verbatim, secrets redacted):
+[brief written by main; approved in developer turn 2026-10-25T11:55:27+05:30]
+directed_by: 2026-10-25T11:55:27+05:30
+
+README draft: write a DRAFT README.md for the submission. G10 finalises it, and G9's judge checks its claims against the code.
+(full brief from main)
+
+Agent Response Summary:
+Copied the organiser README verbatim to notes/ORGANISER_README.md (cmp identical) and wrote a DRAFT README.md with five sections: how it works, how to run, how this was built, limitations, reports. Every T-numbered claim comes from notes/SYSTEM.md, notes/DECISIONS.md, NUMBERS.md or run g5-test-20261025T0530 metrics. The G7 agent and vision wiring is marked in progress, because pipeline.py makes no model calls today. The four review checkpoints are listed as not yet logged; the "I chose" items are evidenced only by the SESSION START provenance line, not by developer-typed words.
+
+Actions:
+* cp README.md notes/ORGANISER_README.md; Write README.md
+* Read notes/SYSTEM.md, notes/DECISIONS.md, NUMBERS.md, split.json, HOLDOUT_RUN_PROPOSAL.md, PLAYBOOK.md section 11, runs/g5-test-20261025T0530/metrics.json; ran deletion_audit --help (no paid call, .env not read)
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=orch-packager
+parent_agent=main
+directed_by=2026-10-25T11:55:27+05:30
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T12:00:00+05:30] [auto] README draft done and checked; committed (DRAFT)
+
+User Prompt (verbatim, secrets redacted):
+(Background-agent notification: the README draft, orch-packager, directed_by 2026-10-25T11:55:27+05:30, finished. No developer text.)
+
+Agent Response Summary:
+The packager copied the organiser's README verbatim to notes/ORGANISER_README.md and wrote a 71-line DRAFT README.md (How it works, How to run, How this was built, Limitations, Reports), marking G7's parts as in progress. Main checked it: the copy is byte-identical to the committed README, and the counts it quotes match run g5-test-20261025T0530 (27 D18_TIE_PICK, 6 T27_LATER_IDENTITY_LOOKUP). It flags, truthfully, that the four review checkpoints and the developer's "I chose" and D4c approvals have no log.txt entries in this session; G10 must handle that without inventing anything. The draft is committed.
+
+Actions:
+* Checks: git show HEAD:README.md | cmp - notes/ORGANISER_README.md (equal); the DRAFT banner is line 3; a flag count over runs/g5-test-20261025T0530/cases.jsonl gives D18_TIE_PICK 27 and T27_LATER_IDENTITY_LOOKUP 6; the DEV 19/22 citation is g5-dev-iter3-score (correct, though the canonical run is g5-dev22-20261025T0530).
+* notes/agent_reports/readme_draft.md (the report verbatim, with main's check); TASKS.md (three items for G10).
+* git commit of README.md, notes/ORGANISER_README.md, notes/agent_reports/readme_draft.md, TASKS.md and log.txt; secret scan PASS; pushed to github main.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
