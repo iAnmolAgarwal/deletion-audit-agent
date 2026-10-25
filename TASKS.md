@@ -51,6 +51,7 @@ Rebuilt at the developer's direction (turn 2026-10-25T00:08:45+05:30). Updated a
 - **Freeze checks (T60, T71, T87):** 0 FAILED_CLOSED rows; 0 `INTENT_FAILED_CLOSED` flags (a failed intent call in the final run is re-run until it succeeds; no row ships with intent from the fail-closed path); 0 skips (empty allow-list).
 - **G9 list, GP (T87):** GP's old ruff findings. **`evidence/` done** (T94, about 06:23; 8 findings, behaviour unchanged, committed). Any left in `inputs/` belong to G5's files.
 - **Found by the smoke call (run `smoke-t76-20261025T0601`, for the developer to place):** GM's `AnthropicTransport` keeps only the error class and status of an `APIStatusError`, so `calls.jsonl` cannot say why the API refused a request.
+- **T95 at the G7 wiring:** `evaluation_report.md`'s generator embeds `agent_report.py`'s tool-sequence histogram and its tools on vs off sections for the fixtures (G8 included) and for the test rows that differ between arms, not only DEV (C2). The G7 verifier checks that a G8 injection fixture exercises both the code flag and the model flag (C4), and checks the prompt and tool-description parts (C1). Items (1) and (2) were sent to G7a at 06:24.
 - **G7b items to settle at the G7 wiring:**
   1. the vision file name (`VISION_ARTIFACT`, assumed `vision.json`);
   2. whether `committed_key`/`final_key` are labels or reply keys (if keys, add `committed_label`/`final_label`);
