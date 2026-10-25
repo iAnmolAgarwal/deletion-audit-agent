@@ -5565,3 +5565,35 @@ parent_agent=none
 worktree=main
 branch=main
 repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T13:04:58+05:30] T115: A+ test run reinstated; caps $40 and 1,200 sends; intake-row list
+
+User Prompt (verbatim, secrets redacted):
+Order and ETA: agreed, including the holdout after the judge's fix round.
+
+1. FAILED_CLOSED at freeze: fine. Bring me the rows if any remain.
+
+2. Intake rows: in the one message, list every test text read NOT_DELETION in both replicates, and whether an intake row attached to it. For any without one, add the account it was assigned and its request text. I'll rule per row. T101's condition stays as it is until then.
+
+3. A+ on test: reinstate it, since it costs $6–8. Run it at the end of the same paid pass, after the mode-A test run, with the gate on. Raise the total cap to $40 and 1,200 sends.
+   In the one message, add:
+   - whether the A+ output is byte-identical to mode-A's;
+   - if not, each differing row with its class and the tool calls behind it.
+   I'll choose which file to approve. There is still no separate stop.
+
+Time is not a factor.
+
+Agent Response Summary:
+Developer decision: the A+ test run is reinstated at the end of the one paid pass, after mode A, with the gate on, and the total caps rise to $40 and 1,200 sends. The one message gains the NOT_DELETION intake-row list (account and request text where there is no intake row) and the A+ vs mode-A comparison. I recorded T115 and updated the plan in TASKS. Fix round 2 and the vision adapter are still running.
+
+Actions:
+* notes/DECISIONS.md T115; TASKS.md (caps, step 5, the message contents). git commit pushed to github main.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26

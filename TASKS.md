@@ -38,13 +38,14 @@ Rebuilt at the developer's direction (turn 2026-10-25T00:08:45+05:30). Updated a
 ## Agent queue (cap: 3 at once, T79; never two of the same type)
 - **T114 SCOPE CUT (13:00): two goals only, the best output.csv and the best code.zip.** Order:
   1. **Fix round 2 and the vision adapter finish.** Done = both suites pass and the hashes are unchanged; no verifier. Then the commit.
-  2. **The paid pass** (export, repo cache, `runs/`, gate on, caps $30 and 1,000 sends, no stops except a cap, a case failing twice, or the gate):
+  2. **The paid pass** (export, repo cache, `runs/`, gate on, **caps $40 and 1,200 sends (T115)**, no stops except a cap, a case failing twice, or the gate):
      1. the DEV routing check (cached);
      2. vision, 11 images × 2;
      3. stage 2 on the test texts;
-     4. the mode-A test run.
+     4. the mode-A test run;
+     5. **the A+ test run (T115).**
      Backup rule F applies to image-derived backups.
-  3. **One message:** the changed rows by class, the 10 readings, case_55, the spend. The developer rules on the candidate; cf2a90b0 stays approved until then.
+  3. **One message:** the changed rows by class, the 10 readings, case_55, the spend, plus (T115) every test text read NOT_DELETION in both replicates, with its intake row or, without one, its assigned account and request text, and whether A+ equals mode A (if not, each differing row with its class and tool calls). The developer rules on the candidate; cf2a90b0 stays approved until then.
   4. **Reports** from these runs, with T111/T113: the eval engineer, after the vision adapter.
   5. **The judge** (xhigh, directed_by 2026-10-25T13:00:29+05:30) over the upload set, then one fix round, checked by tests and hashes.
   6. The freeze, then the HOLDOUT EVALUATION RUN ($1; ask for the phrase), then the reports regenerated.
