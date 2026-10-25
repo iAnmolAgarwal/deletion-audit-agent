@@ -4100,3 +4100,44 @@ parent_agent=none
 worktree=main
 branch=main
 repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T06:14:45+05:30] T90/T91: 400 was key scope; smoke call passed on 1.13.0; GM fix; G5 fix queued
+
+User Prompt (verbatim, secrets redacted):
+Two rulings.
+
+1. Smoke-call 400: run your check. Send the identical request once more straight through the SDK, printing only the status and the API's error type and message, never the key (send 2 of 4, $0). Then:
+   - If the message names something in the smoke request, fix the script and re-run within the remaining sends.
+   - If it points at the API version or a feature that 2023-06-01 lacks, stop and show me the message, with your recommendation on anthropic 2.3.0, the version research/13 verified.
+   Also approved now: GM's transport keeps the API's error text in calls.jsonl, with a test, built by orch-builder (medium), directed_by = this turn. It must land before the routing check, and the G7 verifier reviews it.
+
+2. G5: your fix round as proposed, all five plus the holdout guard and the docstring, each fix with a test that fails before and passes after. Keep T69: a legal hold that names no resource still produces no step. The new fail-closed rule is for records that exist but can't be interpreted. Start it when G7a finishes; don't stop G7a. Then a fresh verifier on that diff, then commit.
+
+Time is not a factor.
+
+(Sent during the turn, 2026-10-25T06:11:36+05:30:)
+I've put a new workspace-scoped API key in .env, so no anthropic-workspace-id header is needed and GM's code doesn't change for this. Re-run the smoke call with a fresh 4-send cap (same $0.10 cap). Record it as a T entry: the 400 was the key's scope, not the request or the API version, and anthropic stays at 1.13.0.
+
+Time is not a factor.. im putting it , give me 5 mins
+
+(Sent during the turn:)
+api key scoped to worksapce updated
+
+Agent Response Summary:
+Orchestration decisions (developer): orch-builder (medium) makes GM's transport keep the API's error text, gating the routing check; the G5 fix round (orch-builder-core, high) waits for G7a, then gets a fresh verifier. My $0 diagnostic send showed the 400 was the key's scope (no workspace), not the request or the API version, so 2.3.0 was not needed (T91). After the developer put a workspace-scoped key in .env, the smoke call passed on anthropic 1.13.0: tool_use, a schema-valid answer, and a cache replay with 0 sends, for $0.004964 (project total $0.004964). The GM fix and G7b are done and checked, and stay uncommitted until the G7 verifier; the docs are committed as d58f22f.
+
+Actions:
+* Send 2 (scratchpad smoke_diag.py, directly through SDK 1.13.0, the same body and key 3e587f53…): status 400, invalid_request_error, "This API key is not scoped to a workspace, so this request must include the anthropic-workspace-id header with the ID of the workspace to use. Add the header, or use an API key that is scoped to a workspace." request_id req_011CgN2GNJ8EYey6x4dpJGN6. Not billed; made outside GM, so not in the ledger. Offline check: SDK 1.13.0 keeps a client-level anthropic-workspace-id from default_headers (_client.py:126-132).
+* Agent orch-builder (background), GM error-text fix, directed_by 2026-10-25T06:08:27+05:30; brief at scratchpad gm_errtext_brief.md (0 lines starting with "## ["). Done and checked (see its [auto] entry).
+* G5 fix brief written to scratchpad g5fix_brief.md (directed_by 2026-10-25T06:08:27+05:30). It covers the five findings, the holdout guard (with no unlock path in this round) and the docstring, with T69 pinned by its own test. The verifier's repros were copied to scratchpad g5fix_repros/. It launches when G7a finishes (same agent type).
+* Smoke re-run: .env changed at 06:12:14 (mtime only; the value was never read into the shell). A dry run on FakeTransport passed. The paid run smoke-t76-20261025T0612 imported GM as committed (3f89310, exported to scratchpad gm_committed/, SMOKE_CODE), so the concurrent GM edit could not affect it. Fresh BudgetGuard($0.10, 4 sends): call 1 tool_use (822/60, $0.002244), call 2 end_turn with schema problems [] (915/89, $0.00272), replay cache_hit with 0 sends and identical raw. cache/ledger.jsonl: 3 lines, $0.004964.
+* notes/DECISIONS.md T90 and T91 (with the result); TASKS.md updated. git commit d58f22f (DECISIONS, TASKS, log), pushed to github main, https://github.com/iAnmolAgarwal/orchestrate-oct26-ghost-data
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26

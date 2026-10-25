@@ -1,8 +1,8 @@
-# Resume point (updated 2026-10-25 ~05:47 IST, before a compaction)
+# Resume point (updated 2026-10-25 ~06:18 IST)
 
 The durable state is in these files. Read them first after a compaction:
 - `TASKS.md`: gate status, the agent queue, the G9 list and the freeze checks.
-- `notes/DECISIONS.md`: T1–T87, every developer ruling.
+- `notes/DECISIONS.md`: T1–T92, every developer ruling.
 - `notes/INTERFACES.md`:
   - §7 is G5's engine, amended by T68–T77; §7.1 holds its **as-built signatures**, accepted under T87.
   - §8 is GM's model client.
@@ -15,49 +15,44 @@ The durable state is in these files. Read them first after a compaction:
   | `g4_verify.md`, `g4fix_verify.md`, `g4fix2_verify.md`, `g4fix3_verify.md` | G4 | FIX, FIX, FIX, then PASS |
   | `gp_verify.md` | GP | PASS |
   | `gm_verify.md`, `gm2_verify.md` | GM | FIX, then PASS |
-  | `g5_verify.md` | G5 | pending |
+  | `g5_verify.md` | G5 | FIX (5 MAJOR, 0 BLOCKER); fix round approved (T90) |
 
 Scratchpad below means `/private/tmp/claude-501/-Users-anmolagarwal-hackerrank-orchestrate-october26-hackerrank-orchestrate-october26/a5e12cbe-b80b-4f4f-8569-6ab18d22f35c/scratchpad/`.
 
-## State (05:47)
-**Committed and pushed to `github`** (all of these, in order):
-- `dad20d0`, `92fabd2`: G4 fixes;
-- `b9bd05a`: lint cleanup, plus the two GP annotation fixes;
-- `cb6113f`, `ee6aa8c`: the G5b fixtures, committed before any engine run on them;
-- `3f89310`: GM;
-- `61b315f`: the G5 as-built interface, T87.
+## State (06:18)
+**Committed and pushed to `github`:** everything through `d58f22f`:
+- `8bce1e1`: the log fix (T89) and the G5 verifier report;
+- `d58f22f`: T90 and T91, and the smoke result.
 
-**Uncommitted:**
-- G5's engine and tests: `code/deletion_audit/{inputs/requests.py, identity, discovery, state, policy, steps, validate, engine.py, record.py, artifacts.py, pipeline.py, config.py, timeutil.py, __main__.py}` and `code/tests/{identity, discovery, state, policy, steps, validate, pipeline, hygiene}`, `code/tests/engine_fixtures.py`. These commit after the G5 verifier's verdict and the developer's reply (T87).
-- `log.txt`, from this turn on.
+**Uncommitted, waiting for review:**
+- G5's engine and tests (the paths in TASKS.md). The fix round comes first (T90).
+- G7b's files: `code/evaluation/{agent_report.py, freeze_check.py}` and `code/evaluation/tests/{run_dirs.py, test_agent_report.py, test_freeze_check.py}`. Checked by main: 187 tests OK.
+- The GM error-text change: `model/{transport, policy, calllog, client}.py` and `tests/model/test_api_error_text.py`. Checked by main: model 81 and all 273 OK.
+- `code/evaluation/NUMBERS.md`: the scorer-hash note (T92).
+- Both G7b and the GM change wait for the G7 verifier.
 
-**Running:** the **G5 verifier** (`orch-verifier`, high, directed_by 2026-10-25T05:38:42+05:30, brief at scratchpad `g5_verifier_brief.md`). It reports to `notes/verify/g5_verify.md` and includes a fixture run. On completion:
-- save its report verbatim;
-- spot-check its repros;
-- stop for the developer's reply (the verdict rule);
-- if the verdict is PASS and the developer agrees, commit G5.
+**Running:** G7a (`orch-builder-core`, high, directed_by 2026-10-25T05:49:46+05:30, brief at scratchpad `g7a_brief.md`).
 
-If it was cut, relaunch it with the same brief and log an `[auto]` entry.
+**Order (T90/T92), each step after the one before:**
+1. G7a finishes. Main checks its report, including its proposed wiring changes.
+2. The G5 fix round: `orch-builder-core`, high, directed_by 2026-10-25T06:08:27+05:30. The brief is at scratchpad `g5fix_brief.md`, and the repros at `g5fix_repros/`. It keeps T69 and adds the new fail-closed rule for records that cannot be interpreted.
+3. A fresh verifier on that diff, then the developer's reply, then the G5 commit.
+4. G7a's wiring into `pipeline.py` and `artifacts.py`. `committed_key`/`final_key` must compare intent labels (T92).
+5. The G7 verifier: `orch-verifier`, high, directed_by 2026-10-25T06:15:34+05:30. Scope: G7a, G7b, the GM change and G7b's four details.
+6. The routing check, proposed first with its call count and cost. Stage 1 is DEV and the fixtures through the new transport; stage 2 is the 375 test texts, twice. Stop between the stages on any failure.
 
-**Waiting on the developer:** approval of the **G7 proposal** (main's 05:44 message; summary in the 05:43 log entry):
-- **G7a:** `orch-builder-core`, high, building `code/deletion_audit/agent/**` and `code/tests/agent/**`. That covers turn-1 text-only intent with UNCERTAIN, the CLASSIFY_REQUEST cross-check (flags only), the 11-image vision step (PNG signature, IMAGE_SUBJECT_CONFLICT), the loop (≤4 tool calls, then `tool_choice` none; modes A+/A/tools_off), the read-only tools and answer validation. Fake transport only. No edits to G5's files until G5 commits; the pipeline wiring comes after.
-- **G7b:** `orch-eval-engineer`, high, building `code/evaluation/agent_report.py` (N/M, tools on vs off, the agreement table) and a freeze-check command.
-- **The T76 smoke call** (main runs it): 2 paid calls plus a cache replay, on `claude-sonnet-5-5` with anthropic 1.13.0. It tests a tool together with the JSON-schema format, effort, a tool_result follow-up giving a schema-valid answer, and a cache replay with 0 sends. Expected about $0.014; worst-case reservation $0.075; caps $0.10 and 4 sends. The key is loaded from `.env` inside the process, never printed. Project spend so far: $0.
-- **Next paid step**, proposed later with its cost: the turn-1 routing check, about 820 calls, about $4.5 expected.
+**Paid calls so far:** smoke `smoke-t76-20261025T0612` passed on anthropic 1.13.0 (T91). It cost $0.004964, which is the ledger total. The earlier 400 was the key's scope; `.env` now holds a workspace-scoped key.
 
 **Key numbers:**
-- **Baseline:** `g4lint-baseline-20261025T0529` (prototype), sha256 `60234e8f…`.
-- **G5 DEV** (`g5-dev22-20261025T0530`): 22/22 status, 19/22 exact; the case_08 flip is accepted under T58.
-- **G5 test replay** (`g5-test-20261025T0530`):
-  - 518 rows, 0 crashes;
-  - 18 FAILED_CLOSED rows: 9 non-deletion texts waiting on G7's intent, 9 waiting on G7's images;
-  - 58 hard H03 violations, all on those 18 rows, which T87 allows until G7.
-- **Freeze checks (T60/T71/T87):** 0 FAILED_CLOSED, 0 `INTENT_FAILED_CLOSED`, 0 skips.
+- **G5 DEV** (`g5-dev22-20261025T0530`): 22/22 status, 19/22 exact.
+- **G5 test** (`g5-test-20261025T0530`): 518 rows, 18 FAILED_CLOSED. The freeze check refuses it: 18 FAILED_CLOSED and 11 skips.
+- **Scorer hash:** it changed when G7b added two modules (NUMBERS.md note).
 
 **Environment:**
-- `.venv/` (anthropic 1.13.0, pdfplumber 0.11.10, ruff 0.17.0, mypy 2.4.0), with `requirements*.txt` and `requirements.lock`.
+- `.venv/` (anthropic 1.13.0).
 - Lint: `bash scripts/lint.sh <paths>`.
-- Upstream cron `a94d194d`, every 2 h at :07, baseline unchanged.
+- The log guard lives in the kit at `../hooks/log_guard.py`, with its tests in `../hooks/test_log_guard.py`. It skips summarizer sessions (T89).
+- Upstream cron `a94d194d`.
 
 ## Rules in force that are easy to forget
 - **Before any spawn or message to an agent,** check the brief has no line starting with `## [`. Example headers go in backticks (T64).

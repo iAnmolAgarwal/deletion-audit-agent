@@ -64,6 +64,18 @@ it is typed by hand. The prose outside the block gives context only and quotes n
   - **prep resources** is report 15's "(case, resource) pairs found".
 - One reconciliation failure happened and was fixed; see "Invalidated runs" at the end of the generated block.
 
+## Scorer code hash: a new value from G7b on (T92)
+- Each score run records `scorer_code_sha256` in its `config.json`. The value is `runs.code_hash()`, a sha256 over every `.py`
+  file in `code/evaluation/` (tests excluded), in name order. So it changes when any module in that folder is added or
+  edited, not only the scoring modules.
+- G7b added `agent_report.py` and `freeze_check.py` to the folder on 2026-10-25 at about 06:09 IST, without editing any
+  existing module. **Score runs from then on record a new scorer hash. Every earlier baseline carries the old one,**
+  including the G4 baselines and `g5-dev22-20261025T0530-score`.
+- A hash difference across that boundary does not by itself mean the scoring changed. To compare across it, compare the
+  scoring modules (`scorer.py`, `gold.py`, `outputs.py`, `coherence.py`) by content, or re-score the earlier run's
+  `output.csv` under the new hash. G7b's report run `g7b-agent-report-g5-20261025T0609` re-scored
+  `g5-dev22-20261025T0530` and matched that run's existing score.
+
 <!-- BEGIN GENERATED: evaluate.py numbers (do not edit by hand) -->
 ## Scored runs (DEV, 22 cases; holdout never loaded; producer check passed)
 
