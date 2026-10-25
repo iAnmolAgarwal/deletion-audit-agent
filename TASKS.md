@@ -67,6 +67,15 @@ Rebuilt at the developer's direction (turn 2026-10-25T00:08:45+05:30). Updated a
   - **Running (T108):** the vision-adapter fix (`orch-eval-engineer`, high; brief `visionadapter_brief.md`), the G7 verifier (export of 4dcd719; given T108 (3) for item 14c), and fix round 2 (given T108 (2) as its item 7).
   - **T109:** a FAILED agent outcome is never NOT_APPLICABLE (flagged AGENT_CALL_FAILED), and there is no agent re-send. Fix round 2 item 8 covers (a) and (b), in `pipeline.py` and `regression.py`; the vision-adapter agent covers (c), the freeze check listing FAILED cases. The verifier has the amended 14c. A 14c finding alone does not block stage 1.
   - **T110:** a FAILED case blocks the freeze (T87(2)); the remedy is a re-run. The same case failing with the same error class on two re-runs in a row stops for the developer (case, error class, request size), with no override. Sent to the vision-adapter agent for `freeze_check.py`.
+  - **Queued for `orch-eval-engineer` after the vision-adapter fix (T111):**
+    1. the "failures found and improvements made" section from a ledger, with the format proposed first;
+    2. a generated headline block in both reports;
+    3. `usage_report.md` checked against the organiser's field list.
+  - **G10 (T111):**
+    1. a fresh-clone run command, tested from an export;
+    2. no `../` links;
+    3. the stale phrases fixed;
+    4. the "Organiser claims adopted" list.
   - **G7 verifier: FIX** (12:58; `notes/verify/g7_verify.md`). 0 BLOCKER, 6 MAJOR, 2 MINOR. **Stage 1 is stopped by T108** (MAJORs beyond 14c), and fix classes wait for the developer.
     - MAJOR 1: an image showing nothing becomes REDACTED/ANONYMIZED.
     - MAJOR 2: 14c fails T109 at 4dcd719 (already assigned).

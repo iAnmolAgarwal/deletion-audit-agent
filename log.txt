@@ -5472,3 +5472,43 @@ parent_agent=none
 worktree=main
 branch=main
 repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T12:52:43+05:30] T111: G9/G10 report and README additions queued for the eval engineer
+
+User Prompt (verbatim, secrets redacted):
+Additions for G9/G10. No new agent now; they go to orch-eval-engineer after the vision-adapter fix lands, since it's the same type.
+
+1. evaluation_report.md is missing a required section, "failures found and improvements made" (notes/ORGANISER_README.md:96; problem_statement.md:139). Add it to the generator, built from artifacts rather than typed. Each entry names:
+   - the failure: a verifier report, red-team fixture or custom eval case, with its path;
+   - the fix: its T-number and commit;
+   - the metric before and after, which the generator reads from the two named runs.
+   Before building, propose the input format, for example a ledger file that holds only paths, T-numbers, commits and run IDs, with every metric computed by the generator.
+2. A generated headline block at the top of both reports, with each number's run ID:
+   - DEV status, row-exact and step F1;
+   - test rows by status and the FAILED_CLOSED count;
+   - the tool-use rate and the tools on vs off delta;
+   - total cost and cost per case;
+   - the holdout, with its caveat.
+3. G10 README list:
+   (a) the run command uses ../.venv/bin/python, which won't exist in the unzipped repo; give one that works from a fresh clone, and test it from an export;
+   (b) remove the links to paths outside the repo (../PLAYBOOK.md, ../research/08_claude_blog_practices.md); the README stands alone;
+   (c) "None of the four is logged yet", "In progress (G7)" and "the lost row" are stale.
+4. notes/DECISIONS.md "Organiser claims adopted" still says "None yet". In G10, list each organiser claim we adopted, with its DEV evidence, or point to where CONTRACT_DRAFT records them.
+
+Time is not a factor.
+
+Agent Response Summary:
+Developer decision: the report additions (the improvements section from a ledger, a headline block) wait for orch-eval-engineer after the vision-adapter fix, and four README and DECISIONS items go to G10. I recorded T111 and queued them in TASKS. I added a check of usage_report.md against the organiser's field list, which includes total and average tokens per request. The reply proposes the ledger format and repeats the four G7 rulings still pending.
+
+Actions:
+* Read notes/ORGANISER_README.md:94-98 and problem_statement.md:137-141 as data; CONTRACT_DRAFT.md has no adoption markers.
+* notes/DECISIONS.md T111; TASKS.md. git commit pushed to github main.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
