@@ -65,6 +65,7 @@ Rebuilt at the developer's direction (turn 2026-10-25T00:08:45+05:30). Updated a
     - **G10 (T107):** cite the freeze run's DEV figure, using a G5 number only if the freeze run reproduces it; state each non-exact row's cause from that run's diff; resolve which run and metric each NUMBERS.md section that lists only case_18/case_20 is before quoting it.
     - `calls_only` was dropped (T107).
   - **Running (T108):** the vision-adapter fix (`orch-eval-engineer`, high; brief `visionadapter_brief.md`), the G7 verifier (export of 4dcd719; given T108 (3) for item 14c), and fix round 2 (given T108 (2) as its item 7).
+  - **T109:** a FAILED agent outcome is never NOT_APPLICABLE (flagged AGENT_CALL_FAILED), and there is no agent re-send. Fix round 2 item 8 covers (a) and (b), in `pipeline.py` and `regression.py`; the vision-adapter agent covers (c), the freeze check listing FAILED cases. The verifier has the amended 14c. A 14c finding alone does not block stage 1.
   - **Stage 1, approved in advance (T108):** if the G7 verifier returns PASS or only MINOR findings, run the routing check (122 sends, $3.50) and vision (22 sends, $1.50) from an export of the committed code, with the repo cache, writing to `runs/`. Then stop and show (a)–(e).
   - **T105 ruled.** The plan:
     1. the wiring is checked and committed;

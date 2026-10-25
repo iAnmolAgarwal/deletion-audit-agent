@@ -5321,3 +5321,61 @@ parent_agent=none
 worktree=main
 branch=main
 repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T12:42:36+05:30] Correction: the T108 entry left out a repeated fragment of the prompt
+
+User Prompt (verbatim, secrets redacted):
+(No developer text; main's own correction to keep the User Prompt record verbatim.)
+
+Agent Response Summary:
+The previous entry (T108) logged the developer's message without one fragment the message repeated, and said so. This note supplies it verbatim, so the record is complete. In the received text, the fragment sat between item 3 and the full stage-1 paragraph: "  Stage 1 approved in advance: if the G7 verifier returns PASS, or only MINOR findings, run the routing check (122 ".
+
+Actions:
+* None beyond this note; earlier entries are unchanged.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T12:45:15+05:30] T109: failed agent outcome never NOT_APPLICABLE; no agent re-send; routed
+
+User Prompt (verbatim, secrets redacted):
+Correction to T108 part 3, before the verifier rules on item 14c.
+
+Drop "re-send the failed call once". The transport's retry ladder must stay the only place that decides to give up (CLAUDE.md §5), and a re-send in the agent would add a second one. A later run already re-sends a failed call naturally, because the cache replays the successful calls.
+
+The amended rule:
+(a) A case whose agent outcome is FAILED (a call failed at any turn) never becomes NOT_APPLICABLE, whatever turn 1 said. Its row is what the engine path without model intent gives, which is the approved behaviour, flagged AGENT_CALL_FAILED. Apply this in the pipeline's intent decision, not only in the gate.
+(b) agent/regression.py::_intent_condition also requires the case's loop status is not FAILED. Today it checks only the turn-1 labels and the intake cross-check.
+(c) The freeze check lists every case with a FAILED outcome.
+
+Where it goes: fix round 2, as item 8 (orch-builder-core is already in it, directed_by = this turn). Same stop rule: DEV 641dbc8d… and test cf2a90b0… must not move. Engine-only replay has no model intent, so they shouldn't.
+
+Verifier: if it's still running, send it the amended 14c. Otherwise check its 14c finding against this rule, not T108's wording.
+
+Stage 1: a finding on 14c alone doesn't block it. The fix changes only how a failed outcome maps to a row, not what is sent to the model, so stage 1's replies stay valid in the cache. Any other BLOCKER or MAJOR still stops it.
+
+Record it as T109.
+
+Time is not a factor.
+
+Agent Response Summary:
+Developer decision: T109 replaces T108 part 3. A FAILED agent outcome never becomes NOT_APPLICABLE and is flagged AGENT_CALL_FAILED in the pipeline's intent decision, with no re-send in the agent. Parts (a) and (b) went to fix round 2 as item 8, and part (c) to the vision-adapter agent, which is already editing freeze_check.py, so that no two agents edit one file. The still-running G7 verifier received the amended 14c, and a 14c-only finding no longer blocks stage 1.
+
+Actions:
+* SendMessage to fix round 2 (item 8: pipeline intent decision and agent/regression.py _intent_condition line 199; no agent re-send; same stop rule), to the vision-adapter agent ((c), freeze check listing FAILED cases) and to the G7 verifier (amended 14c).
+* notes/DECISIONS.md T109; TASKS.md. git commit pushed to github main.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
