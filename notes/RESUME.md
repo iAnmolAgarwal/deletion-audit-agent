@@ -31,14 +31,15 @@ Scratchpad below means `/private/tmp/claude-501/-Users-anmolagarwal-hackerrank-o
 - `code/evaluation/NUMBERS.md`: the scorer-hash note (T92).
 - Both G7b and the GM change wait for the G7 verifier.
 
-**Running (3, the cap):**
-- G7a: `orch-builder-core`, high, directed_by 2026-10-25T05:49:46+05:30, brief at scratchpad `g7a_brief.md`.
+**Running:**
+- The G5 fix round: `orch-builder-core`, high, directed_by 2026-10-25T06:08:27+05:30, brief at scratchpad `g5fix_brief.md`, since about 06:52. On its verdict, T93 applies.
+- (Done: G7a, about 06:50, checked by main and uncommitted until the G7 verifier. Its wiring proposals and screenshot risks are on TASKS.md.)
 - G8 red team: `orch-redteam`, high, directed_by 2026-10-25T06:18:59+05:30, brief at scratchpad `g8_redteam_brief.md`. On completion, check the fixtures, then commit `code/tests/fixtures/redteam/` before any engine run.
 - (Done: the GP ruff cleanup, committed `447818a`, with all three baselines unchanged.)
 
 **Order (T90/T92), each step after the one before:**
-1. G7a finishes. Main checks its report, including its proposed wiring changes.
-2. The G5 fix round, once G7a is done (the ruff cleanup finished at 06:23): `orch-builder-core`, high, directed_by 2026-10-25T06:08:27+05:30. The brief is at scratchpad `g5fix_brief.md`, and the repros at `g5fix_repros/`. It keeps T69 and adds the new fail-closed rule for records that cannot be interpreted.
+1. (Done.) G7a finished and was checked; its wiring proposals are on TASKS.md.
+2. The G5 fix round (running since about 06:52): `orch-builder-core`, high, directed_by 2026-10-25T06:08:27+05:30. The brief is at scratchpad `g5fix_brief.md`, and the repros at `g5fix_repros/`. It keeps T69 and adds the new fail-closed rule for records that cannot be interpreted.
 3. A fresh verifier on that diff. **T93:** if it returns PASS or only findings below BLOCKER, commit G5 without waiting and put those findings on the G9 list. A BLOCKER stops for the developer's reply.
 4. G7a's wiring into `pipeline.py` and `artifacts.py`. `committed_key`/`final_key` must compare intent labels (T92). The `evaluation_report.md` generator embeds the tool histogram and the on vs off sections for the fixtures and differing test rows (T95 C2). G7a was sent T95 C4 (the code-side injection flag merged with the model's) and C1 (prompt files and tool descriptions) at 06:24.
 5. The G7 verifier: `orch-verifier`, high, directed_by 2026-10-25T06:15:34+05:30. Scope: G7a, G7b, the GM change and G7b's four details.

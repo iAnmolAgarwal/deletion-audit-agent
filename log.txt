@@ -4329,3 +4329,54 @@ parent_agent=none
 worktree=main
 branch=main
 repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T06:29:31+05:30] G7a agent package built (intent, vision, loop, tools, answers)
+
+User Prompt (verbatim, secrets redacted):
+[brief written by main; approved in developer turn 2026-10-25T05:49:46+05:30]
+G7a: build the agent package (intent, cross-check, vision, loop, tools, answer validation) on the fake transport.
+(full brief from main; plus main's mid-task message adding T95 items 1 and 2, approved in developer turn 2026-10-25T06:24:17+05:30)
+
+Agent Response Summary:
+Built code/deletion_audit/agent/ (turn-1 text-only intent with UNCERTAIN, intake cross-check that only flags, two-namespace vision with a merge rule that never hides a record, data-learned resource-ID shapes, the A+/A/tools_off loop capped at 4 tool calls then tool_choice none, five read-only case-bound tools, answer validation and twice-compiled rows) with 108 tests on GM's fake transport. No paid call was made, .env was not read and no gold was opened. Both T95 additions are in: a pattern-based code check for instruction-like text that only flags and is merged with the model's flag, and prompts restructured into role / constraints / untrusted data / refusal / examples, with labelled tool descriptions. Pipeline wiring stays outside my paths and is proposed in the report.
+
+Actions:
+* Wrote code/deletion_audit/agent/{__init__,params,prompting,schemas,intent,crosscheck,idshapes,vision,questions,tools,loop,answers,report,harness,routing,injection}.py and agent/prompts/{system,tools,vision}.md
+* Wrote code/tests/agent/ (_support plus 12 test modules, 108 tests); scratchpad g7a/mutate.py mutation check: 10/10 rule removals caught, plus 3/3 for the T95 code check
+* T95 (developer turn 2026-10-25T06:24:17+05:30): agent/injection.py detect_instruction_like / detect_in_json / InstructionSignal, report field instruction_like_text; tests test_injection.py and test_prompt_parts.py; final-answer schema gains uncertain_reason; screenshot fenced in <screenshot> blocks
+* Real-data checks (inputs only): learned ID shapes map all 11 screenshot IDs; the detector matches 0 of 398 dataset request texts and 0 of 4,011 activity details
+* Ran bash scripts/lint.sh code/deletion_audit/agent code/tests/agent (clean); unittest: agent 108 OK, code/tests 381 OK, code/evaluation/tests 187 OK
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=orch-builder-core
+parent_agent=main
+directed_by=2026-10-25T05:49:46+05:30
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T06:32:07+05:30] [auto] G7a done and checked (108/381/187 OK); G5 fix round launched
+
+User Prompt (verbatim, secrets redacted):
+(Background-agent notification: G7a, orch-builder-core, directed_by 2026-10-25T05:49:46+05:30, with the T95 additions sent at 06:24, finished. No developer text.)
+
+Agent Response Summary:
+G7a built the agent package (intent, cross-check, two-namespace vision with ID-shape checks, the loop, tools, answer validation, the T95 code injection flag and prompt files) with 108 tests on the fake transport. Main checked it: agent 108, code/tests 381 and evaluation 187 OK, lint clean, and no G5 or model/ file touched. One gap against T92: the report emits committed_key/final_key as reply keys, so the wiring adds labels. With G7a and the ruff cleanup done, I launched the approved G5 fix round (T90). G7a's routing estimate gives a stage proposal, reported to the developer.
+
+Actions:
+* Re-ran: unittest discover on code/tests/agent (108 OK), code/tests (381 OK) and code/evaluation/tests (187 OK); scripts/lint.sh on agent/ and its tests (clean). A find for G5 .py files newer than the 05:56 verifier report finds none; the model/ diff is still the GM fix's (68+/11-).
+* agent/report.py lines 33-34 emit intent.committed_key/final_key (reply keys); loop.py holds committed_label. Goes to the wiring (T92).
+* G7a's six wiring proposals and three screenshot risks are on TASKS.md. The main risk: backup_9287 probably gets NO_STATE, which under the G5 fix's new fail-closed rule would fail that row closed and block the freeze.
+* Agent orch-builder-core (background), the G5 fix round, brief scratchpad g5fix_brief.md, directed_by 2026-10-25T06:08:27+05:30, told that the full suite now has 381 tests.
+* Distinct request texts counted from the request inputs (no gold): test 375; DEV 22 (7 also in test); committed fixtures 15; stage 1 is 37; stage 2 adds 368; all distinct 405.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26

@@ -36,8 +36,9 @@ Rebuilt at the developer's direction (turn 2026-10-25T00:08:45+05:30). Updated a
 - **Interview prep:** removed from the plan (T37). The developer will say how to prepare once the deliverables are ready.
 
 ## Agent queue (cap: 3 at once, T79; never two of the same type)
-- **Running:** G7a (`orch-builder-core`, high, T88), since about 05:57. G8 red team (`orch-redteam`, high, T94), since 06:21; brief at scratchpad `g8_redteam_brief.md`; fixtures in `code/tests/fixtures/redteam/`, committed before any engine run.
-- **G5 fix round:** starts when G7a finishes. The ruff cleanup is done (06:23).
+- **Running:** the G5 fix round (`orch-builder-core`, high, T90, directed_by 2026-10-25T06:08:27+05:30), since about 06:52. G8 red team (`orch-redteam`, high, T94), since 06:21; brief at scratchpad `g8_redteam_brief.md`; fixtures in `code/tests/fixtures/redteam/`, committed before any engine run.
+- **Done:** G7a (about 06:50; checked by main: agent 108, `code/tests` 381 and evaluation 187 tests OK; lint clean; no G5 or `model/` file touched; uncommitted until the G7 verifier).
+- **Routing check and vision proposal** (about 06:55; waiting for the developer): stage 1 is 37 distinct texts (22 DEV and 15 fixture) × 2 = 74 calls, plus the G8 red-team texts once committed; vision is 11 images × 2 = 22 calls; stage 2 is 368 new test texts × 2 = 736 calls. Costs are from G7a's estimates, and all of it runs after the G7 verifier.
 - **Order (T90/T92):** G7a finishes → the G5 fix round → its verifier → G5 commit → G7a's wiring → the G7 verifier → routing check stage 1 → stage 2.
 - **Next, when G7a finishes (T90):** the G5 fix round (`orch-builder-core`, high, directed_by 2026-10-25T06:08:27+05:30); the brief is ready at scratchpad `g5fix_brief.md`. Then a fresh verifier on that diff (T90). **T93:** a PASS, or only findings below BLOCKER (which go on the G9 list), commits G5 without waiting; a BLOCKER stops for the developer.
 - **Done:** the G5 verifier (FIX, 05:56); G7b (06:09); the GM error-text fix (06:13).
@@ -52,6 +53,19 @@ Rebuilt at the developer's direction (turn 2026-10-25T00:08:45+05:30). Updated a
 - **G9 list, GP (T87):** GP's old ruff findings. **`evidence/` done** (T94, about 06:23; 8 findings, behaviour unchanged, committed). Any left in `inputs/` belong to G5's files.
 - **Found by the smoke call (run `smoke-t76-20261025T0601`, for the developer to place):** GM's `AnthropicTransport` keeps only the error class and status of an `APIStatusError`, so `calls.jsonl` cannot say why the API refused a request.
 - **Holdout unlock proposal** (`notes/HOLDOUT_RUN_PROPOSAL.md`, about 06:28), waiting for the developer's ruling: the phrase as is; trigger (a) main in the developer's turn, or (b) the developer's own `!` command (main recommends b); caps for the 10 holdout texts' calls (~$0.20 expected; $1 and 60 sends proposed); `orch-eval-engineer` builds it before the G9 clean-cache run.
+- **G7a's wiring proposals** (after the G5 commit; `orch-builder-core`):
+  1. vision clients and the review refusal in `pipeline.py`;
+  2. read PNGs no longer counted as skips (needed for T60);
+  3. `open_questions`, `answers` and `rejected` filled;
+  4. `calls.jsonl` and `usage.json` from GM's logs;
+  5. `IMAGE_FIELD_UNREADABLE` answers patched into `world_applied`;
+  6. the freeze check also counts `INTENT_FAILED_BUDGET` (G7b already does).
+
+  **T92 gap:** the agent report emits `committed_key`/`final_key` as reply keys. The wiring adds `committed_label`/`final_label` (the loop holds `committed_label`), and G7b's adapter compares labels.
+- **G7a's risks to rule on:**
+  1. `backup_9287`'s screenshot shows no restore cue, so it probably gets NO_STATE. Under the G5 fix's new fail-closed rule, that row would fail closed and block the freeze.
+  2. A support image with no identifiers is read as REDACTED.
+  3. `backup_9291` is named by no other input, so it is flagged and kept (T88).
 - **T95 at the G7 wiring:** `evaluation_report.md`'s generator embeds `agent_report.py`'s tool-sequence histogram and its tools on vs off sections for the fixtures (G8 included) and for the test rows that differ between arms, not only DEV (C2). The G7 verifier checks that a G8 injection fixture exercises both the code flag and the model flag (C4), and checks the prompt and tool-description parts (C1). Items (1) and (2) were sent to G7a at 06:24.
 - **G7b items to settle at the G7 wiring:**
   1. the vision file name (`VISION_ARTIFACT`, assumed `vision.json`);
