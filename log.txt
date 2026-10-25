@@ -3651,3 +3651,24 @@ directed_by=2026-10-25T05:25:29+05:30
 worktree=main
 branch=main
 repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T05:36:42+05:30] [auto] G5b T86 fixture edits checked and committed before any engine run
+
+User Prompt (verbatim, secrets redacted):
+(none: background-agent completion notice for orch-redteam, the G5b T86 follow-up, directed_by 2026-10-25T05:25:29+05:30)
+
+Agent Response Summary:
+The G5b agent applied the T86 rulings to the fixtures: assertion files for F11a and F11b, a look-alike negative case in F09, and T86 citations in F08-F10, which stay provisional. I re-ran its three checks, which pass, confirmed that no engine has run on the fixtures since, and committed the edits. No agent is running now.
+
+Actions:
+* Re-ran scratchpad g5b/collide.py (4 shared timestamps only), parse_check.py (16 OK, 1 ERROR for F11a's missing file, intended) and check_expected.py (every row OK). Both expected_assertions.json files are valid JSON. The newest runs are G5's 05:30 runs, so no engine run on the fixtures.
+* git commit (code/tests/fixtures, TASKS.md, log.txt), pushed to github main, https://github.com/iAnmolAgarwal/orchestrate-oct26-ghost-data.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26

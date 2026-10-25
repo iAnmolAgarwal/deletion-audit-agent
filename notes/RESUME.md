@@ -28,11 +28,15 @@ Both have directed_by 2026-10-25T04:39:02+05:30, and both started at 04:47. If e
 - GM: the lint output and the list of SDK 1.13.0 differences;
 - then report and stop for the developer.
 
+**G4 round 3 running** (T80): `orch-eval-engineer`, directed_by 2026-10-25T04:50:18+05:30, brief at scratchpad `g4fix3_msg.txt`.
+- Then a fresh `orch-verifier` on that diff only, in the first free slot.
+- Its non-BLOCKER findings go to the G9 list in `TASKS.md`; no fourth round.
+- Then commit the G4 fix (`code/evaluation/**`, `notes/verify/g4fix*_verify.md`).
+
+**Queued (T82):** the GM verifier (`orch-verifier`, high), brief at scratchpad `gm_verifier_brief.md`, directed_by 2026-10-25T05:03:50+05:30, in the first free slot. Also running since 05:04: G5b (`orch-redteam`, brief `g5b_brief.md`) and the G4 G9-list fixes (`orch-eval-engineer`, `g4g9_msg.txt`). Commit G5b's fixtures before G5's engine runs on them (T81).
+
 **Waiting on the developer:**
-- The G4 round-2 fix class, in `notes/verify/g4fix2_verify.md`:
-  - M1: a non-UTF-8 byte crashes `read_output`;
-  - M2: `--prev` bypasses the run-ID check.
-  The fix goes to `orch-eval-engineer`, then a fresh `orch-verifier` on that diff. After that, commit the G4 fix (`code/evaluation/**`).
+- GM's six interface choices (in the 05:05 log entry and main's message).
 - **T76 smoke call:** propose it with its cost before G7's routing check. It covers structured output, effort, a tool call and the reply cache, on `claude-sonnet-5-5` with `anthropic` 1.13.0.
 
 **Commits this session (all pushed to `github`):** `351928b` G2, `2b7efe2` checker, `3163730` GP, `ce88703` G3/T70–T74, `d9ac31e` raw check, deps and T75–T79. `ce88703` carried a corrupted copy of this file, fixed in the next commit.
