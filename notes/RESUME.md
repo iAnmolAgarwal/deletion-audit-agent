@@ -8,7 +8,7 @@ Scratchpad = `/private/tmp/claude-501/-Users-anmolagarwal-hackerrank-orchestrate
 - **Freeze:** tag `freeze-20261025` = `bca55eb` (pushed). Freeze run `freeze-test-Aplus-20261025T1629`.
 - **Holdout (done once, T124):** `holdout-20261025T1628`: status 9/10, rows exact 8/10, step F1 0.974, 18 sends, $0.197868.
 - **Reports:** published from `code/evaluation/specs/reports_final.json` (repo-relative); ledger `code/evaluation/improvements.json`.
-- **Upload files:** `~/Desktop/oct26_final/` — `code.zip` sha256 `79001ea011d8245e7128c3c8d544e640327444f6178bb2d695c909a797acd196` (from `8568391`), `output.csv` `a00ba71a…`, each with a `.sha256` file.
+- **Upload files:** `~/Desktop/oct26_final/` — `code.zip` sha256 `38b907097ff357904f12bfb92e63f8b56bb5adc06db40aaf8dc66cd56011b277` (from `d037d38`, 535 files; diff verifier PASS), `output.csv` `a00ba71a…`, each with a `.sha256` file; the previous zip `79001ea0…` is kept in `fallback-79001ea0/`.
 - **Spend:** ledger total about $15.46 (pass ≈ $13.94 + holdout $0.20 + stage 1 $1.31).
 - HEAD after T126 records: see `git log` (last code commit 8568391; later commits are docs/log only).
 
