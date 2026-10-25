@@ -16,8 +16,8 @@ from __future__ import annotations
 
 import datetime as dt
 import re
+from collections.abc import Iterable, Mapping
 from types import MappingProxyType
-from typing import Iterable, Mapping
 
 from .model import (
     FileRef,

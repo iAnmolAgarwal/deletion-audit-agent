@@ -10,8 +10,9 @@ Two layers live here:
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Literal, Mapping
+from typing import Literal
 
 IdKind = Literal["email", "phone", "email_hash", "user_id", "name", "subject_reference", "other"]
 LocatorKind = Literal["line", "sql_row", "json_path", "pdf_page", "image"]

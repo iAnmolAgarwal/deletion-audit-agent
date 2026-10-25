@@ -34,7 +34,7 @@ def parse(content: Content) -> RawFile:
         parts = [p.strip() for p in line[2:].split("|")]
         if len(parts) != len(COLUMNS):
             raise ParseError(f"line {index}: expected {len(COLUMNS)} columns")
-        fields = dict(zip(COLUMNS, parts))
+        fields = dict(zip(COLUMNS, parts, strict=False))
         records.append(RawRecord(
             locator_kind="line",
             ref=f"L{index}",

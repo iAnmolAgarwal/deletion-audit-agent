@@ -14,9 +14,9 @@ Status rules (``notes/INTERFACES.md`` section 4):
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Sequence
 from pathlib import Path
 from types import ModuleType
-from typing import Sequence
 
 from . import interpret
 from .families._common import Content

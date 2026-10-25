@@ -25,7 +25,7 @@ def load(content: Content) -> tuple[SqlTable, ...]:
 
 def row_fields(table: SqlTable, values: tuple[object, ...]) -> dict[str, str]:
     """A row's columns as raw strings."""
-    return {col: raw_value(val) for col, val in zip(table.columns, values)}
+    return {col: raw_value(val) for col, val in zip(table.columns, values, strict=False)}
 
 
 def row_time(fields: dict[str, str]) -> str | None:

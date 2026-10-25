@@ -12,8 +12,8 @@ Any breach raises :class:`SqlSafetyError`, which the caller records as status ``
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 DEFAULT_MAX_STEPS = 50_000_000      # VM instructions for loading and reading one file
 DEFAULT_MAX_ROWS = 200_000          # rows across all tables of one file

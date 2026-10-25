@@ -36,8 +36,8 @@ Rebuilt at the developer's direction (turn 2026-10-25T00:08:45+05:30). Updated a
 - **Interview prep:** removed from the plan (T37). The developer will say how to prepare once the deliverables are ready.
 
 ## Agent queue (cap: 3 at once, T79; never two of the same type)
-- **Running:** G7a (`orch-builder-core`, high, T88), since about 05:57. G8 red team (`orch-redteam`, high, T94), since 06:21; brief at scratchpad `g8_redteam_brief.md`; fixtures in `code/tests/fixtures/redteam/`, committed before any engine run. GP ruff cleanup (`orch-builder`, medium, T94), since 06:21; brief at scratchpad `gp_ruff_brief.md`.
-- **G5 fix round:** starts when G7a **and** the ruff cleanup are both done (T94 sequencing note).
+- **Running:** G7a (`orch-builder-core`, high, T88), since about 05:57. G8 red team (`orch-redteam`, high, T94), since 06:21; brief at scratchpad `g8_redteam_brief.md`; fixtures in `code/tests/fixtures/redteam/`, committed before any engine run.
+- **G5 fix round:** starts when G7a finishes. The ruff cleanup is done (06:23).
 - **Order (T90/T92):** G7a finishes → the G5 fix round → its verifier → G5 commit → G7a's wiring → the G7 verifier → routing check stage 1 → stage 2.
 - **Next, when G7a finishes (T90):** the G5 fix round (`orch-builder-core`, high, directed_by 2026-10-25T06:08:27+05:30); the brief is ready at scratchpad `g5fix_brief.md`. Then a fresh verifier on that diff (T90). **T93:** a PASS, or only findings below BLOCKER (which go on the G9 list), commits G5 without waiting; a BLOCKER stops for the developer.
 - **Done:** the G5 verifier (FIX, 05:56); G7b (06:09); the GM error-text fix (06:13).
@@ -49,7 +49,7 @@ Rebuilt at the developer's direction (turn 2026-10-25T00:08:45+05:30). Updated a
   3. schema-checker gaps (a self-referencing `$ref`, a list-valued `items`, a list-valued `properties`), all failing closed;
   4. five surviving mutants (key computed from the live body, two log entries, the settle clauses, `parse_constant`).
 - **Freeze checks (T60, T71, T87):** 0 FAILED_CLOSED rows; 0 `INTENT_FAILED_CLOSED` flags (a failed intent call in the final run is re-run until it succeeds; no row ships with intent from the fail-closed path); 0 skips (empty allow-list).
-- **G9 list, GP (T87):** GP's old ruff findings in `code/deletion_audit/evidence` and `inputs`.
+- **G9 list, GP (T87):** GP's old ruff findings. **`evidence/` done** (T94, about 06:23; 8 findings, behaviour unchanged, committed). Any left in `inputs/` belong to G5's files.
 - **Found by the smoke call (run `smoke-t76-20261025T0601`, for the developer to place):** GM's `AnthropicTransport` keeps only the error class and status of an `APIStatusError`, so `calls.jsonl` cannot say why the API refused a request.
 - **G7b items to settle at the G7 wiring:**
   1. the vision file name (`VISION_ARTIFACT`, assumed `vision.json`);

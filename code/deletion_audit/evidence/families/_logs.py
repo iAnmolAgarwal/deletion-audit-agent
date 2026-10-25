@@ -7,8 +7,8 @@ every non-blank line is timestamped and written in that family's dialect.
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 from ..model import ParseError, RawFile, RawRecord
 from ._common import Content

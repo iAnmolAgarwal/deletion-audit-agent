@@ -5,9 +5,9 @@ match. File names and the manifest ``origin`` are never consulted.
 """
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from types import ModuleType
-from typing import Sequence
 
 from .families import (
     bracketed_log,
