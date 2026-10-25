@@ -2,7 +2,7 @@
 
 The durable state is in these files. Read them first after a compaction:
 - `TASKS.md`: gate status, the agent queue, the G9 list and the freeze checks.
-- `notes/DECISIONS.md`: T1–T97, every developer ruling.
+- `notes/DECISIONS.md`: T1–T98, every developer ruling.
 - `notes/INTERFACES.md`:
   - §7 is G5's engine, amended by T68–T77; §7.1 holds its **as-built signatures**, accepted under T87.
   - §8 is GM's model client.
@@ -18,6 +18,8 @@ The durable state is in these files. Read them first after a compaction:
   | `g5_verify.md` | G5 | FIX (5 MAJOR, 0 BLOCKER); fix round approved (T90) |
 
 Scratchpad below means `/private/tmp/claude-501/-Users-anmolagarwal-hackerrank-orchestrate-october26-hackerrank-orchestrate-october26/a5e12cbe-b80b-4f4f-8569-6ab18d22f35c/scratchpad/`.
+
+**PAUSED (T98) until the developer resumes at about 10:00:** no new subagents and no paid calls. See notes/HANDOFF.md once written.
 
 ## State (06:18)
 **Committed and pushed to `github`:** everything through `d58f22f`:
