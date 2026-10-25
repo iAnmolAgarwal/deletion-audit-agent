@@ -4412,3 +4412,38 @@ parent_agent=none
 worktree=main
 branch=main
 repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T06:37:14+05:30] T97: routing and vision caps; mode-A run plan; DEV backup evidence shown
+
+User Prompt (verbatim, secrets redacted):
+1. Routing check and vision: approved as proposed. Stage 1 plus vision: caps $5 and 130 sends. Stage 2: caps $20 and 820 sends. Stop before stage 2 if anything fails. Prompt caching stays off, but before stage 2, re-project the 518-case A+ full run from the measured request sizes (turn 1 and turn 2), and show it to me with stage 1's results. If it comes out above $80, put caching back on the table then, before any test text is sent.
+
+2. After stage 2 and the vision readings pass: a mode-A run over all 518 test cases, using the cached routing and vision replies, with the loop only on cases that have an open question (cap $3). Write it to runs/ only, never --write-root, and give me its path and sha256 so I can score it. It's the same output as A+ by construction, so it tells us early whether the output is where we need it.
+
+3. Backup screenshot: decide it when the readings are in, as you suggest. My leaning, to check against DEV first: a backup with no visible restore-blocked cue is treated as having an active restore path (a finding, then BLOCK_RESTORE and VERIFY_RESTORE_BLOCKED), not as uninterpretable. That's DEV's backup pattern and SYSTEM.md's rule never to report COMPLETE while a restore path may exist. Show me what DEV's two backups' evidence showed before I rule.
+
+Time is not a factor.
+
+Agent Response Summary:
+I recorded the three rulings as T97. The paid steps run after the G7 verifier, with the caps as given, a stop and re-projection before stage 2, and the mode-A run written to runs/ only. For ruling 3, I pulled DEV's backup evidence: DEV has four backup records, and every one carries an explicit restore cue. The two findings show eligible=true / deletion_block=false or restore_allowed=1, and the two compliant ones show restore_allowed=false. DEV has no backup without a cue, so it neither confirms nor refutes the leaning. The test backup in question (case_55's backup_9287) has only the screenshot evidence_32 at or before its audit_at, since its log cue in evidence_01 comes from after audit_at.
+
+Actions:
+* Engine records (runs/g5-dev22-20261025T0530/cases.jsonl): case_09 backup_4978 RESTORABLE FINDING; case_17 backup_3245 RESTORABLE FINDING; case_26 backup_3120 and case_27 backup_5970 RESTORE_BLOCKED COMPLIANT.
+* GP parse_all over dataset/, observations for those IDs:
+  - backup_3245: evidence_01 kv_log restore_candidate_evaluated, eligible=true, deletion_block=false;
+  - backup_4978: evidence_06 json log, same event, eligible=true, deletion_block=false; and evidence_93 SQL, restore_allowed=1;
+  - backup_3120 and backup_5970: evidence_02 snapshot bundle and evidence_92 export, restore_allowed=false.
+* DEV gold via evaluation.gold.load_gold() (DEV only), the backup steps:
+  - case_09 and case_17: FINDING REPORT_RESTORE_RISK ACTIVE citing the cue file (evidence_93; evidence_01), REMEDIATION BLOCK_RESTORE BLOCKED "", VERIFICATION VERIFY_RESTORE_BLOCKED BLOCKED "";
+  - case_26 and case_27: VERIFICATION VERIFY_RESTORE_BLOCKED BLOCKED citing evidence_92.
+* Test side (no gold): backup_9287 is in case_55 (audit_at 2026-04-30T11:00:00Z), FAILED_CLOSED in g5-test, ABSENT by omission, depending on evidence_32/42/46. Its evidence_01 cue was captured 2026-09-15, after audit_at. evidence_32 (backup_restore_console_20260429.png) was captured 2026-04-29T09:00:00Z. backup_9291 is in no test case's records.
+* notes/DECISIONS.md T97; TASKS.md; notes/RESUME.md.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26

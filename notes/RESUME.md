@@ -2,7 +2,7 @@
 
 The durable state is in these files. Read them first after a compaction:
 - `TASKS.md`: gate status, the agent queue, the G9 list and the freeze checks.
-- `notes/DECISIONS.md`: T1–T96, every developer ruling.
+- `notes/DECISIONS.md`: T1–T97, every developer ruling.
 - `notes/INTERFACES.md`:
   - §7 is G5's engine, amended by T68–T77; §7.1 holds its **as-built signatures**, accepted under T87.
   - §8 is GM's model client.
@@ -44,7 +44,9 @@ Scratchpad below means `/private/tmp/claude-501/-Users-anmolagarwal-hackerrank-o
 3. A fresh verifier on that diff. **T93:** if it returns PASS or only findings below BLOCKER, commit G5 without waiting and put those findings on the G9 list. A BLOCKER stops for the developer's reply.
 4. G7a's wiring into `pipeline.py` and `artifacts.py`. `committed_key`/`final_key` must compare intent labels (T92). The `evaluation_report.md` generator embeds the tool histogram and the on vs off sections for the fixtures and differing test rows (T95 C2). G7a was sent T95 C4 (the code-side injection flag merged with the model's) and C1 (prompt files and tool descriptions) at 06:24.
 5. The G7 verifier: `orch-verifier`, high, directed_by 2026-10-25T06:15:34+05:30. Scope: G7a, G7b, the GM change and G7b's four details.
-6. The routing check, proposed first with its call count and cost. Stage 1 is DEV and the fixtures through the new transport; stage 2 is the 375 test texts, twice. Stop between the stages on any failure.
+6. The routing check and vision (approved, T97). Stage 1 is DEV and the fixtures, plus vision: $5 and 130 sends. Then stop and show the results, with a re-projection of the A+ full run from measured sizes; above $80, caching comes back for a ruling. Stage 2 is the 375 test texts, twice: $20 and 820 sends.
+7. The mode-A run on all 518 test cases from cached replies (loop cap $3), written to `runs/` only, with its path and sha256 given to the developer.
+8. The backup-screenshot rule (case_55's `backup_9287`; `evidence_32`, the only backup evidence before its audit_at), ruled when the readings are in.
 
 **Paid calls so far:** smoke `smoke-t76-20261025T0612` passed on anthropic 1.13.0 (T91). It cost $0.004964, which is the ledger total. The earlier 400 was the key's scope; `.env` now holds a workspace-scoped key.
 
