@@ -4304,3 +4304,28 @@ parent_agent=none
 worktree=main
 branch=main
 repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
+
+## [2026-10-25T06:28:21+05:30] Holdout unlock proposal for G9 (proposal only; waiting for a ruling)
+
+User Prompt (verbatim, secrets redacted):
+While the agents work: propose how the HOLDOUT EVALUATION RUN gets past pipeline.run's holdout guard at G9: the unlock phrase, who can trigger it, what it logs, and the test that proves nothing else can unlock it. Proposal only; I'll rule. That way G9 doesn't stall on it.
+
+Time is not a factor.
+
+Agent Response Summary:
+I wrote the proposal to notes/HOLDOUT_RUN_PROPOSAL.md; nothing is built. It keeps the existing phrase and check_unlock as the single source, and makes a new evaluation/holdout_run.py the only caller. That caller refuses unless the code is the frozen commit, the freeze check passes again, and no completed holdout record exists. Each unlock is logged in runs/HOLDOUT_ACCESS.log, the run's producer record, log.txt and the report. An AST test allows only gold.py, pipeline.py and holdout_run.py to touch the phrase, plus behavioural tests on synthetic data; the plain limit is that the phrase is a constant, not a secret, so the control is procedural.
+
+Actions:
+* Read code/evaluation/gold.py (UNLOCK_PHRASE, check_unlock, load_gold) and split.py. runs/HOLDOUT_ACCESS.log does not exist, so no unlock has ever been granted. A grep finds no non-test code passing holdout=True or the phrase.
+* Weak points found: the refusal message at gold.py:61 prints the phrase, and the access log lives in gitignored runs/.
+* notes/HOLDOUT_RUN_PROPOSAL.md (new); TASKS.md (pending ruling).
+* git commit of the proposal, TASKS.md and log.txt, pushed to github main.
+
+Context:
+tool=Claude Code
+model=claude-opus-5-5
+agent_type=main
+parent_agent=none
+worktree=main
+branch=main
+repo_root=/Users/anmolagarwal/hackerrank_orchestrate/october26/hackerrank-orchestrate-october26
