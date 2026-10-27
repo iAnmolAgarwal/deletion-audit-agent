@@ -4,7 +4,7 @@
 
 **A deletion-audit agent that proves whether a person's data is *really* gone.**
 
-HackerRank Orchestrate · October 2026
+**Top 10 of 4,646 globally: HackerRank Orchestrate, October 2026** (24-hour hackathon)
 
 ![Python](https://img.shields.io/badge/python-3.13%2B-3776AB?logo=python&logoColor=white)
 ![Claude Sonnet 5.5](https://img.shields.io/badge/runtime-Claude%20Sonnet%205.5-D97757)
