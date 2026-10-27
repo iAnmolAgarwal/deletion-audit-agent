@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="820" height="300" viewBox="0 0 820 300" role="img" aria-label="Scorecard: chat transcript 9.3 of 10, AI interview 25.8 of 30, output CSV 28.8 of 30, code 23.4 of 30, total 87.3 of 100">
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="300" viewBox="0 0 820 300" role="img" aria-label="Scorecard: chat transcript 9.3 of 10, AI interview 25.8 of 30, output CSV 29.1 of 30, code 23.4 of 30, total 87.6 of 100">
   <style>
     .t { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
     .h { font-size: 20px; font-weight: 600; fill: #e6edf3; }
@@ -10,13 +10,13 @@
   </style>
   <rect x="1" y="1" width="818" height="298" rx="14" fill="#0d1117" stroke="#30363d"/>
   <text class="t h" x="32" y="46">HackerRank Orchestrate · October 2026</text>
-  <text class="t s" x="32" y="68">“Ghost Data Still Exists” · live leaderboard scores, 26 Oct 2026 (final results pending)</text>
+  <text class="t s" x="32" y="68">“Ghost Data Still Exists” · leaderboard scores after output re-grading, 27 Oct 2026</text>
 
   <g transform="translate(32,104)">
     <text class="t l" x="0" y="15">Output CSV</text>
     <rect x="150" y="2" width="420" height="16" rx="8" fill="#21262d"/>
-    <rect x="150" y="2" width="403.2" height="16" rx="8" fill="#3fb950"/>
-    <text class="t v" x="586" y="15">28.8 / 30</text>
+    <rect x="150" y="2" width="407.4" height="16" rx="8" fill="#3fb950"/>
+    <text class="t v" x="586" y="15">29.1 / 30</text>
   </g>
   <g transform="translate(32,144)">
     <text class="t l" x="0" y="15">AI interview</text>
@@ -38,6 +38,6 @@
   </g>
 
   <line x1="690" y1="100" x2="690" y2="250" stroke="#30363d"/>
-  <text class="t big" x="754" y="178" text-anchor="middle">87.3</text>
+  <text class="t big" x="754" y="178" text-anchor="middle">87.6</text>
   <text class="t sub" x="754" y="204" text-anchor="middle">total / 100</text>
 </svg>

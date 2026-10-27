@@ -10,9 +10,9 @@ HackerRank Orchestrate · October 2026
 ![Claude Sonnet 5.5](https://img.shields.io/badge/runtime-Claude%20Sonnet%205.5-D97757)
 ![Built with Claude Code](https://img.shields.io/badge/built%20with-Claude%20Code%20%C2%B7%20Opus%205.5-D97757)
 ![Tests](https://img.shields.io/badge/tests-939%20passing-3fb950)
-![Output](https://img.shields.io/badge/output%20CSV-28.8%2F30-3fb950)
+![Output](https://img.shields.io/badge/output%20CSV-29.1%2F30-3fb950)
 
-<img src="docs/assets/scorecard.svg" alt="Scorecard: output 28.8/30, interview 25.8/30, code 23.4/30, transcript 9.3/10, total 87.3/100" width="760">
+<img src="docs/assets/scorecard.svg" alt="Scorecard: output 29.1/30, interview 25.8/30, code 23.4/30, transcript 9.3/10, total 87.6/100" width="760">
 
 </div>
 
@@ -79,7 +79,7 @@ Every number names the run that produced it; the reports are generated from run 
 | Final run | 0 model calls: a byte-exact replay from the reply cache | `freeze-test-Aplus-20261025T1629` |
 
 <div align="center">
-<img src="docs/assets/output-by-season.svg" alt="Output CSV score by season: June 14.4, August 18.0, September 15.6, October 28.8" width="760">
+<img src="docs/assets/output-by-season.svg" alt="Output CSV score by season: June 14.4, August 18.0, September 15.6, October 29.1" width="760">
 </div>
 
 ## Run it
